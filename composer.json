@@ -2,7 +2,7 @@
     "name": "simbiat/cron",
     "type": "library",
     "keywords": ["cron","php","scheduler"],
-    "description": "Set of classes for database pool and helper.",
+    "description": "Cron utilizing a database to store tasks.",
     "homepage": "https://github.com/Simbiat/cron",
     "license": "AGPL-3.0-or-later",
     "authors": [
