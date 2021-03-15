@@ -1,0 +1,29 @@
+{
+    "name": "simbiat/cron",
+    "type": "library",
+    "keywords": ["cron","php","scheduler"],
+    "description": "Set of classes for database pool and helper.",
+    "homepage": "https://github.com/Simbiat/cron",
+    "license": "AGPL-3.0-or-later",
+    "authors": [
+        {
+            "name": "Dmitry Kustov",
+            "email": "simbiat@outlook.com",
+            "homepage": "https://simbiat.ru",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": "^8",
+        "simbiat/database": "^2"
+    },
+    "autoload": {
+        "psr-4": {
+            "Simbiat\\": "src/"
+        }
+    },
+	"support": {
+		"issues": "https://github.com/Simbiat/cron/issues",
+		"source": "https://github.com/Simbiat/cron"
+	}
+}
