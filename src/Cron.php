@@ -113,15 +113,15 @@ class Cron
                     return false;
                 }
                 #Update last run
-                self::$dbController->query('UPDATE `'.self::$prefix.'schedule` SET `status`= 1, `lastrun` = UTC_TIMESTAMP() WHERE `task`=:task AND `arguments` '.(empty($task['arguments']) ? 'IS' : '=').' :arguments', [
-                    ':task' => [$task['task'], 'string'],
-                    ':arguments' => [$task['arguments'], (empty($task['arguments']) ? 'null' : 'string')],
-                ]);
+                #self::$dbController->query('UPDATE `'.self::$prefix.'schedule` SET `status`= 1, `lastrun` = UTC_TIMESTAMP() WHERE `task`=:task AND `arguments` '.(empty($task['arguments']) ? 'IS' : '=').' :arguments', [
+                #    ':task' => [$task['task'], 'string'],
+                #    ':arguments' => [$task['arguments'], (empty($task['arguments']) ? 'null' : 'string')],
+                #]);
                 #Check if object is required
                 if (!empty($task['object'])) {
                     #Check if parameters for the object are set
                     if (!empty($task['parameters'])) {
-                        $task['parameters'] = json_decode($task['parameters']);
+                        $task['parameters'] = json_decode($task['parameters'], true);
                         #Check if extra methods are set
                         if (!empty($task['parameters']['extramethods'])) {
                             #Separate extra methods
@@ -140,8 +140,17 @@ class Cron
                     if (!empty($extramethods)) {
                         foreach ($extramethods as $method) {
                             #Check if method value is present, skip the method, if not
-                            
+                            if (empty($method['method']) || !is_string($method['method'])) {
+                                continue;
+                            }
                             #Check for arguments for the method
+                            if (empty($method['arguments']) || !is_array($method['arguments'])) {
+                                #Call without arguments
+                                $object = $object->{$method['method']}();
+                            } else {
+                                #Call with arguments
+                                $object = $object->{$method['method']}(...$method['arguments']);
+                            }
                         }
                     }
                 }
@@ -156,7 +165,7 @@ class Cron
                     #Register error
                     $this->error('Function is not callable', $task['task'], $task['arguments']);
                     #Reschedule
-                    $this->reSchedule($task['task'], $task['arguments'], $task['schedule'], false);
+                    $this->reSchedule($task['task'], $task['arguments'], $task['nextrun'], $task['frequency'], false);
                     return false;
                 }
                 #Run function
@@ -164,7 +173,7 @@ class Cron
                     $result = call_user_func($function);
                 } else {
                     #Decode arguments
-                    $arguments = json_decode($task['arguments']);
+                    $arguments = json_decode($task['arguments'], true);
                     if (is_array($arguments)) {
                         $result = call_user_func_array($function, $arguments);
                     } else {
@@ -173,7 +182,7 @@ class Cron
                 }
                 #Decode allowed returns if any
                 if (!empty($task['allowedreturns'])) {
-                    $task['allowedreturns'] = json_decode($task['allowedreturns']);
+                    $task['allowedreturns'] = json_decode($task['allowedreturns'], true);
                     #Check that it's an array
                     if (!is_array($task['allowedreturns'])) {
                         #Remove it as invalid value
@@ -190,8 +199,8 @@ class Cron
                     #Override the value
                     $result = true;
                 } else {
-                    #Register error
-                    $this->error(strval($result), $task['task'], $task['arguments']);
+                    #Register error. Strval is silenced to avoid warning in case result is an array or object, that can't be converted
+                    $this->error(@strval($result), $task['task'], $task['arguments']);
                     $result = false;
                 }
             }
@@ -203,7 +212,7 @@ class Cron
                 ]);
             }
             #Reschedule
-            $this->reSchedule($task['task'], $task['arguments'], $task['schedule'], $result);
+            $this->reSchedule($task['task'], $task['arguments'], $task['nextrun'], $task['frequency'], $result);
             #Return
             return $result;
         } else {
@@ -211,15 +220,15 @@ class Cron
         }
     }
     
-    #Schedule a task or update its schedule
-    public function add(string $task, mixed $arguments = NULL, int|string $schedule = 0, int $priority = 0, ?string $message = NULL, int $time = 0): bool
+    #Schedule a task or update its frequency
+    public function add(string $task, mixed $arguments = NULL, int|string $frequency = 0, int $priority = 0, ?string $message = NULL, int $time = 0): bool
     {
         if (self::$dbReady) {
             #Sanitize arguments
             $arguments = $this->sanitize($arguments);
-            $schedule = intval($schedule);
-            if ($schedule < 0) {
-                $schedule = 0;
+            $frequency = intval($frequency);
+            if ($frequency < 0) {
+                $frequency = 0;
             }
             if ($priority < 0) {
                 $priority = 0;
@@ -229,10 +238,10 @@ class Cron
             if ($time <= 0) {
                 $time = time();
             }
-            return self::$dbController->query('INSERT INTO `'.self::$prefix.'schedule`(`task`, `arguments`, `schedule`, `priority`, `message`, `nextrun`) VALUES (:task, :arguments, :schedule, :priority, :message, :nextrun) ON DUPLICATE KEY UPDATE `schedule`=:schedule, `nextrun`=:nextrun, `priority`=:priority, `message`=:message, `updated`=UTC_TIMESTAMP();', [
+            return self::$dbController->query('INSERT INTO `'.self::$prefix.'schedule` (`task`, `arguments`, `frequency`, `priority`, `message`, `nextrun`) VALUES (:task, :arguments, :frequency, :priority, :message, :nextrun) ON DUPLICATE KEY UPDATE `frequency`=:frequency, `nextrun`=:nextrun, `priority`=:priority, `message`=:message, `updated`=UTC_TIMESTAMP();', [
                 ':task' => [$task, 'string'],
                 ':arguments' => [$arguments, (empty($arguments) ? 'null' : 'string')],
-                ':schedule' => [$schedule, 'int'],
+                ':frequency' => [$frequency, 'int'],
                 ':priority' => [$priority, 'int'],
                 ':message' => [$message, (empty($message) ? 'null' : 'string')],
                 ':nextrun' => [$time, 'time'],
@@ -257,23 +266,33 @@ class Cron
         }
     }
     
-    #Add task type
-    public function addTask(): bool
+    #Add (or update) task type
+    public function addTask(string $task, string $function, ?string $object = NULL, mixed $parameters = NULL, mixed $returns = NULL, ?string $desc = NULL): bool
     {
         if (self::$dbReady) {
-            #Sanitize arguments
-            $arguments = $this->sanitize($arguments);
+            #Sanitize parameters and return
+            $parameters = $this->sanitize($parameters);
+            $returns = $this->sanitize($returns);
+            return self::$dbController->query('INSERT INTO `cron__tasks`(`task`, `function`, `object`, `parameters`, `allowedreturns`, `description`) VALUES (\':task\', \':function\', \':object\', \':parameters\', \':returns\', \':desc\') ON DUPLICATE KEY UPDATE `function`=:function, `object`=:object, `parameters`=:parameters, `allowedreturns`=:returns, `description`=:desc;', [
+                ':task' => [$task, 'string'],
+                ':function' => [$function, 'string'],
+                ':object' => [$object, 'string'],
+                ':parameters' => [$parameters, (empty($parameters) ? 'null' : 'string')],
+                ':returns' => [$returns, (empty($returns) ? 'null' : 'string')],
+                ':desc' => [$desc, 'string'],
+            ]);
         } else {
             return false;
         }
     }
     
     #Delete task type
-    public function deleteTask(): bool
+    public function deleteTask(string $task): bool
     {
         if (self::$dbReady) {
-            #Sanitize arguments
-            $arguments = $this->sanitize($arguments);
+            return self::$dbController->query('DELETE FROM `cron__tasks` WHERE `task`=:task;', [
+                ':task' => [$task, 'string'],
+            ]);
         } else {
             return false;
         }
@@ -283,7 +302,7 @@ class Cron
     public function unHang(): bool
     {
         if (self::$dbReady) {
-            return self::$dbController->query('UPDATE `'.self::$prefix.'schedule` SET `status`=0, `nextrun`=TIMESTAMPADD(SECOND, IF(`schedule`>0, `schedule`, :retry), CONCAT(UTC_DATE(), DATE_FORMAT(`nextrun`, \' %H:%i:%S.%u\'))) WHERE `status`=1 AND UTC_TIMESTAMP()>DATE_ADD(`lastrun`, INTERVAL :maxtime SECOND);', [
+            return self::$dbController->query('UPDATE `'.self::$prefix.'schedule` SET `status`=0, `nextrun`=TIMESTAMPADD(SECOND, IF(`frequency` > 0, IF(CEIL(TIME_TO_SEC(TIMEDIFF(UTC_TIMESTAMP(), `nextrun`))/`frequency`) > 0, CEIL(TIME_TO_SEC(TIMEDIFF(UTC_TIMESTAMP(), `nextrun`))/`frequency`), 1)*`frequency`, :retry), `nextrun`) WHERE `status`=1 AND UTC_TIMESTAMP()>DATE_ADD(`lastrun`, INTERVAL :maxtime SECOND);', [
                 ':retry' => [self::$retryTime, 'int'],
                 ':maxtime' => [self::$maxTime, 'int'],
             ]);
@@ -305,18 +324,18 @@ class Cron
     }
     
     #Reschedule a task (or remove it if it's onetime)
-    private function reSchedule(string $task, mixed $arguments = NULL, int|string $schedule = 0, bool $result = true): bool
+    private function reSchedule(string $task, mixed $arguments = NULL, int|string $prevrun, int|string $frequency = 0, bool $result = true): bool
     {
         if (self::$dbReady) {
             #Ensure schedule is INT
-            $schedule = intval($schedule);
+            $frequency = intval($frequency);
             #Check whether this is a successful one-time job
-            if ($schedule === 0 && $result === true) {
+            if ($frequency === 0 && $result === true) {
                 #Since this is a one-time task, we can just remove it
                 return $this->delete($task, $arguments);
             } else {
                 #Actually reschedule. One task time task will be rescheduled for the retry time from settings
-                return self::$dbController->query('UPDATE `'.self::$prefix.'schedule` SET `status`=0, `nextrun`=TIMESTAMPADD(SECOND, IF(`schedule`>0, `schedule`, :time), CONCAT(UTC_DATE(), DATE_FORMAT(`nextrun`, \' %H:%i:%S.%u\'))) WHERE `task`=:task AND `arguments` '.(empty($arguments) ? 'IS' : '=').' :arguments', [
+                return self::$dbController->query('UPDATE `'.self::$prefix.'schedule` SET `status`=0, `nextrun`=TIMESTAMPADD(SECOND, IF(`frequency` > 0, IF(CEIL(TIME_TO_SEC(TIMEDIFF(UTC_TIMESTAMP(), `nextrun`))/`frequency`) > 0, CEIL(TIME_TO_SEC(TIMEDIFF(UTC_TIMESTAMP(), `nextrun`))/`frequency`), 1)*`frequency`, :time), `nextrun`) WHERE `task`=:task AND `arguments` '.(empty($arguments) ? 'IS' : '=').' :arguments', [
                     ':time' => [self::$retryTime, 'int'],
                     ':task' => [$task, 'string'],
                     ':arguments' => [$arguments, (empty($arguments) ? 'null' : 'string')],
@@ -364,7 +383,7 @@ class Cron
             #Check if string
             if (is_string($arguments)) {
                 #Check if JSON
-                $json = json_decode($arguments);
+                $json = json_decode($arguments, true);
                 #If it is a JSON - return it as is
                 if (json_last_error() === JSON_ERROR_NONE) {
                     return $arguments;
