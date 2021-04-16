@@ -18,6 +18,9 @@ class Cron
     public static int $maxTime = 3600;
     #Errors life
     public static int $errorLife = 30;
+    #SSE settings
+    public static bool $sseLoop = false;
+    public static int $sseRetry = 10000;
     #CLI mode flag
     private static $CLI = false;
     
@@ -37,11 +40,22 @@ class Cron
                 if (!empty($settings['enabled'])) {
                     self::$enabled = boolval($settings['enabled']);
                 }
+                #Update SSE loop flag
+                if (!empty($settings['sseLoop'])) {
+                    self::$sseLoop = boolval($settings['sseLoop']);
+                }
                 #Update retry time
                 if (!empty($settings['retry'])) {
                     $settings['retry'] = intval($settings['retry']);
                     if ($settings['retry'] > 0) {
                         self::$retryTime = $settings['retry'];
+                    }
+                }
+                #Update SSE retry time
+                if (!empty($settings['sseRetry'])) {
+                    $settings['sseRetry'] = intval($settings['sseRetry']);
+                    if ($settings['sseRetry'] > 0) {
+                        self::$retryTime = $settings['sseRetry'];
                     }
                 }
                 #Update maximum time
@@ -69,12 +83,30 @@ class Cron
     #Process the items
     public function process(int $items = 1): bool
     {
+        #ALlow long runs
+        set_time_limit(0);
+        #Start stream if not in CLI
+        if (self::$CLI === false) {
+            ignore_user_abort(true);
+            header('Content-Type: text/event-stream');
+            header('Transfer-Encoding:chunked');
+            #Forbid caching, since stream is not supposed to be cached
+            header('Cache-Control: no-cache');
+            $this->streamEcho('Cron processing started', 'CronStart');
+        }
         #Regular maintenance
         if (self::$dbReady) {
             #Reschedule hanged jobs
             $this->unHang();
             #Clean old errors
             $this->errorPurge();
+        } else {
+            #Notify of end of stream
+            if (self::$CLI === false) {
+                $this->streamEcho('Cron database not available', 'CronFail');
+                header('Connection: close');
+            }
+            return false;
         }
         #Check if cron is enabled and process only if it is
         if (self::$enabled) {
@@ -82,15 +114,52 @@ class Cron
             if ($items < 1) {
                 $items = 1;
             }
-            #Get tasks
-            $tasks = self::$dbController->SelectAll('SELECT `'.self::$prefix.'schedule`.`task`, `arguments` FROM `'.self::$prefix.'schedule` INNER JOIN `'.self::$prefix.'tasks` ON `'.self::$prefix.'schedule`.`task`=`'.self::$prefix.'tasks`.`task` WHERE `status`=0 AND `function`<>\'\' AND `function` IS NOT NULL AND `nextrun`<=UTC_TIMESTAMP() ORDER BY `priority` DESC, `nextrun` ASC LIMIT '.$items);
-            if (is_array($tasks) && !empty($tasks)) {
-                foreach ($tasks as $task) {
-                    $this->runTask($task['task'], $task['arguments']);
+            #Generate random ID
+            $randomid = bin2hex(random_bytes(15));
+            do {
+                #Queue tasks for this random ID
+                if (self::$dbController->query('UPDATE `'.self::$prefix.'schedule` INNER JOIN `'.self::$prefix.'tasks` ON `'.self::$prefix.'schedule`.`task`=`'.self::$prefix.'tasks`.`task` SET `status`=1, `runby`=\''.$randomid.'\' WHERE `status`<>2 AND `function`<>\'\' AND `function` IS NOT NULL AND `nextrun`<=UTC_TIMESTAMP() ORDER BY `priority` DESC, `nextrun` ASC LIMIT '.$items) !== true) {
+                    #Notify of end of stream
+                    if (self::$CLI === false) {
+                        $this->streamEcho('Cron processing failed', 'CronFail');
+                        header('Connection: close');
+                    }
+                    return false;
                 }
+                #Get tasks
+                $tasks = self::$dbController->SelectAll('SELECT `'.self::$prefix.'schedule`.`task`, `arguments`, `message` FROM `'.self::$prefix.'schedule` INNER JOIN `'.self::$prefix.'tasks` ON `'.self::$prefix.'schedule`.`task`=`'.self::$prefix.'tasks`.`task` WHERE `runby`=\''.$randomid.'\' ORDER BY `priority` DESC, `nextrun` ASC');
+                if (is_array($tasks) && !empty($tasks)) {
+                    foreach ($tasks as $task) {
+                        #Notify of the task starting
+                        if (self::$CLI === false) {
+                            $this->streamEcho((empty($task['message']) ? $task['task'].' starting' : $task['message']), 'CronTaskStart');
+                        }
+                        $result = $this->runTask($task['task'], $task['arguments']);
+                        #Notify of the task finishing
+                        if (self::$CLI === false) {
+                            if ($result) {
+                                $this->streamEcho($task['task'].' finished', 'CronTaskEnd');
+                            } else {
+                                $this->streamEcho($task['task'].' failed', 'CronTaskFail');
+                            }
+                        }
+                    }
+                } else {
+                    $this->streamEcho('Cron list is empty', 'CronEempty');
+                }
+            } while (self::$sseLoop === true && connection_status() === 0);
+            #Notify of end of stream
+            if (self::$CLI === false) {
+                $this->streamEcho('Cron processing finished', 'CronEnd');
+                header('Connection: close');
             }
             return true;
         } else {
+            #Notify of end of stream
+            if (self::$CLI === false) {
+                $this->streamEcho('Cron processing is disabled', 'CronFail');
+                header('Connection: close');
+            }
             return false;
         }
     }
@@ -105,7 +174,7 @@ class Cron
             $result = false;
             try {
                 #Get full details
-                $task = self::$dbController->SelectRow('SELECT * FROM `'.self::$prefix.'schedule` INNER JOIN `'.self::$prefix.'tasks` ON `'.self::$prefix.'schedule`.`task`=`'.self::$prefix.'tasks`.`task` WHERE `status`=0 AND `function`<>\'\' AND `function` IS NOT NULL AND `'.self::$prefix.'schedule`.`task`=:task AND `arguments` '.(empty($arguments) ? 'IS' : '=').' :arguments', [
+                $task = self::$dbController->SelectRow('SELECT * FROM `'.self::$prefix.'schedule` INNER JOIN `'.self::$prefix.'tasks` ON `'.self::$prefix.'schedule`.`task`=`'.self::$prefix.'tasks`.`task` WHERE `status`<>2 AND `function`<>\'\' AND `function` IS NOT NULL AND `'.self::$prefix.'schedule`.`task`=:task AND `arguments` '.(empty($arguments) ? 'IS' : '=').' :arguments', [
                     ':task' => [$task, 'string'],
                     ':arguments' => [$arguments, (empty($arguments) ? 'null' : 'string')]
                 ]);
@@ -113,10 +182,10 @@ class Cron
                     return false;
                 }
                 #Update last run
-                #self::$dbController->query('UPDATE `'.self::$prefix.'schedule` SET `status`= 1, `lastrun` = UTC_TIMESTAMP() WHERE `task`=:task AND `arguments` '.(empty($task['arguments']) ? 'IS' : '=').' :arguments', [
-                #    ':task' => [$task['task'], 'string'],
-                #    ':arguments' => [$task['arguments'], (empty($task['arguments']) ? 'null' : 'string')],
-                #]);
+                self::$dbController->query('UPDATE `'.self::$prefix.'schedule` SET `status`= 2, `lastrun` = UTC_TIMESTAMP() WHERE `task`=:task AND `arguments` '.(empty($task['arguments']) ? 'IS' : '=').' :arguments', [
+                    ':task' => [$task['task'], 'string'],
+                    ':arguments' => [$task['arguments'], (empty($task['arguments']) ? 'null' : 'string')],
+                ]);
                 #Check if object is required
                 if (!empty($task['object'])) {
                     #Check if parameters for the object are set
@@ -206,7 +275,7 @@ class Cron
             }
             if ($result === true) {
                 #Update last successful run time
-                self::$dbController->query('UPDATE `'.self::$prefix.'schedule` SET `lastsuccess` = UTC_TIMESTAMP() WHERE `task`=:task AND `arguments` '.(empty($task['arguments']) ? 'IS' : '=').' :arguments', [
+                self::$dbController->query('UPDATE `'.self::$prefix.'schedule` SET `lastsuccess` = UTC_TIMESTAMP(), `runby`=NULL WHERE `task`=:task AND `arguments` '.(empty($task['arguments']) ? 'IS' : '=').' :arguments', [
                     ':task' => [$task['task'], 'string'],
                     ':arguments' => [$task['arguments'], (empty($task['arguments']) ? 'null' : 'string')],
                 ]);
@@ -302,7 +371,7 @@ class Cron
     public function unHang(): bool
     {
         if (self::$dbReady) {
-            return self::$dbController->query('UPDATE `'.self::$prefix.'schedule` SET `status`=0, `nextrun`=TIMESTAMPADD(SECOND, IF(`frequency` > 0, IF(CEIL(TIME_TO_SEC(TIMEDIFF(UTC_TIMESTAMP(), `nextrun`))/`frequency`) > 0, CEIL(TIME_TO_SEC(TIMEDIFF(UTC_TIMESTAMP(), `nextrun`))/`frequency`), 1)*`frequency`, :retry), `nextrun`) WHERE `status`=1 AND UTC_TIMESTAMP()>DATE_ADD(`lastrun`, INTERVAL :maxtime SECOND);', [
+            return self::$dbController->query('UPDATE `'.self::$prefix.'schedule` SET `status`=0, `runby`=NULL, `nextrun`=TIMESTAMPADD(SECOND, IF(`frequency` > 0, IF(CEIL(TIME_TO_SEC(TIMEDIFF(UTC_TIMESTAMP(), `nextrun`))/`frequency`) > 0, CEIL(TIME_TO_SEC(TIMEDIFF(UTC_TIMESTAMP(), `nextrun`))/`frequency`), 1)*`frequency`, :retry), `nextrun`) WHERE `status`<>0 AND UTC_TIMESTAMP()>DATE_ADD(`lastrun`, INTERVAL :maxtime SECOND);', [
                 ':retry' => [self::$retryTime, 'int'],
                 ':maxtime' => [self::$maxTime, 'int'],
             ]);
@@ -335,7 +404,7 @@ class Cron
                 return $this->delete($task, $arguments);
             } else {
                 #Actually reschedule. One task time task will be rescheduled for the retry time from settings
-                return self::$dbController->query('UPDATE `'.self::$prefix.'schedule` SET `status`=0, `nextrun`=TIMESTAMPADD(SECOND, IF(`frequency` > 0, IF(CEIL(TIME_TO_SEC(TIMEDIFF(UTC_TIMESTAMP(), `nextrun`))/`frequency`) > 0, CEIL(TIME_TO_SEC(TIMEDIFF(UTC_TIMESTAMP(), `nextrun`))/`frequency`), 1)*`frequency`, :time), `nextrun`) WHERE `task`=:task AND `arguments` '.(empty($arguments) ? 'IS' : '=').' :arguments', [
+                return self::$dbController->query('UPDATE `'.self::$prefix.'schedule` SET `status`=0, `runby`=NULL, `nextrun`=TIMESTAMPADD(SECOND, IF(`frequency` > 0, IF(CEIL(TIME_TO_SEC(TIMEDIFF(UTC_TIMESTAMP(), `nextrun`))/`frequency`) > 0, CEIL(TIME_TO_SEC(TIMEDIFF(UTC_TIMESTAMP(), `nextrun`))/`frequency`), 1)*`frequency`, :time), `nextrun`) WHERE `task`=:task AND `arguments` '.(empty($arguments) ? 'IS' : '=').' :arguments', [
                     ':time' => [self::$retryTime, 'int'],
                     ':task' => [$task, 'string'],
                     ':arguments' => [$arguments, (empty($arguments) ? 'null' : 'string')],
@@ -394,10 +463,10 @@ class Cron
         }
     }
     
-    public function streamEcho(string $data = '', string $event = 'Status'): void
+    #Helper function to output event stream data
+    private function streamEcho(?string $message = '', string $event = 'Status'): void
     {
-        header('Content-Type: text/event-stream');
-        echo "retry: 10000\nid: ".time()."\n".(empty($event) ? '' : 'event: '.$event."\n").'data: '.$data."\n\n";
+        echo 'retry: '.self::$sseRetry."\n".'id: '.hrtime(true)."\n".(empty($event) ? '' : 'event: '.$event."\n").'data: '.$message."\n\n";
         ob_flush();
 		flush();
     }
