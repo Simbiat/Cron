@@ -13,18 +13,20 @@ class Cron
     #Flag to indicate, that we are maintenance
     public static bool $enabled = false;
     #Retry time
-    public static int $retryTime = 3600;
+    public static int $retry = 3600;
     #Maximum job time
-    public static int $maxTime = 3600;
+    public static int $maxtime = 3600;
     #Errors life
-    public static int $errorLife = 30;
+    public static int $errorlife = 30;
     #SSE settings
     public static bool $sseLoop = false;
     public static int $sseRetry = 10000;
     #CLI mode flag
     private static $CLI = false;
+    #Supported settings
+    public array $settings = ['enabled', 'errorlife', 'maxtime', 'retry', 'sseLoop', 'sseRetry'];
     
-    public function __construct(string $prefix = 'cron__')
+    public function __construct(string $prefix = 'cron__', bool $installed = true)
     {
         #Update prefix
         self::$prefix = $prefix;
@@ -34,6 +36,13 @@ class Cron
                 self::$dbReady = true;
                 #Cache controller
                 self::$dbController = (new \Simbiat\Database\Controller);
+                #Install tables
+                if ($installed === false) {
+                    $install = $this->install();
+                    if ($install !== true) {
+                        throw new \UnexpectedValueException('Failed to install tables for CRON');
+                    }
+                }
                 #Get settings
                 $settings = self::$dbController->selectPair('SELECT `setting`, `value` FROM `'.self::$prefix.'settings`');
                 #Update enabled flag
@@ -48,28 +57,28 @@ class Cron
                 if (!empty($settings['retry'])) {
                     $settings['retry'] = intval($settings['retry']);
                     if ($settings['retry'] > 0) {
-                        self::$retryTime = $settings['retry'];
+                        self::$retry = $settings['retry'];
                     }
                 }
                 #Update SSE retry time
                 if (!empty($settings['sseRetry'])) {
                     $settings['sseRetry'] = intval($settings['sseRetry']);
                     if ($settings['sseRetry'] > 0) {
-                        self::$retryTime = $settings['sseRetry'];
+                        self::$retry = $settings['sseRetry'];
                     }
                 }
                 #Update maximum time
                 if (!empty($settings['maxtime'])) {
                     $settings['maxtime'] = intval($settings['maxtime']);
                     if ($settings['maxtime'] > 0) {
-                        self::$maxTime = $settings['maxtime'];
+                        self::$maxtime = $settings['maxtime'];
                     }
                 }
                 #Update maximum time
                 if (!empty($settings['errorlife'])) {
                     $settings['errorlife'] = intval($settings['errorlife']);
                     if ($settings['errorlife'] > 0) {
-                        self::$errorLife = $settings['errorlife'];
+                        self::$errorlife = $settings['errorlife'];
                     }
                 }
             }
@@ -89,7 +98,7 @@ class Cron
         if (self::$CLI === false) {
             ignore_user_abort(true);
             header('Content-Type: text/event-stream');
-            header('Transfer-Encoding:chunked');
+            header('Transfer-Encoding: chunked');
             #Forbid caching, since stream is not supposed to be cached
             header('Cache-Control: no-cache');
             $this->streamEcho('Cron processing started', 'CronStart');
@@ -110,50 +119,82 @@ class Cron
         }
         #Check if cron is enabled and process only if it is
         if (self::$enabled) {
-            #Sanitize number of items
-            if ($items < 1) {
-                $items = 1;
-            }
-            #Generate random ID
-            $randomid = bin2hex(random_bytes(15));
-            do {
-                #Queue tasks for this random ID
-                if (self::$dbController->query('UPDATE `'.self::$prefix.'schedule` INNER JOIN `'.self::$prefix.'tasks` ON `'.self::$prefix.'schedule`.`task`=`'.self::$prefix.'tasks`.`task` SET `status`=1, `runby`=\''.$randomid.'\' WHERE `status`<>2 AND `function`<>\'\' AND `function` IS NOT NULL AND `nextrun`<=UTC_TIMESTAMP() ORDER BY `priority` DESC, `nextrun` ASC LIMIT '.$items) !== true) {
-                    #Notify of end of stream
-                    if (self::$CLI === false) {
-                        $this->streamEcho('Cron processing failed', 'CronFail');
-                        header('Connection: close');
-                    }
-                    return false;
+            try {
+                #Sanitize number of items
+                if ($items < 1) {
+                    $items = 1;
                 }
-                #Get tasks
-                $tasks = self::$dbController->SelectAll('SELECT `'.self::$prefix.'schedule`.`task`, `arguments`, `message` FROM `'.self::$prefix.'schedule` INNER JOIN `'.self::$prefix.'tasks` ON `'.self::$prefix.'schedule`.`task`=`'.self::$prefix.'tasks`.`task` WHERE `runby`=\''.$randomid.'\' ORDER BY `priority` DESC, `nextrun` ASC');
-                if (is_array($tasks) && !empty($tasks)) {
-                    foreach ($tasks as $task) {
-                        #Notify of the task starting
+                #Generate random ID
+                $randomid = bin2hex(random_bytes(15));
+                do {
+                    #Queue tasks for this random ID
+                    if (self::$dbController->query('UPDATE `'.self::$prefix.'schedule` INNER JOIN `'.self::$prefix.'tasks` ON `'.self::$prefix.'schedule`.`task`=`'.self::$prefix.'tasks`.`task` SET `status`=1, `runby`=\''.$randomid.'\' WHERE `status`<>2 AND `function`<>\'\' AND `function` IS NOT NULL AND `nextrun`<=UTC_TIMESTAMP() ORDER BY `priority` DESC, `nextrun` ASC LIMIT '.$items) !== true) {
+                        #Notify of end of stream
                         if (self::$CLI === false) {
-                            $this->streamEcho((empty($task['message']) ? $task['task'].' starting' : $task['message']), 'CronTaskStart');
+                            $this->streamEcho('Cron processing failed', 'CronFail');
+                            header('Connection: close');
                         }
-                        $result = $this->runTask($task['task'], $task['arguments']);
-                        #Notify of the task finishing
+                        return false;
+                    }
+                    #Get tasks
+                    $tasks = self::$dbController->SelectAll('SELECT `'.self::$prefix.'schedule`.`task`, `arguments`, `frequency`, `dayofmonth`, `dayofweek`, `message`, `nextrun` FROM `'.self::$prefix.'schedule` INNER JOIN `'.self::$prefix.'tasks` ON `'.self::$prefix.'schedule`.`task`=`'.self::$prefix.'tasks`.`task` WHERE `runby`=\''.$randomid.'\' ORDER BY `priority` DESC, `nextrun` ASC');
+                    if (is_array($tasks) && !empty($tasks)) {
+                        foreach ($tasks as $task) {
+                            #Check for day restrictions
+                            if ((!empty($task['dayofmonth']) || !empty($task['dayofweek'])) && ($this->dayOfCheck($task['dayofmonth'], true) === false || $this->dayOfCheck($task['dayofweek'], false))) {
+                                #Reschedule
+                                $this->reSchedule($task['task'], $task['arguments'], $task['nextrun'], $task['frequency'], false);
+                                #Notify of the task skipping
+                                if (self::$CLI === false) {
+                                    $this->streamEcho($task['task'].' skipped due to day restrictions', 'CronTaskSkip');
+                                }
+                                #Skip
+                                continue;
+                            }
+                            #Notify of the task starting
+                            if (self::$CLI === false) {
+                                $this->streamEcho((empty($task['message']) ? $task['task'].' starting' : $task['message']), 'CronTaskStart');
+                            }
+                            $result = $this->runTask($task['task'], $task['arguments']);
+                            #Notify of the task finishing
+                            if (self::$CLI === false) {
+                                if ($result) {
+                                    $this->streamEcho($task['task'].' finished', 'CronTaskEnd');
+                                } else {
+                                    $this->streamEcho($task['task'].' failed', 'CronTaskFail');
+                                }
+                            }
+                        }
+                    } else {
                         if (self::$CLI === false) {
-                            if ($result) {
-                                $this->streamEcho($task['task'].' finished', 'CronTaskEnd');
+                            $this->streamEcho('Cron list is empty', 'CronEempty');
+                            #Sleep for a bit
+                            if (self::$sseRetry > 1000000) {
+                                sleep(self::$sseRetry/1000);
                             } else {
-                                $this->streamEcho($task['task'].' failed', 'CronTaskFail');
+                                usleep(self::$sseRetry);
                             }
                         }
                     }
-                } else {
-                    $this->streamEcho('Cron list is empty', 'CronEempty');
+                    #Additionally reschedule hanged jobs if we're in SSE
+                    if (self::$CLI === false && self::$sseLoop === true) {
+                        $this->unHang();
+                    }
+                } while (self::$sseLoop === true && connection_status() === 0);
+                #Notify of end of stream
+                if (self::$CLI === false) {
+                    $this->streamEcho('Cron processing finished', 'CronEnd');
+                    header('Connection: close');
                 }
-            } while (self::$sseLoop === true && connection_status() === 0);
-            #Notify of end of stream
-            if (self::$CLI === false) {
-                $this->streamEcho('Cron processing finished', 'CronEnd');
-                header('Connection: close');
+                return true;
+            } catch(Exception $e) {
+                #Notify of end of stream
+                if (self::$CLI === false) {
+                    $this->streamEcho('Cron processing failed', 'CronEnd');
+                    header('Connection: close');
+                }
+                return false;
             }
-            return true;
         } else {
             #Notify of end of stream
             if (self::$CLI === false) {
@@ -165,7 +206,7 @@ class Cron
     }
     
     #Run the function based on the task details
-    public function runTask(string $task, mixed $arguments = NULL): bool
+    public function runTask(string $task, null|array|string $arguments = NULL): bool
     {
         if (self::$enabled) {
             #Sanitize arguments
@@ -191,12 +232,16 @@ class Cron
                     #Check if parameters for the object are set
                     if (!empty($task['parameters'])) {
                         $task['parameters'] = json_decode($task['parameters'], true);
-                        #Check if extra methods are set
-                        if (!empty($task['parameters']['extramethods'])) {
-                            #Separate extra methods
-                            $extramethods = $task['parameters']['extramethods'];
-                            #Remove them from original
-                            unset($task['parameters']['extramethods']);
+                        if (is_array($task['parameters'])) {
+                            #Check if extra methods are set
+                            if (!empty($task['parameters']['extramethods'])) {
+                                #Separate extra methods
+                                $extramethods = $task['parameters']['extramethods'];
+                                #Remove them from original
+                                unset($task['parameters']['extramethods']);
+                            }
+                        } else {
+                            $task['parameters'] = NULL;
                         }
                     }
                     #Generate object
@@ -289,12 +334,46 @@ class Cron
         }
     }
     
+    #Adjust settings
+    public function setSetting(string $setting, int $value): self
+    {
+        #Check setting name
+        if (!is_array($setting, $this->settings)) {
+            throw new \InvalidArgumentException('Attempt to set unsupported setting');
+        }
+        #Handle values lower than 0
+        if ($value <= 0) {
+            $value = match($setting) {
+                'enabled' => 0,
+                'errorlife' => 30,
+                'maxtime' => 3600,
+                'retry' => 3600,
+                'sseLoop' => 0,
+                'sseRetry' => 10000,
+            };
+        }
+        #Handle booleans
+        if (in_array($setting, ['enabled', 'sseLoop']) && $value > 1) {
+            $value = 1;
+        }
+        if (self::$dbController->query('UPDATE `'.self::$prefix.'settings` SET `value`=:value WHERE `setting`=:setting;', [
+                ':setting' => [$setting, 'string'],
+                ':value' => [$value, 'int'],
+            ]) === true) {
+            return $this;
+        } else {
+            throw new \UnexpectedValueException('Failed to set setting `'.$setting.'` to '.$value);
+        }
+    }
+    
     #Schedule a task or update its frequency
-    public function add(string $task, mixed $arguments = NULL, int|string $frequency = 0, int $priority = 0, ?string $message = NULL, int $time = 0): bool
+    public function add(string $task, null|array|string $arguments = NULL, int|string $frequency = 0, int $priority = 0, ?string $message = NULL, null|array|string $dayofmonth = NULL, null|array|string $dayofweek = NULL, int $time = 0): bool
     {
         if (self::$dbReady) {
             #Sanitize arguments
             $arguments = $this->sanitize($arguments);
+            $dayofmonth = $this->sanitize($dayofmonth);
+            $dayofweek = $this->sanitize($dayofweek);
             $frequency = intval($frequency);
             if ($frequency < 0) {
                 $frequency = 0;
@@ -307,10 +386,12 @@ class Cron
             if ($time <= 0) {
                 $time = time();
             }
-            return self::$dbController->query('INSERT INTO `'.self::$prefix.'schedule` (`task`, `arguments`, `frequency`, `priority`, `message`, `nextrun`) VALUES (:task, :arguments, :frequency, :priority, :message, :nextrun) ON DUPLICATE KEY UPDATE `frequency`=:frequency, `nextrun`=:nextrun, `priority`=:priority, `message`=:message, `updated`=UTC_TIMESTAMP();', [
+            return self::$dbController->query('INSERT INTO `'.self::$prefix.'schedule` (`task`, `arguments`, `frequency`, `dayofmonth`, `dayofweek`, `priority`, `message`, `nextrun`) VALUES (:task, :arguments, :frequency, :dayofmonth, :dayofweek, :priority, :message, :nextrun) ON DUPLICATE KEY UPDATE `frequency`=:frequency, `dayofmonth`=:dayofmonth, `dayofweek`=:dayofweek, `nextrun`=:nextrun, `priority`=:priority, `message`=:message, `updated`=UTC_TIMESTAMP();', [
                 ':task' => [$task, 'string'],
                 ':arguments' => [$arguments, (empty($arguments) ? 'null' : 'string')],
                 ':frequency' => [$frequency, 'int'],
+                ':dayofmonth' => [$dayofmonth, (empty($dayofmonth) ? 'null' : 'string')],
+                ':dayofweek' => [$dayofweek, (empty($dayofweek) ? 'null' : 'string')],
                 ':priority' => [$priority, 'int'],
                 ':message' => [$message, (empty($message) ? 'null' : 'string')],
                 ':nextrun' => [$time, 'time'],
@@ -321,7 +402,7 @@ class Cron
     }
     
     #Remove a task from schedule
-    public function delete(string $task, mixed $arguments = NULL): bool
+    public function delete(string $task, null|array|string $arguments = NULL): bool
     {
         if (self::$dbReady) {
             #Sanitize arguments
@@ -336,7 +417,7 @@ class Cron
     }
     
     #Add (or update) task type
-    public function addTask(string $task, string $function, ?string $object = NULL, mixed $parameters = NULL, mixed $returns = NULL, ?string $desc = NULL): bool
+    public function addTask(string $task, string $function, ?string $object = NULL, null|array|string $parameters = NULL, null|array|string $returns = NULL, ?string $desc = NULL): bool
     {
         if (self::$dbReady) {
             #Sanitize parameters and return
@@ -372,8 +453,8 @@ class Cron
     {
         if (self::$dbReady) {
             return self::$dbController->query('UPDATE `'.self::$prefix.'schedule` SET `status`=0, `runby`=NULL, `nextrun`=TIMESTAMPADD(SECOND, IF(`frequency` > 0, IF(CEIL(TIME_TO_SEC(TIMEDIFF(UTC_TIMESTAMP(), `nextrun`))/`frequency`) > 0, CEIL(TIME_TO_SEC(TIMEDIFF(UTC_TIMESTAMP(), `nextrun`))/`frequency`), 1)*`frequency`, :retry), `nextrun`) WHERE `status`<>0 AND UTC_TIMESTAMP()>DATE_ADD(`lastrun`, INTERVAL :maxtime SECOND);', [
-                ':retry' => [self::$retryTime, 'int'],
-                ':maxtime' => [self::$maxTime, 'int'],
+                ':retry' => [self::$retry, 'int'],
+                ':maxtime' => [self::$maxtime, 'int'],
             ]);
         } else {
             return false;
@@ -385,15 +466,31 @@ class Cron
     {
         if (self::$dbReady) {
             return self::$dbController->query('DELETE FROM `'.self::$prefix.'errors` WHERE `time` <= DATE_SUB(UTC_TIMESTAMP(), INTERVAL :errorlife DAY);', [
-                ':errorlife' => [self::$errorLife, 'int'],
+                ':errorlife' => [self::$errorlife, 'int'],
             ]);
         } else {
             return false;
         }
     }
     
+    #Function to prepare tables
+    private function install(): bool|string
+    {
+        #Get contents from SQL file
+        $sql = file_get_contents(__DIR__.'\install.sql');
+        #Replace prefix
+        $sql = str_replace('%dbprefix%', self::$prefix, $sql);
+        #Split file content into queries
+        $sql = self::$dbController->stringToQueries($sql);
+        try {
+            return self::$dbController->query($sql);
+        } catch(\Exception $e) {
+            return $e->getMessage()."\r\n".$e->getTraceAsString();
+        }
+    }
+    
     #Reschedule a task (or remove it if it's onetime)
-    private function reSchedule(string $task, mixed $arguments = NULL, int|string $prevrun, int|string $frequency = 0, bool $result = true): bool
+    private function reSchedule(string $task, null|array|string $arguments = NULL, int|string $prevrun, int|string $frequency = 0, bool $result = true): bool
     {
         if (self::$dbReady) {
             #Ensure schedule is INT
@@ -405,7 +502,7 @@ class Cron
             } else {
                 #Actually reschedule. One task time task will be rescheduled for the retry time from settings
                 return self::$dbController->query('UPDATE `'.self::$prefix.'schedule` SET `status`=0, `runby`=NULL, `nextrun`=TIMESTAMPADD(SECOND, IF(`frequency` > 0, IF(CEIL(TIME_TO_SEC(TIMEDIFF(UTC_TIMESTAMP(), `nextrun`))/`frequency`) > 0, CEIL(TIME_TO_SEC(TIMEDIFF(UTC_TIMESTAMP(), `nextrun`))/`frequency`), 1)*`frequency`, :time), `nextrun`) WHERE `task`=:task AND `arguments` '.(empty($arguments) ? 'IS' : '=').' :arguments', [
-                    ':time' => [self::$retryTime, 'int'],
+                    ':time' => [self::$retry, 'int'],
                     ':task' => [$task, 'string'],
                     ':arguments' => [$arguments, (empty($arguments) ? 'null' : 'string')],
                 ]);
@@ -416,7 +513,7 @@ class Cron
     }
     
     #Register error
-    private function error(string $text, string $task, mixed $arguments = NULL): void
+    private function error(string $text, string $task, null|array|string $arguments = NULL): void
     {
         if (self::$dbReady) {
             #Set time, so that we will have identical value
@@ -443,7 +540,7 @@ class Cron
     }
     
     #Helper function to sanitize the arguments/parameters into JSON string or NULL
-    private function sanitize(mixed $arguments = NULL): ?string
+    private function sanitize(null|array|string $arguments = NULL): ?string
     {
         #Return NULL if empty
         if (empty($arguments)) {
@@ -469,6 +566,41 @@ class Cron
         echo 'retry: '.self::$sseRetry."\n".'id: '.hrtime(true)."\n".(empty($event) ? '' : 'event: '.$event."\n").'data: '.$message."\n\n";
         ob_flush();
 		flush();
+    }
+    
+    #Helper function to validate whether job is allowed to run today
+    private function dayOfCheck(?string $values = NULL, bool $month = true): bool
+    {
+        #Set the settings
+        if ($month) {
+            $format = 'j';
+            $maxValue = 31;
+        } else {
+            $format = 'N';
+            $maxValue = 7;
+        }
+        #Sanitize
+        $values = $this->sanitize($values);
+        #Actually decode
+        $values = json_decode($values, true);
+        #If not an array - allow run
+        if (is_array($values)) {
+            #If empty - allow run
+            if (!empty($values)) {
+                #Filter non-integers, negative integers and too large integers
+                $values = array_filter($values, function($item) use ($maxValue) {
+                    return (is_int($item) && $item >= 1 && $item <= $maxValue);
+                });
+                #If empty after filtering - allow run
+                if (!empty($values)) {
+                    #If current day is in array - allow run
+                    if (!in_array(intval(date($format, time())), $values)) {
+                        return false;
+                    }
+                }
+            }
+        }
+        return true;
     }
 }
 ?>
