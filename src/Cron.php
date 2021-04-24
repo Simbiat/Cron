@@ -201,7 +201,7 @@ class Cron
                     #header('Connection: close');
                 }
                 return true;
-            } catch(Exception $e) {
+            } catch(\Exception $e) {
                 #Notify of end of stream
                 if (self::$CLI === false) {
                     $this->streamEcho('Cron processing failed', 'CronEnd');
@@ -317,7 +317,7 @@ class Cron
                         unset($task['allowedreturns']);
                     }
                 }
-            } catch(Exception $e) {
+            } catch(\Exception $e) {
                 $result = $e->getMessage()."\r\n".$e->getTraceAsString();
             }
             #Validate result
