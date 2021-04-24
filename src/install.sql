@@ -44,7 +44,8 @@ INSERT IGNORE INTO `%dbprefix%settings` (`setting`, `value`, `description`) VALU
 ('maxtime', 3600, 'Maximum amount of time in seconds to allow jobs to run. If the period elapses, a job will be considered hanged and will be rescheduled on next CRON processing.'),
 ('retry', 3600, 'Time in seconds to add to failed one-time jobs or hanged jobs, when rescheduling them'),
 ('sseLoop', 0, 'Whether we need to loop task processing when launched outside of CLI (that is SSE mode).'),
-('sseRetry', 10000, 'Milliseconds for retry value of SSE');
+('sseRetry', 10000, 'Milliseconds for retry value of SSE'),
+('maxthreads', 4, 'Maximum number of simultanious threads to run');
 
 CREATE TABLE IF NOT EXISTS `%dbprefix%tasks` (
   `task` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Function''s internal ID',

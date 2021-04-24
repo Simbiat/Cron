@@ -21,10 +21,12 @@ class Cron
     #SSE settings
     public static bool $sseLoop = false;
     public static int $sseRetry = 10000;
+    #Maximum threads
+    public static int $maxthreads = 4;
     #CLI mode flag
     private static $CLI = false;
     #Supported settings
-    public array $settings = ['enabled', 'errorlife', 'maxtime', 'retry', 'sseLoop', 'sseRetry'];
+    public array $settings = ['enabled', 'errorlife', 'maxtime', 'retry', 'sseLoop', 'sseRetry', 'maxthreads'];
     
     public function __construct(string $prefix = 'cron__', bool $installed = true)
     {
@@ -74,7 +76,14 @@ class Cron
                         self::$maxtime = $settings['maxtime'];
                     }
                 }
-                #Update maximum time
+                #Update maximum number of threads
+                if (!empty($settings['maxthreads'])) {
+                    $settings['maxthreads'] = intval($settings['maxthreads']);
+                    if ($settings['maxthreads'] > 0) {
+                        self::$maxthreads = $settings['maxthreads'];
+                    }
+                }
+                #Update maximum life of an error
                 if (!empty($settings['errorlife'])) {
                     $settings['errorlife'] = intval($settings['errorlife']);
                     if ($settings['errorlife'] > 0) {
@@ -127,64 +136,69 @@ class Cron
                 #Generate random ID
                 $randomid = bin2hex(random_bytes(15));
                 do {
-                    #Queue tasks for this random ID
-                    if (self::$dbController->query('UPDATE `'.self::$prefix.'schedule` INNER JOIN `'.self::$prefix.'tasks` ON `'.self::$prefix.'schedule`.`task`=`'.self::$prefix.'tasks`.`task` SET `status`=1, `runby`=\''.$randomid.'\' WHERE `status`<>2 AND `function`<>\'\' AND `function` IS NOT NULL AND `nextrun`<=UTC_TIMESTAMP() ORDER BY `priority` DESC, `nextrun` ASC LIMIT '.$items) !== true) {
-                        #Notify of end of stream
-                        if (self::$CLI === false) {
-                            $this->streamEcho('Cron processing failed', 'CronFail');
-                            header('Connection: close');
+                    #Check if enough threads are available
+                    if ($this->threadAvailable() === true) {
+                        #Queue tasks for this random ID
+                        if (self::$dbController->query('UPDATE `'.self::$prefix.'schedule` INNER JOIN `'.self::$prefix.'tasks` ON `'.self::$prefix.'schedule`.`task`=`'.self::$prefix.'tasks`.`task` SET `status`=1, `runby`=\''.$randomid.'\' WHERE `status`<>2 AND `function`<>\'\' AND `function` IS NOT NULL AND `nextrun`<=UTC_TIMESTAMP() ORDER BY `priority` DESC, `nextrun` ASC LIMIT '.$items) !== true) {
+                            #Notify of end of stream
+                            if (self::$CLI === false) {
+                                $this->streamEcho('Cron processing failed', 'CronFail');
+                                header('Connection: close');
+                            }
+                            return false;
                         }
-                        return false;
-                    }
-                    #Get tasks
-                    $tasks = self::$dbController->SelectAll('SELECT `'.self::$prefix.'schedule`.`task`, `arguments`, `frequency`, `dayofmonth`, `dayofweek`, `message`, `nextrun` FROM `'.self::$prefix.'schedule` INNER JOIN `'.self::$prefix.'tasks` ON `'.self::$prefix.'schedule`.`task`=`'.self::$prefix.'tasks`.`task` WHERE `runby`=\''.$randomid.'\' ORDER BY `priority` DESC, `nextrun` ASC');
-                    if (is_array($tasks) && !empty($tasks)) {
-                        foreach ($tasks as $task) {
-                            #Check for day restrictions
-                            if ((!empty($task['dayofmonth']) || !empty($task['dayofweek'])) && ($this->dayOfCheck($task['dayofmonth'], true) === false || $this->dayOfCheck($task['dayofweek'], false))) {
-                                #Reschedule
-                                $this->reSchedule($task['task'], $task['arguments'], $task['nextrun'], $task['frequency'], false);
-                                #Notify of the task skipping
+                        #Get tasks
+                        $tasks = self::$dbController->SelectAll('SELECT `'.self::$prefix.'schedule`.`task`, `arguments`, `frequency`, `dayofmonth`, `dayofweek`, `message`, `nextrun` FROM `'.self::$prefix.'schedule` INNER JOIN `'.self::$prefix.'tasks` ON `'.self::$prefix.'schedule`.`task`=`'.self::$prefix.'tasks`.`task` WHERE `runby`=\''.$randomid.'\' ORDER BY `priority` DESC, `nextrun` ASC');
+                        if (is_array($tasks) && !empty($tasks)) {
+                            foreach ($tasks as $task) {
+                                #Check for day restrictions
+                                if ((!empty($task['dayofmonth']) || !empty($task['dayofweek'])) && ($this->dayOfCheck($task['dayofmonth'], true) === false || $this->dayOfCheck($task['dayofweek'], false))) {
+                                    #Reschedule
+                                    $this->reSchedule($task['task'], $task['arguments'], $task['nextrun'], $task['frequency'], false);
+                                    #Notify of the task skipping
+                                    if (self::$CLI === false) {
+                                        $this->streamEcho($task['task'].' skipped due to day restrictions', 'CronTaskSkip');
+                                    }
+                                    #Skip
+                                    continue;
+                                }
+                                #Notify of the task starting
                                 if (self::$CLI === false) {
-                                    $this->streamEcho($task['task'].' skipped due to day restrictions', 'CronTaskSkip');
+                                    $this->streamEcho((empty($task['message']) ? $task['task'].' starting' : $task['message']), 'CronTaskStart');
                                 }
-                                #Skip
-                                continue;
-                            }
-                            #Notify of the task starting
-                            if (self::$CLI === false) {
-                                $this->streamEcho((empty($task['message']) ? $task['task'].' starting' : $task['message']), 'CronTaskStart');
-                            }
-                            $result = $this->runTask($task['task'], $task['arguments']);
-                            #Notify of the task finishing
-                            if (self::$CLI === false) {
-                                if ($result) {
-                                    $this->streamEcho($task['task'].' finished', 'CronTaskEnd');
-                                } else {
-                                    $this->streamEcho($task['task'].' failed', 'CronTaskFail');
+                                $result = $this->runTask($task['task'], $task['arguments']);
+                                #Notify of the task finishing
+                                if (self::$CLI === false) {
+                                    if ($result) {
+                                        $this->streamEcho($task['task'].' finished', 'CronTaskEnd');
+                                    } else {
+                                        $this->streamEcho($task['task'].' failed', 'CronTaskFail');
+                                    }
                                 }
                             }
+                        } else {
+                            if (self::$CLI === false) {
+                                $this->streamEcho('Cron list is empty', 'CronEmpty');
+                                #Sleep for a bit
+                                sleep(self::$sseRetry/20);
+                            }
+                        }
+                        #Additionally reschedule hanged jobs if we're in SSE
+                        if (self::$CLI === false && self::$sseLoop === true) {
+                            $this->unHang();
                         }
                     } else {
                         if (self::$CLI === false) {
-                            $this->streamEcho('Cron list is empty', 'CronEempty');
+                            $this->streamEcho('Cron threads are exhausted', 'CronNoThreads');
                             #Sleep for a bit
-                            if (self::$sseRetry > 1000000) {
-                                sleep(self::$sseRetry/1000);
-                            } else {
-                                usleep(self::$sseRetry);
-                            }
+                            sleep(self::$sseRetry/20);
                         }
-                    }
-                    #Additionally reschedule hanged jobs if we're in SSE
-                    if (self::$CLI === false && self::$sseLoop === true) {
-                        $this->unHang();
                     }
                 } while (self::$sseLoop === true && connection_status() === 0);
                 #Notify of end of stream
                 if (self::$CLI === false) {
                     $this->streamEcho('Cron processing finished', 'CronEnd');
-                    header('Connection: close');
+                    #header('Connection: close');
                 }
                 return true;
             } catch(Exception $e) {
@@ -350,6 +364,7 @@ class Cron
                 'retry' => 3600,
                 'sseLoop' => 0,
                 'sseRetry' => 10000,
+                'maxthreads' => 4,
             };
         }
         #Handle booleans
@@ -601,6 +616,18 @@ class Cron
             }
         }
         return true;
+    }
+    
+    #Helper function to check number of active threads
+    private function threadAvailable(): bool
+    {
+        #Get current count
+        $current = self::$dbController->count('SELECT COUNT(DISTINCT(`runby`)) FROM `'.self::$prefix.'schedule` WHERE `runby` IS NOT NULL;');
+        if ($current < self::$maxthreads) {
+            return true;
+        } else {
+            return false;
+        }
     }
 }
 ?>

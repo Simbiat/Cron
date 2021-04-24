@@ -137,7 +137,8 @@ Supported settings are as follows:
 3. `maxtime` is maximum seconds that a job can run. When exceeded, a job is considered "hung" and will be rescheduled. Default is `3600`.
 4. `retry` is the number of seconds to delay execution of failed one-time jobs. Such jobs have frequency set to `0`, thus in case of failure this can result in them spamming. This setting can help avoid that. Default is`3600`.
 5. `sseLoop` governs whether processing can be done in a loop if used in SSE mode. If set to `0` after running `process` cycle SSE will send `CronEnd` event. If set to `1` - it will continue processing in a loop until stream is closed. Default is `0`.
-6. `sseRetry` is number of milliseconds for connection retry for SSE. Default is `10000`.
+6. `sseRetry` is number of milliseconds for connection retry for SSE. Will also be used to determine how long should the loop sleep if no threads or jobs, but will be treated as number of seconds divided by 20. Default is `10000` (or roughly 8 minutes for empty cycles).
+7. `maxthreads` is maximum number of threads (or rather loops) to be allowed to run at the same time. Does not affect singular `runTask()` calls, only `process()`. Number of current threads is determined by the number of distinct values of `runby` in the `schedule` table, thus be careful with bad (or no) error catching or otherwise it can be easily overrun by hanged jobs. Default is `4`.
 
 ## SSE Events
 When used in SSE mode, these events will be sent to client:
@@ -147,5 +148,6 @@ When used in SSE mode, these events will be sent to client:
 4. `CronTaskStart` - task was started.
 5. `CronTaskEnd` - task completed successfully.
 6. `CronTaskFail` - task failed.
-7. `CronEempty` - empty list of tasks in the cycle.
-8. `CronEnd` - end of processing.
+7. `CronEmpty` - empty list of tasks in the cycle.
+8. `CronNoThreads` - no free threads on this cycle.
+9. `CronEnd` - end of processing.
