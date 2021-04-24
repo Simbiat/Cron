@@ -375,7 +375,7 @@ class Cron
                 ':setting' => [$setting, 'string'],
                 ':value' => [$value, 'int'],
             ]) === true) {
-            self::{'$'.$setting} = $value;
+            self::${$setting} = $value;
             return $this;
         } else {
             throw new \UnexpectedValueException('Failed to set setting `'.$setting.'` to '.$value);
