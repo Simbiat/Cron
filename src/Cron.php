@@ -139,11 +139,11 @@ class Cron
                     #Check if enough threads are available
                     if ($this->threadAvailable() === true) {
                         #Queue tasks for this random ID
-                        if (self::$dbController->query('UPDATE `'.self::$prefix.'schedule` INNER JOIN `'.self::$prefix.'tasks` ON `'.self::$prefix.'schedule`.`task`=`'.self::$prefix.'tasks`.`task` SET `status`=1, `runby`=\''.$randomid.'\' WHERE `status`<>2 AND `function`<>\'\' AND `function` IS NOT NULL AND `nextrun`<=UTC_TIMESTAMP() ORDER BY `priority` DESC, `nextrun` ASC LIMIT '.$items) !== true) {
+                        if (self::$dbController->query('UPDATE `'.self::$prefix.'schedule` SET `status`=1, `runby`=\''.$randomid.'\' WHERE `status`<>2 AND `nextrun`<=UTC_TIMESTAMP() ORDER BY `priority` DESC, `nextrun` ASC LIMIT '.$items) !== true) {
                             #Notify of end of stream
                             if (self::$CLI === false) {
                                 $this->streamEcho('Cron processing failed', 'CronFail');
-                                header('Connection: close');
+                                @header('Connection: close');
                             }
                             return false;
                         }
@@ -198,14 +198,14 @@ class Cron
                 #Notify of end of stream
                 if (self::$CLI === false) {
                     $this->streamEcho('Cron processing finished', 'CronEnd');
-                    #header('Connection: close');
+                    @header('Connection: close');
                 }
                 return true;
             } catch(\Exception $e) {
                 #Notify of end of stream
                 if (self::$CLI === false) {
                     $this->streamEcho('Cron processing failed', 'CronEnd');
-                    header('Connection: close');
+                    @header('Connection: close');
                 }
                 return false;
             }
@@ -213,7 +213,7 @@ class Cron
             #Notify of end of stream
             if (self::$CLI === false) {
                 $this->streamEcho('Cron processing is disabled', 'CronFail');
-                header('Connection: close');
+                @header('Connection: close');
             }
             return false;
         }
