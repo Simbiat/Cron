@@ -202,6 +202,8 @@ class Cron
                 }
                 return true;
             } catch(\Exception $e) {
+                #Attempt to register error
+                $this->error('General cycle failure:'."\r\n".$e->getMessage()."\r\n".$e->getTraceAsString(), NULL, NULL);
                 #Notify of end of stream
                 if (self::$CLI === false) {
                     $this->streamEcho('Cron processing failed', 'CronEnd');
@@ -229,11 +231,19 @@ class Cron
             $result = false;
             try {
                 #Get full details
-                $task = self::$dbController->SelectRow('SELECT * FROM `'.self::$prefix.'schedule` INNER JOIN `'.self::$prefix.'tasks` ON `'.self::$prefix.'schedule`.`task`=`'.self::$prefix.'tasks`.`task` WHERE `status`<>2 AND `function`<>\'\' AND `function` IS NOT NULL AND `'.self::$prefix.'schedule`.`task`=:task AND `arguments` '.(empty($arguments) ? 'IS' : '=').' :arguments', [
+                $task = self::$dbController->SelectRow('SELECT * FROM `'.self::$prefix.'schedule` INNER JOIN `'.self::$prefix.'tasks` ON `'.self::$prefix.'schedule`.`task`=`'.self::$prefix.'tasks`.`task` WHERE `status`<>2 AND `'.self::$prefix.'schedule`.`task`=:task AND `arguments` '.(empty($arguments) ? 'IS' : '=').' :arguments', [
                     ':task' => [$task, 'string'],
                     ':arguments' => [$arguments, (empty($arguments) ? 'null' : 'string')]
                 ]);
                 if (empty($task)) {
+                    #Assume that it was a one-time job, that has already been run
+                    return true;
+                }
+                if (empty($task['function'])) {
+                    #Register error
+                    $this->error('Task has no assigned function', $task['task'], $task['arguments']);
+                    #Reschedule
+                    $this->reSchedule($task['task'], $task['arguments'], $task['nextrun'], $task['frequency'], false);
                     return false;
                 }
                 #Update last run
@@ -522,7 +532,7 @@ class Cron
     }
     
     #Register error
-    private function error(string $text, string $task, null|array|string $arguments = NULL): void
+    private function error(string $text, ?string $task, null|array|string $arguments = NULL): void
     {
         if (self::$dbReady) {
             #Insert error
