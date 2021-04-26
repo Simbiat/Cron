@@ -196,7 +196,7 @@ class Cron
                             sleep(self::$sseRetry/20);
                         }
                     }
-                } while (self::$sseLoop === true && connection_status() === 0);
+                } while (self::$CLI === false && self::$sseLoop === true && connection_status() === 0);
                 #Notify of end of stream
                 if (self::$CLI === false) {
                     $this->streamEcho('Cron processing finished', 'CronEnd');
