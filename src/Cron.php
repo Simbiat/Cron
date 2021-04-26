@@ -332,13 +332,6 @@ class Cron
                     $result = false;
                 }
             }
-            if ($result === true) {
-                #Update last successful run time
-                self::$dbController->query('UPDATE `'.self::$prefix.'schedule` SET `lastsuccess` = UTC_TIMESTAMP() WHERE `task`=:task AND `arguments` '.(empty($task['arguments']) ? 'IS' : '=').' :arguments', [
-                    ':task' => [$task['task'], 'string'],
-                    ':arguments' => [$task['arguments'], (empty($task['arguments']) ? 'null' : 'string')],
-                ]);
-            }
             #Reschedule
             $this->reSchedule($task['task'], $task['arguments'], $task['nextrun'], $task['frequency'], $result);
             #Return
@@ -517,7 +510,7 @@ class Cron
                 return $this->delete($task, $arguments);
             } else {
                 #Actually reschedule. One task time task will be rescheduled for the retry time from settings
-                return self::$dbController->query('UPDATE `'.self::$prefix.'schedule` SET `status`=0, `runby`=NULL, `nextrun`=TIMESTAMPADD(SECOND, IF(`frequency` > 0, IF(CEIL(TIMESTAMPDIFF(SECOND, `nextrun`, UTC_TIMESTAMP())/`frequency`) > 0, CEIL(TIMESTAMPDIFF(SECOND, `nextrun`, UTC_TIMESTAMP())/`frequency`), 1)*`frequency`, :time), `nextrun`) WHERE `task`=:task AND `arguments` '.(empty($arguments) ? 'IS' : '=').' :arguments', [
+                return self::$dbController->query('UPDATE `'.self::$prefix.'schedule` SET `status`=0, `runby`=NULL, `nextrun`=TIMESTAMPADD(SECOND, IF(`frequency` > 0, IF(CEIL(TIMESTAMPDIFF(SECOND, `nextrun`, UTC_TIMESTAMP())/`frequency`) > 0, CEIL(TIMESTAMPDIFF(SECOND, `nextrun`, UTC_TIMESTAMP())/`frequency`), 1)*`frequency`, :time), `nextrun`), `'.($result === true ? 'lastsuccess' : 'lasterror')'`=UTC_TIMESTAMP() WHERE `task`=:task AND `arguments` '.(empty($arguments) ? 'IS' : '=').' :arguments', [
                     ':time' => [self::$retry, 'int'],
                     ':task' => [$task, 'string'],
                     ':arguments' => [$arguments, (empty($arguments) ? 'null' : 'string')],
@@ -532,26 +525,15 @@ class Cron
     private function error(string $text, string $task, null|array|string $arguments = NULL): void
     {
         if (self::$dbReady) {
-            #Set time, so that we will have identical value
-            $time = time();
             #Insert error
             self::$dbController->query(
-                'INSERT INTO `'.self::$prefix.'errors` (`time`, `task`, `arguments`, `text`) VALUES (:time, :task, :arguments, :text) ON DUPLICATE KEY UPDATE `time`=:time, `text`=:text;',
+                'INSERT INTO `'.self::$prefix.'errors` (`time`, `task`, `arguments`, `text`) VALUES (:time, :task, :arguments, :text) ON DUPLICATE KEY UPDATE `time`=UTC_TIMESTAMP(), `text`=:text;',
                 [
-                    ':time' => [$time, 'time'],
                     ':task' => [$task, (empty($task) ? 'null' : 'string')],
                     ':arguments' => [$arguments, (empty($arguments) ? 'null' : 'string')],
                     ':text' => [$text, 'string'],
                 ]
             );
-            #Update error if task is not empty
-            if (!empty($task)) {
-                self::$dbController->query('UPDATE `'.self::$prefix.'schedule` SET `lasterror`=:time WHERE `task`=:task AND `arguments` '.(empty($arguments) ? 'IS' : '=').' :arguments', [
-                    ':time' => [$time, 'time'],
-                    ':task' => [$task, 'string'],
-                    ':arguments' => [$arguments, (empty($arguments) ? 'null' : 'string')],
-                ]);
-            }
         }
     }
     
