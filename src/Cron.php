@@ -537,7 +537,7 @@ class Cron
         if (self::$dbReady) {
             #Insert error
             self::$dbController->query(
-                'INSERT INTO `'.self::$prefix.'errors` (`time`, `task`, `arguments`, `text`) VALUES (:time, :task, :arguments, :text) ON DUPLICATE KEY UPDATE `time`=UTC_TIMESTAMP(), `text`=:text;',
+                'INSERT INTO `'.self::$prefix.'errors` (`time`, `task`, `arguments`, `text`) VALUES (UTC_TIMESTAMP(), :task, :arguments, :text) ON DUPLICATE KEY UPDATE `time`=UTC_TIMESTAMP(), `text`=:text;',
                 [
                     ':task' => [$task, (empty($task) ? 'null' : 'string')],
                     ':arguments' => [$arguments, (empty($arguments) ? 'null' : 'string')],
