@@ -28,7 +28,8 @@ CREATE TABLE IF NOT EXISTS `%dbprefix%schedule` (
   KEY `priority` (`priority`),
   KEY `status` (`status`),
   KEY `runby` (`runby`),
-  KEY `lastrun` (`lastrun`)
+  KEY `lastrun` (`lastrun`),
+  KEY `arguments` (`arguments`),
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=COMPRESSED;
 
 CREATE TABLE IF NOT EXISTS `%dbprefix%settings` (
@@ -59,6 +60,9 @@ CREATE TABLE IF NOT EXISTS `%dbprefix%tasks` (
 
 ALTER TABLE `%dbprefix%errors`
   ADD CONSTRAINT `errors_to_tasks` FOREIGN KEY (`task`) REFERENCES `%dbprefix%tasks` (`task`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE `%dbprefix%errors`
+  ADD CONSTRAINT `errors_to_arguments` FOREIGN KEY (`arguments`) REFERENCES `%dbprefix%schedule`(`arguments`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 ALTER TABLE `%dbprefix%schedule`
   ADD CONSTRAINT `schedule_to_task` FOREIGN KEY (`task`) REFERENCES `%dbprefix%tasks` (`task`) ON DELETE CASCADE ON UPDATE CASCADE;
