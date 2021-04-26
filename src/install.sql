@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS `%dbprefix%errors` (
   `time` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp() COMMENT 'Time the error occured',
   `task` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Optional task ID',
-  `arguments` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Optional task arguments',
+  `arguments` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Optional task arguments',
   `text` text COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Error for the text',
   UNIQUE KEY `task` (`task`,`arguments`),
   KEY `time` (`time`)
