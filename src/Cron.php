@@ -237,7 +237,7 @@ class Cron
                     return false;
                 }
                 #Update last run
-                self::$dbController->query('UPDATE `'.self::$prefix.'schedule` SET `status`= 2, `lastrun` = UTC_TIMESTAMP() WHERE `task`=:task AND `arguments` '.(empty($task['arguments']) ? 'IS' : '=').' :arguments', [
+                self::$dbController->query('UPDATE `'.self::$prefix.'schedule` SET `status`=2, `lastrun` = UTC_TIMESTAMP() WHERE `task`=:task AND `arguments` '.(empty($task['arguments']) ? 'IS' : '=').' :arguments', [
                     ':task' => [$task['task'], 'string'],
                     ':arguments' => [$task['arguments'], (empty($task['arguments']) ? 'null' : 'string')],
                 ]);
@@ -334,7 +334,7 @@ class Cron
             }
             if ($result === true) {
                 #Update last successful run time
-                self::$dbController->query('UPDATE `'.self::$prefix.'schedule` SET `lastsuccess` = UTC_TIMESTAMP(), `runby`=NULL WHERE `task`=:task AND `arguments` '.(empty($task['arguments']) ? 'IS' : '=').' :arguments', [
+                self::$dbController->query('UPDATE `'.self::$prefix.'schedule` SET `lastsuccess` = UTC_TIMESTAMP() WHERE `task`=:task AND `arguments` '.(empty($task['arguments']) ? 'IS' : '=').' :arguments', [
                     ':task' => [$task['task'], 'string'],
                     ':arguments' => [$task['arguments'], (empty($task['arguments']) ? 'null' : 'string')],
                 ]);
