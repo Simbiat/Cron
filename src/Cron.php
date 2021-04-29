@@ -473,7 +473,7 @@ class Cron
     public function unHang(): bool
     {
         if (self::$dbReady) {
-            return self::$dbController->query('UPDATE `'.self::$prefix.'schedule` SET `status`=0, `runby`=NULL, `nextrun`='.$this->sqlNextRun.' WHERE `status`<>0 AND UTC_TIMESTAMP()>DATE_ADD(IF(`lastrun` IS NOT NULL, `lastrun`, `nextrun`), INTERVAL :maxtime SECOND);', [
+            return self::$dbController->query('UPDATE `'.self::$prefix.'schedule` SET `status`=0, `runby`=NULL, `nextrun`='.$this->sqlNextRun.', `lastrun`=IF(`lastrun` IS NULL, UTC_TIMESTAMP(), `lastrun`), `lasterror`=UTC_TIMESTAMP() WHERE `status`<>0 AND UTC_TIMESTAMP()>DATE_ADD(IF(`lastrun` IS NOT NULL, `lastrun`, `nextrun`), INTERVAL :maxtime SECOND);', [
                 ':time' => [self::$retry, 'int'],
                 ':maxtime' => [self::$maxtime, 'int'],
             ]);
