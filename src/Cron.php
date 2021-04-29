@@ -141,7 +141,7 @@ class Cron
                     #Check if enough threads are available
                     if ($this->threadAvailable() === true) {
                         #Queue tasks for this random ID
-                        if (self::$dbController->query('UPDATE `'.self::$prefix.'schedule` SET `status`=1, `runby`=\''.$randomid.'\' WHERE `status`<>2 AND `runby` IS NULL AND `nextrun`<=UTC_TIMESTAMP() ORDER BY `priority` DESC, `nextrun` ASC LIMIT '.$items) !== true) {
+                        if (self::$dbController->query('UPDATE `'.self::$prefix.'schedule` SET `status`=1, `runby`=\''.$randomid.'\', `lastrun`=UTC_TIMESTAMP() WHERE `status`<>2 AND `runby` IS NULL AND `nextrun`<=UTC_TIMESTAMP() ORDER BY `priority` DESC, `nextrun` ASC LIMIT '.$items) !== true) {
                             #Notify of end of stream
                             if (self::$CLI === false) {
                                 $this->streamEcho('Cron processing failed', 'CronFail');
