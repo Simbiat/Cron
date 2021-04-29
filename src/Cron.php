@@ -229,12 +229,9 @@ class Cron
         if (self::$enabled) {
             try {
                 #Set negative value by default
-                #Sanitize arguments
-                var_dump($arguments);
-                $arguments = $this->sanitize($arguments);
-                var_dump($arguments);
-                exit;
                 $result = false;
+                #Sanitize arguments
+                $arguments = $this->sanitize($arguments);
                 #Get full details
                 $task = self::$dbController->SelectRow('SELECT * FROM `'.self::$prefix.'schedule` INNER JOIN `'.self::$prefix.'tasks` ON `'.self::$prefix.'schedule`.`task`=`'.self::$prefix.'tasks`.`task` WHERE `status`<>2 AND `'.self::$prefix.'schedule`.`task`=:task AND `arguments` '.(empty($arguments) ? 'IS' : '=').' :arguments', [
                     ':task' => [$taskname, 'string'],
