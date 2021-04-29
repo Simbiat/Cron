@@ -156,7 +156,7 @@ class Cron
                                 #Check for day restrictions
                                 if ((!empty($task['dayofmonth']) || !empty($task['dayofweek'])) && ($this->dayOfCheck($task['dayofmonth'], true) === false || $this->dayOfCheck($task['dayofweek'], false))) {
                                     #Reschedule
-                                    $this->reSchedule($task['task'], $task['arguments'], $task['nextrun'], $task['frequency'], false);
+                                    $this->reSchedule($task['task'], $task['arguments'], $task['frequency'], false);
                                     #Notify of the task skipping
                                     if (self::$CLI === false) {
                                         $this->streamEcho($task['task'].' skipped due to day restrictions', 'CronTaskSkip');
@@ -224,17 +224,20 @@ class Cron
     }
     
     #Run the function based on the task details
-    public function runTask(string $task, null|array|string $arguments = NULL): bool
+    public function runTask(string $taskname, ?string $arguments = NULL): bool
     {
         if (self::$enabled) {
-            #Sanitize arguments
-            $arguments = $this->sanitize($arguments);
-            #Set negative value by default
-            $result = false;
             try {
+                #Set negative value by default
+                #Sanitize arguments
+                var_dump($arguments);
+                $arguments = $this->sanitize($arguments);
+                var_dump($arguments);
+                exit;
+                $result = false;
                 #Get full details
                 $task = self::$dbController->SelectRow('SELECT * FROM `'.self::$prefix.'schedule` INNER JOIN `'.self::$prefix.'tasks` ON `'.self::$prefix.'schedule`.`task`=`'.self::$prefix.'tasks`.`task` WHERE `status`<>2 AND `'.self::$prefix.'schedule`.`task`=:task AND `arguments` '.(empty($arguments) ? 'IS' : '=').' :arguments', [
-                    ':task' => [$task, 'string'],
+                    ':task' => [$taskname, 'string'],
                     ':arguments' => [$arguments, (empty($arguments) ? 'null' : 'string')]
                 ]);
                 if (empty($task)) {
@@ -245,7 +248,7 @@ class Cron
                     #Register error
                     $this->error('Task has no assigned function', $task['task'], $task['arguments']);
                     #Reschedule
-                    $this->reSchedule($task['task'], $task['arguments'], $task['nextrun'], $task['frequency'], false);
+                    $this->reSchedule($task['task'], $task['arguments'], $task['frequency'], false);
                     return false;
                 }
                 #Update last run
@@ -257,7 +260,7 @@ class Cron
                 if (!empty($task['object'])) {
                     #Check if parameters for the object are set
                     if (!empty($task['parameters'])) {
-                        $task['parameters'] = json_decode($task['parameters'], true);
+                        $task['parameters'] = $this->json_decode_alt($task['parameters']);
                         if (is_array($task['parameters'])) {
                             #Check if extra methods are set
                             if (!empty($task['parameters']['extramethods'])) {
@@ -305,7 +308,7 @@ class Cron
                     #Register error
                     $this->error('Function is not callable', $task['task'], $task['arguments']);
                     #Reschedule
-                    $this->reSchedule($task['task'], $task['arguments'], $task['nextrun'], $task['frequency'], false);
+                    $this->reSchedule($task['task'], $task['arguments'], $task['frequency'], false);
                     return false;
                 }
                 #Run function
@@ -313,7 +316,7 @@ class Cron
                     $result = call_user_func($function);
                 } else {
                     #Decode arguments
-                    $arguments = json_decode($task['arguments'], true);
+                    $arguments = $this->json_decode_alt($task['arguments']);
                     if (is_array($arguments)) {
                         $result = call_user_func_array($function, $arguments);
                     } else {
@@ -322,7 +325,7 @@ class Cron
                 }
                 #Decode allowed returns if any
                 if (!empty($task['allowedreturns'])) {
-                    $task['allowedreturns'] = json_decode($task['allowedreturns'], true);
+                    $task['allowedreturns'] = $this->json_decode_alt($task['allowedreturns']);
                     #Check that it's an array
                     if (!is_array($task['allowedreturns'])) {
                         #Remove it as invalid value
@@ -340,12 +343,12 @@ class Cron
                     $result = true;
                 } else {
                     #Register error. Strval is silenced to avoid warning in case result is an array or object, that can't be converted
-                    $this->error(@strval($result), $task['task'], $task['arguments']);
+                    $this->error(@strval($result), $taskname, $arguments);
                     $result = false;
                 }
             }
             #Reschedule
-            $this->reSchedule($task['task'], $task['arguments'], $task['nextrun'], $task['frequency'], $result);
+            $this->reSchedule($taskname, $arguments, (empty($task['frequency']) ? 0 : $task['frequency']), $result);
             #Return
             return $result;
         } else {
@@ -388,7 +391,7 @@ class Cron
     }
     
     #Schedule a task or update its frequency
-    public function add(string $task, null|array|string $arguments = NULL, int|string $frequency = 0, int $priority = 0, ?string $message = NULL, null|array|string $dayofmonth = NULL, null|array|string $dayofweek = NULL, int $time = 0): bool
+    public function add(string $task, ?string $arguments = NULL, int|string $frequency = 0, int $priority = 0, ?string $message = NULL, ?string $dayofmonth = NULL, ?string $dayofweek = NULL, int $time = 0): bool
     {
         if (self::$dbReady) {
             #Sanitize arguments
@@ -423,7 +426,7 @@ class Cron
     }
     
     #Remove a task from schedule
-    public function delete(string $task, null|array|string $arguments = NULL): bool
+    public function delete(string $task, ?string $arguments = NULL): bool
     {
         if (self::$dbReady) {
             #Sanitize arguments
@@ -438,7 +441,7 @@ class Cron
     }
     
     #Add (or update) task type
-    public function addTask(string $task, string $function, ?string $object = NULL, null|array|string $parameters = NULL, null|array|string $returns = NULL, ?string $desc = NULL): bool
+    public function addTask(string $task, string $function, ?string $object = NULL, ?string $parameters = NULL, ?string $returns = NULL, ?string $desc = NULL): bool
     {
         if (self::$dbReady) {
             #Sanitize parameters and return
@@ -511,7 +514,7 @@ class Cron
     }
     
     #Reschedule a task (or remove it if it's onetime)
-    private function reSchedule(string $task, null|array|string $arguments = NULL, int|string $prevrun, int|string $frequency = 0, bool $result = true): bool
+    private function reSchedule(string $task, ?string $arguments = NULL, int|string $frequency = 0, bool $result = true): bool
     {
         if (self::$dbReady) {
             #Ensure schedule is INT
@@ -534,7 +537,7 @@ class Cron
     }
     
     #Register error
-    private function error(string $text, ?string $task, null|array|string $arguments = NULL): void
+    private function error(string $text, ?string $task, ?string $arguments = NULL): void
     {
         if (self::$dbReady) {
             #Insert error
@@ -550,7 +553,7 @@ class Cron
     }
     
     #Helper function to sanitize the arguments/parameters into JSON string or NULL
-    private function sanitize(null|array|string $arguments = NULL): ?string
+    private function sanitize(?string $arguments = NULL): ?string
     {
         #Return NULL if empty
         if (empty($arguments)) {
@@ -559,14 +562,21 @@ class Cron
             #Check if string
             if (is_string($arguments)) {
                 #Check if JSON
-                $json = json_decode($arguments, true);
-                #If it is a JSON - return it as is
-                if (json_last_error() === JSON_ERROR_NONE) {
-                    return $arguments;
-                }
+                $json = $this->json_decode_alt($arguments);
+                return $arguments;
             }
-            #Encode to JSON and return it
-            return json_encode($arguments, JSON_PRETTY_PRINT|JSON_INVALID_UTF8_SUBSTITUTE|JSON_UNESCAPED_UNICODE|JSON_PRESERVE_ZERO_FRACTION);
+        }
+    }
+    
+    #Helper function to throw better JSON errors
+    private function json_decode_alt(string $arguments): bool
+    {
+        try {
+            $json = json_decode($arguments, flags: JSON_THROW_ON_ERROR|JSON_INVALID_UTF8_SUBSTITUTE|JSON_BIGINT_AS_STRING|JSON_OBJECT_AS_ARRAY);
+            return true;
+        } catch(\Exception $e) {
+            throw new \InvalidArgumentException('JSON decoding of \''.$arguments.'\' string failed with \''.$e->getMessage().'\' error.');
+            return false;
         }
     }
     
@@ -592,7 +602,7 @@ class Cron
         #Sanitize
         $values = $this->sanitize($values);
         #Actually decode
-        $values = json_decode($values, true);
+        $values = json_decode($values, flags: JSON_THROW_ON_ERROR|JSON_INVALID_UTF8_SUBSTITUTE|JSON_BIGINT_AS_STRING|JSON_OBJECT_AS_ARRAY);
         #If not an array - allow run
         if (is_array($values)) {
             #If empty - allow run
