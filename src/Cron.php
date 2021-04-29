@@ -313,9 +313,9 @@ class Cron
                     $result = call_user_func($function);
                 } else {
                     #Decode arguments
-                    $arguments = $this->json_decode_alt($task['arguments']);
-                    if (is_array($arguments)) {
-                        $result = call_user_func_array($function, $arguments);
+                    $finalarguments = $this->json_decode_alt($task['arguments']);
+                    if (is_array($finalarguments)) {
+                        $result = call_user_func_array($function, $finalarguments);
                     } else {
                         $result = call_user_func($function);
                     }
