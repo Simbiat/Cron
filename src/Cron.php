@@ -380,7 +380,11 @@ class Cron
                 ':setting' => [$setting, 'string'],
                 ':value' => [$value, 'int'],
             ]) === true) {
-            self::${$setting} = $value;
+            if (in_array($setting, ['enabled', 'sseLoop'])) {
+                self::${$setting} = boolval($value);
+            } else {
+                self::${$setting} = $value;
+            }
             return $this;
         } else {
             throw new \UnexpectedValueException('Failed to set setting `'.$setting.'` to '.$value);
