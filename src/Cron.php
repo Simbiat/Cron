@@ -566,11 +566,11 @@ class Cron
     }
     
     #Helper function to throw better JSON errors
-    private function json_decode_alt(string $arguments): bool
+    private function json_decode_alt(string $arguments): bool|array
     {
         try {
             $json = json_decode($arguments, flags: JSON_THROW_ON_ERROR|JSON_INVALID_UTF8_SUBSTITUTE|JSON_BIGINT_AS_STRING|JSON_OBJECT_AS_ARRAY);
-            return true;
+            return $json;
         } catch(\Exception $e) {
             throw new \InvalidArgumentException('JSON decoding of \''.$arguments.'\' string failed with \''.$e->getMessage().'\' error.');
             return false;
