@@ -357,7 +357,7 @@ class Cron
     public function setSetting(string $setting, int $value): self
     {
         #Check setting name
-        if (!is_array($setting, $this->settings)) {
+        if (!in_array($setting, $this->settings)) {
             throw new \InvalidArgumentException('Attempt to set unsupported setting');
         }
         #Handle values lower than 0
