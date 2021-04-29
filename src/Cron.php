@@ -224,7 +224,7 @@ class Cron
     }
     
     #Run the function based on the task details
-    public function runTask(string $taskname, ?string $arguments = NULL): bool
+    public function runTask(string $taskname, null|array|string $arguments = NULL): bool
     {
         if (self::$enabled) {
             try {
@@ -388,7 +388,7 @@ class Cron
     }
     
     #Schedule a task or update its frequency
-    public function add(string $task, ?string $arguments = NULL, int|string $frequency = 0, int $priority = 0, ?string $message = NULL, ?string $dayofmonth = NULL, ?string $dayofweek = NULL, int $time = 0): bool
+    public function add(string $task, null|array|string $arguments = NULL, int|string $frequency = 0, int $priority = 0, ?string $message = NULL, null|array|string $dayofmonth = NULL, null|array|string $dayofweek = NULL, int $time = 0): bool
     {
         if (self::$dbReady) {
             #Sanitize arguments
@@ -438,7 +438,7 @@ class Cron
     }
     
     #Add (or update) task type
-    public function addTask(string $task, string $function, ?string $object = NULL, ?string $parameters = NULL, ?string $returns = NULL, ?string $desc = NULL): bool
+    public function addTask(string $task, string $function, ?string $object = NULL, null|array|string $parameters = NULL, null|array|string $returns = NULL, ?string $desc = NULL): bool
     {
         if (self::$dbReady) {
             #Sanitize parameters and return
@@ -550,7 +550,7 @@ class Cron
     }
     
     #Helper function to sanitize the arguments/parameters into JSON string or NULL
-    private function sanitize(?string $arguments = NULL): ?string
+    private function sanitize(null|array|string $arguments = NULL): ?string
     {
         #Return NULL if empty
         if (empty($arguments)) {
@@ -561,6 +561,9 @@ class Cron
                 #Check if JSON
                 $json = $this->json_decode_alt($arguments);
                 return $arguments;
+            } else {
+                #We have an array
+                return json_encode($arguments, JSON_PRETTY_PRINT|JSON_INVALID_UTF8_SUBSTITUTE|JSON_UNESCAPED_UNICODE|JSON_PRESERVE_ZERO_FRACTION);
             }
         }
     }
