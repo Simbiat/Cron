@@ -567,7 +567,7 @@ class Cron
                 return $arguments;
             } else {
                 #We have an array
-                return json_encode($arguments, JSON_PRETTY_PRINT|JSON_INVALID_UTF8_SUBSTITUTE|JSON_UNESCAPED_UNICODE|JSON_PRESERVE_ZERO_FRACTION);
+                return json_encode($arguments, JSON_INVALID_UTF8_SUBSTITUTE|JSON_UNESCAPED_UNICODE|JSON_PRESERVE_ZERO_FRACTION);
             }
         }
     }
