@@ -205,7 +205,7 @@ class Cron
                 return true;
             } catch(\Exception $e) {
                 #Attempt to register error
-                $this->error('General cycle failure:'."\r\n".$e->getMessage()."\r\n".$e->getTraceAsString(), NULL, NULL);
+                $this->error('General cycle failure:'."\r\n".$e->getMessage()."\r\n".$e->getTraceAsString(), '', '');
                 #Notify of end of stream
                 if (self::$CLI === false) {
                     $this->streamEcho('Cron processing failed', 'CronEnd');
@@ -235,7 +235,7 @@ class Cron
                 #Get full details
                 $task = self::$dbController->SelectRow('SELECT * FROM `'.self::$prefix.'schedule` INNER JOIN `'.self::$prefix.'tasks` ON `'.self::$prefix.'schedule`.`task`=`'.self::$prefix.'tasks`.`task` WHERE `status`<>2 AND `'.self::$prefix.'schedule`.`task`=:task AND `arguments` '.(empty($arguments) ? 'IS' : '=').' :arguments', [
                     ':task' => [$taskname, 'string'],
-                    ':arguments' => [$arguments, (empty($arguments) ? 'null' : 'string')]
+                    ':arguments' => [strval($arguments), 'string']
                 ]);
                 if (empty($task)) {
                     #Assume that it was a one-time job, that has already been run
@@ -251,7 +251,7 @@ class Cron
                 #Update last run
                 self::$dbController->query('UPDATE `'.self::$prefix.'schedule` SET `status`=2, `lastrun` = UTC_TIMESTAMP() WHERE `task`=:task AND `arguments` '.(empty($task['arguments']) ? 'IS' : '=').' :arguments', [
                     ':task' => [$task['task'], 'string'],
-                    ':arguments' => [$task['arguments'], (empty($task['arguments']) ? 'null' : 'string')],
+                    ':arguments' => [strval($task['arguments']), 'string'],
                 ]);
                 #Check if object is required
                 if (!empty($task['object'])) {
@@ -392,7 +392,7 @@ class Cron
     }
     
     #Schedule a task or update its frequency
-    public function add(string $task, null|array|string $arguments = NULL, int|string $frequency = 0, int $priority = 0, ?string $message = NULL, null|array|string $dayofmonth = NULL, null|array|string $dayofweek = NULL, int $time = 0): bool
+    public function add(string $task, null|array|string $arguments = '', int|string $frequency = 0, int $priority = 0, ?string $message = NULL, null|array|string $dayofmonth = NULL, null|array|string $dayofweek = NULL, int $time = 0): bool
     {
         if (self::$dbReady) {
             #Sanitize arguments
@@ -413,7 +413,7 @@ class Cron
             }
             return self::$dbController->query('INSERT INTO `'.self::$prefix.'schedule` (`task`, `arguments`, `frequency`, `dayofmonth`, `dayofweek`, `priority`, `message`, `nextrun`) VALUES (:task, :arguments, :frequency, :dayofmonth, :dayofweek, :priority, :message, :nextrun) ON DUPLICATE KEY UPDATE `frequency`=:frequency, `dayofmonth`=:dayofmonth, `dayofweek`=:dayofweek, `nextrun`=:nextrun, `priority`=:priority, `message`=:message, `updated`=UTC_TIMESTAMP();', [
                 ':task' => [$task, 'string'],
-                ':arguments' => [$arguments, (empty($arguments) ? 'null' : 'string')],
+                ':arguments' => [strval($arguments), 'string'],
                 ':frequency' => [$frequency, 'int'],
                 ':dayofmonth' => [$dayofmonth, (empty($dayofmonth) ? 'null' : 'string')],
                 ':dayofweek' => [$dayofweek, (empty($dayofweek) ? 'null' : 'string')],
@@ -427,14 +427,14 @@ class Cron
     }
     
     #Remove a task from schedule
-    public function delete(string $task, ?string $arguments = NULL): bool
+    public function delete(string $task, string $arguments = ''): bool
     {
         if (self::$dbReady) {
             #Sanitize arguments
             $arguments = $this->sanitize($arguments);
             return self::$dbController->query('DELETE FROM `'.self::$prefix.'schedule` WHERE `task`=:task AND `arguments` '.(empty($arguments) ? 'IS' : '=').' :arguments', [
                 ':task' => [$task, 'string'],
-                ':arguments' => [$arguments, (empty($arguments) ? 'null' : 'string')],
+                ':arguments' => [strval($arguments), 'string'],
             ]);
         } else {
             return false;
@@ -515,7 +515,7 @@ class Cron
     }
     
     #Reschedule a task (or remove it if it's onetime)
-    private function reSchedule(string $task, ?string $arguments = NULL, int|string $frequency = 0, bool $result = true): bool
+    private function reSchedule(string $task, string $arguments = '', int|string $frequency = 0, bool $result = true): bool
     {
         if (self::$dbReady) {
             #Ensure schedule is INT
@@ -529,7 +529,7 @@ class Cron
                 return self::$dbController->query('UPDATE `'.self::$prefix.'schedule` SET `status`=0, `runby`=NULL, `nextrun`='.$this->sqlNextRun.', `'.($result === true ? 'lastsuccess' : 'lasterror').'`=UTC_TIMESTAMP() WHERE `task`=:task AND `arguments` '.(empty($arguments) ? 'IS' : '=').' :arguments', [
                     ':time' => [self::$retry, 'int'],
                     ':task' => [$task, 'string'],
-                    ':arguments' => [$arguments, (empty($arguments) ? 'null' : 'string')],
+                    ':arguments' => [strval($arguments), 'string'],
                 ]);
             }
         } else {
@@ -538,15 +538,15 @@ class Cron
     }
     
     #Register error
-    private function error(string $text, ?string $task, ?string $arguments = NULL): void
+    private function error(string $text, string $task, string $arguments = ''): void
     {
         if (self::$dbReady) {
             #Insert error
             self::$dbController->query(
                 'INSERT INTO `'.self::$prefix.'errors` (`time`, `task`, `arguments`, `text`) VALUES (UTC_TIMESTAMP(), :task, :arguments, :text) ON DUPLICATE KEY UPDATE `time`=UTC_TIMESTAMP(), `text`=:text;',
                 [
-                    ':task' => [$task, (empty($task) ? 'null' : 'string')],
-                    ':arguments' => [$arguments, (empty($arguments) ? 'null' : 'string')],
+                    ':task' => [strval($task), 'string'],
+                    ':arguments' => [strval($arguments), 'string'],
                     ':text' => [$text, 'string'],
                 ]
             );
@@ -554,11 +554,11 @@ class Cron
     }
     
     #Helper function to sanitize the arguments/parameters into JSON string or NULL
-    private function sanitize(null|array|string $arguments = NULL): ?string
+    private function sanitize(null|array|string $arguments = NULL): string
     {
         #Return NULL if empty
         if (empty($arguments)) {
-            return NULL;
+            return '';
         } else {
             #Check if string
             if (is_string($arguments)) {

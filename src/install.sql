@@ -66,3 +66,10 @@ ALTER TABLE `%dbprefix%errors`
 
 ALTER TABLE `%dbprefix%schedule`
   ADD CONSTRAINT `schedule_to_task` FOREIGN KEY (`task`) REFERENCES `%dbprefix%tasks` (`task`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE `%dbprefix%schedule` CHANGE `arguments` `arguments` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '' COMMENT 'Optional arguments in JSON string';
+ALTER TABLE `%dbprefix%schedule` DROP INDEX `task`, ADD PRIMARY KEY (`task`, `arguments`) USING BTREE;
+ALTER TABLE `%dbprefix%errors` CHANGE `arguments` `arguments` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '' COMMENT 'Optional task arguments';
+ALTER TABLE `%dbprefix%errors` CHANGE `task` `task` VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '' COMMENT 'Optional task ID';
+ALTER TABLE `%dbprefix%errors` DROP INDEX `task`, ADD PRIMARY KEY (`task`, `arguments`) USING BTREE;
+ALTER TABLE `%dbprefix%errors` CHANGE `task` `task` VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '\'\'' COMMENT 'Optional task ID' FIRST, CHANGE `arguments` `arguments` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '\'\'' COMMENT 'Optional task arguments' AFTER `task`;
