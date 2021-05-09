@@ -249,7 +249,7 @@ class Cron
                     return false;
                 }
                 #Update last run
-                self::$dbController->query('UPDATE `'.self::$prefix.'schedule` SET `status`=2, `lastrun` = UTC_TIMESTAMP() WHERE `task`=:task AND `arguments` '.(empty($task['arguments']) ? 'IS' : '=').' :arguments', [
+                self::$dbController->query('UPDATE `'.self::$prefix.'schedule` SET `status`=2, `lastrun` = UTC_TIMESTAMP() WHERE `task`=:task AND `arguments`=:arguments;', [
                     ':task' => [$task['task'], 'string'],
                     ':arguments' => [strval($task['arguments']), 'string'],
                 ]);
@@ -432,7 +432,7 @@ class Cron
         if (self::$dbReady) {
             #Sanitize arguments
             $arguments = $this->sanitize($arguments);
-            return self::$dbController->query('DELETE FROM `'.self::$prefix.'schedule` WHERE `task`=:task AND `arguments` '.(empty($arguments) ? 'IS' : '=').' :arguments', [
+            return self::$dbController->query('DELETE FROM `'.self::$prefix.'schedule` WHERE `task`=:task AND `arguments`=:arguments;', [
                 ':task' => [$task, 'string'],
                 ':arguments' => [strval($arguments), 'string'],
             ]);
