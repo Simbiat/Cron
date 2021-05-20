@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS `%dbprefix%errors` (
+CREATE TABLE IF NOT EXISTS `%dbPrefix%errors` (
   `time` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp() COMMENT 'Time the error occured',
   `task` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Optional task ID',
   `arguments` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Optional task arguments',
@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS `%dbprefix%errors` (
   KEY `time` (`time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=COMPRESSED;
 
-CREATE TABLE IF NOT EXISTS `%dbprefix%schedule` (
+CREATE TABLE IF NOT EXISTS `%dbPrefix%schedule` (
   `task` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Task ID',
   `arguments` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Optional arguments in JSON string',
   `frequency` int(10) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Frequency to run a task in seconds',
@@ -29,26 +29,26 @@ CREATE TABLE IF NOT EXISTS `%dbprefix%schedule` (
   KEY `status` (`status`),
   KEY `runby` (`runby`),
   KEY `lastrun` (`lastrun`),
-  KEY `arguments` (`arguments`),
+  KEY `arguments` (`arguments`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=COMPRESSED;
 
-CREATE TABLE IF NOT EXISTS `%dbprefix%settings` (
+CREATE TABLE IF NOT EXISTS `%dbPrefix%settings` (
   `setting` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Name of the setting',
   `value` int(10) DEFAULT NULL COMMENT 'Value of the setting',
   `description` text COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Description of the setting',
   PRIMARY KEY (`setting`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=COMPRESSED;
 
-INSERT IGNORE INTO `%dbprefix%settings` (`setting`, `value`, `description`) VALUES
+INSERT IGNORE INTO `%dbPrefix%settings` (`setting`, `value`, `description`) VALUES
 ('enabled', 1, 'Whether cron is enabled. Will only affect processing, task management will still be possible.'),
-('errorlife', 30, 'Days to keep errors in log. Older records will be removed on next CRON process.'),
-('maxtime', 3600, 'Maximum amount of time in seconds to allow jobs to run. If the period elapses, a job will be considered hanged and will be rescheduled on next CRON processing.'),
+('errorLife', 30, 'Days to keep errors in log. Older records will be removed on next CRON process.'),
+('maxTime', 3600, 'Maximum amount of time in seconds to allow jobs to run. If the period elapses, a job will be considered hanged and will be rescheduled on next CRON processing.'),
 ('retry', 3600, 'Time in seconds to add to failed one-time jobs or hanged jobs, when rescheduling them'),
 ('sseLoop', 0, 'Whether we need to loop task processing when launched outside of CLI (that is SSE mode).'),
 ('sseRetry', 10000, 'Milliseconds for retry value of SSE'),
-('maxthreads', 4, 'Maximum number of simultanious threads to run');
+('maxThreads', 4, 'Maximum number of simultanious threads to run');
 
-CREATE TABLE IF NOT EXISTS `%dbprefix%tasks` (
+CREATE TABLE IF NOT EXISTS `%dbPrefix%tasks` (
   `task` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Function''s internal ID',
   `function` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Actual function reference, that will be called by Cron processor',
   `object` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Optional object',
@@ -58,18 +58,18 @@ CREATE TABLE IF NOT EXISTS `%dbprefix%tasks` (
   PRIMARY KEY (`task`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=COMPRESSED;
 
-ALTER TABLE `%dbprefix%errors`
-  ADD CONSTRAINT `errors_to_tasks` FOREIGN KEY (`task`) REFERENCES `%dbprefix%tasks` (`task`) ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE `%dbPrefix%errors`
+  ADD CONSTRAINT `errors_to_tasks` FOREIGN KEY (`task`) REFERENCES `%dbPrefix%tasks` (`task`) ON DELETE CASCADE ON UPDATE CASCADE;
 
-ALTER TABLE `%dbprefix%errors`
-  ADD CONSTRAINT `errors_to_arguments` FOREIGN KEY (`arguments`) REFERENCES `%dbprefix%schedule`(`arguments`) ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE `%dbPrefix%errors`
+  ADD CONSTRAINT `errors_to_arguments` FOREIGN KEY (`arguments`) REFERENCES `%dbPrefix%schedule`(`arguments`) ON DELETE CASCADE ON UPDATE CASCADE;
 
-ALTER TABLE `%dbprefix%schedule`
-  ADD CONSTRAINT `schedule_to_task` FOREIGN KEY (`task`) REFERENCES `%dbprefix%tasks` (`task`) ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE `%dbPrefix%schedule`
+  ADD CONSTRAINT `schedule_to_task` FOREIGN KEY (`task`) REFERENCES `%dbPrefix%tasks` (`task`) ON DELETE CASCADE ON UPDATE CASCADE;
 
-ALTER TABLE `%dbprefix%schedule` CHANGE `arguments` `arguments` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '' COMMENT 'Optional arguments in JSON string';
-ALTER TABLE `%dbprefix%schedule` DROP INDEX `task`, ADD PRIMARY KEY (`task`, `arguments`) USING BTREE;
-ALTER TABLE `%dbprefix%errors` CHANGE `arguments` `arguments` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '' COMMENT 'Optional task arguments';
-ALTER TABLE `%dbprefix%errors` CHANGE `task` `task` VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '' COMMENT 'Optional task ID';
-ALTER TABLE `%dbprefix%errors` DROP INDEX `task`, ADD PRIMARY KEY (`task`, `arguments`) USING BTREE;
-ALTER TABLE `%dbprefix%errors` CHANGE `task` `task` VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '\'\'' COMMENT 'Optional task ID' FIRST, CHANGE `arguments` `arguments` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '\'\'' COMMENT 'Optional task arguments' AFTER `task`;
+ALTER TABLE `%dbPrefix%schedule` CHANGE `arguments` `arguments` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '' COMMENT 'Optional arguments in JSON string';
+ALTER TABLE `%dbPrefix%schedule` DROP INDEX `task`, ADD PRIMARY KEY (`task`, `arguments`) USING BTREE;
+ALTER TABLE `%dbPrefix%errors` CHANGE `arguments` `arguments` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '' COMMENT 'Optional task arguments';
+ALTER TABLE `%dbPrefix%errors` CHANGE `task` `task` VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '' COMMENT 'Optional task ID';
+ALTER TABLE `%dbPrefix%errors` DROP INDEX `task`, ADD PRIMARY KEY (`task`, `arguments`) USING BTREE;
+ALTER TABLE `%dbPrefix%errors` CHANGE `task` `task` VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '\'\'' COMMENT 'Optional task ID' FIRST, CHANGE `arguments` `arguments` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '\'\'' COMMENT 'Optional task arguments' AFTER `task`;
