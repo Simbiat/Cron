@@ -36,6 +36,10 @@ class Cron
      */
     public function __construct(bool $installed = true)
     {
+        #Check if we are in CLI
+        if (preg_match('/^cli(-server)?$/i', php_sapi_name()) === 1) {
+            self::$CLI = true;
+        }
         #Check that database connection is established
         if (self::$dbReady === false) {
             $pool = (new Pool);
@@ -50,56 +54,8 @@ class Cron
                         throw new \UnexpectedValueException('Failed to install tables for CRON');
                     }
                 }
-                #Get settings
-                $settings = self::$dbController->selectPair('SELECT `setting`, `value` FROM `cron__settings`');
-                #Update enabled flag
-                if (!empty($settings['enabled'])) {
-                    self::$enabled = boolval($settings['enabled']);
-                }
-                #Update SSE loop flag
-                if (!empty($settings['sseLoop'])) {
-                    self::$sseLoop = boolval($settings['sseLoop']);
-                }
-                #Update retry time
-                if (!empty($settings['retry'])) {
-                    $settings['retry'] = intval($settings['retry']);
-                    if ($settings['retry'] > 0) {
-                        self::$retry = $settings['retry'];
-                    }
-                }
-                #Update SSE retry time
-                if (!empty($settings['sseRetry'])) {
-                    $settings['sseRetry'] = intval($settings['sseRetry']);
-                    if ($settings['sseRetry'] > 0) {
-                        self::$retry = $settings['sseRetry'];
-                    }
-                }
-                #Update maximum time
-                if (!empty($settings['maxTime'])) {
-                    $settings['maxTime'] = intval($settings['maxTime']);
-                    if ($settings['maxTime'] > 0) {
-                        self::$maxTime = $settings['maxTime'];
-                    }
-                }
-                #Update maximum number of threads
-                if (!empty($settings['maxThreads'])) {
-                    $settings['maxThreads'] = intval($settings['maxThreads']);
-                    if ($settings['maxThreads'] > 0) {
-                        self::$maxThreads = $settings['maxThreads'];
-                    }
-                }
-                #Update maximum life of an error
-                if (!empty($settings['errorLife'])) {
-                    $settings['errorLife'] = intval($settings['errorLife']);
-                    if ($settings['errorLife'] > 0) {
-                        self::$errorLife = $settings['errorLife'];
-                    }
-                }
+                $this->getSettings();
             }
-        }
-        #Check if we are in CLI
-        if (preg_match('/^cli(-server)?$/i', php_sapi_name()) === 1) {
-            self::$CLI = true;
         }
     }
 
@@ -203,7 +159,7 @@ class Cron
                             sleep(self::$sseRetry/20);
                         }
                     }
-                } while (self::$CLI === false && self::$sseLoop === true && connection_status() === 0);
+                } while ($this->getSettings() === true && self::$enabled === true && self::$CLI === false && self::$sseLoop === true && connection_status() === 0);
                 #Notify of end of stream
                 if (self::$CLI === false) {
                     $this->streamEcho('Cron processing finished', 'CronEnd');
@@ -666,7 +622,6 @@ class Cron
     }
 
     #Helper function to check number of active threads
-
     /**
      * @throws \Exception
      */
@@ -679,5 +634,62 @@ class Cron
         } else {
             return false;
         }
+    }
+
+    #Helper function to get/update settings
+    private function getSettings(): bool
+    {
+        #Get settings
+        try {
+            $settings = self::$dbController->selectPair('SELECT `setting`, `value` FROM `cron__settings`');
+        } catch (\Exception $e) {
+            #Implies, that DB went away, for example
+            self::$dbReady = false;
+            return false;
+        }
+        #Update enabled flag
+        if (!empty($settings['enabled'])) {
+            self::$enabled = boolval($settings['enabled']);
+        }
+        #Update SSE loop flag
+        if (!empty($settings['sseLoop'])) {
+            self::$sseLoop = boolval($settings['sseLoop']);
+        }
+        #Update retry time
+        if (!empty($settings['retry'])) {
+            $settings['retry'] = intval($settings['retry']);
+            if ($settings['retry'] > 0) {
+                self::$retry = $settings['retry'];
+            }
+        }
+        #Update SSE retry time
+        if (!empty($settings['sseRetry'])) {
+            $settings['sseRetry'] = intval($settings['sseRetry']);
+            if ($settings['sseRetry'] > 0) {
+                self::$retry = $settings['sseRetry'];
+            }
+        }
+        #Update maximum time
+        if (!empty($settings['maxTime'])) {
+            $settings['maxTime'] = intval($settings['maxTime']);
+            if ($settings['maxTime'] > 0) {
+                self::$maxTime = $settings['maxTime'];
+            }
+        }
+        #Update maximum number of threads
+        if (!empty($settings['maxThreads'])) {
+            $settings['maxThreads'] = intval($settings['maxThreads']);
+            if ($settings['maxThreads'] > 0) {
+                self::$maxThreads = $settings['maxThreads'];
+            }
+        }
+        #Update maximum life of an error
+        if (!empty($settings['errorLife'])) {
+            $settings['errorLife'] = intval($settings['errorLife']);
+            if ($settings['errorLife'] > 0) {
+                self::$errorLife = $settings['errorLife'];
+            }
+        }
+        return true;
     }
 }
