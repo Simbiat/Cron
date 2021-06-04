@@ -71,10 +71,10 @@ class Cron
         #Start stream if not in CLI
         if (self::$CLI === false) {
             ignore_user_abort(true);
-            header('Content-Type: text/event-stream');
-            header('Transfer-Encoding: chunked');
+            @header('Content-Type: text/event-stream');
+            @header('Transfer-Encoding: chunked');
             #Forbid caching, since stream is not supposed to be cached
-            header('Cache-Control: no-cache');
+            @header('Cache-Control: no-cache');
             $this->streamEcho('Cron processing started', 'CronStart');
         }
         #Regular maintenance
@@ -87,7 +87,7 @@ class Cron
             #Notify of end of stream
             if (self::$CLI === false) {
                 $this->streamEcho('Cron database not available', 'CronFail');
-                header('Connection: close');
+                @header('Connection: close');
             }
             return false;
         }
