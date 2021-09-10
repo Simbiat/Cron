@@ -7,6 +7,7 @@ use Simbiat\Database\Pool;
 
 class Cron
 {
+    const dbPrefix = 'cron__';
     #Flag to indicate that we are ready to work with DB
     public static bool $dbReady = false;
     #Cached database controller for performance
@@ -105,7 +106,7 @@ class Cron
                     if ($this->threadAvailable() === true) {
                         #Queue tasks for this random ID
                         if (self::$dbController->query(
-                            'UPDATE `cron__schedule` SET `status`=1, `runby`=:runby, `sse`=:sse, `lastrun`=UTC_TIMESTAMP() WHERE `status`<>2 AND `runby` IS NULL AND `nextrun`<=UTC_TIMESTAMP() ORDER BY `priority` DESC, `nextrun` LIMIT :limit',
+                            'UPDATE `'.self::dbPrefix.'schedule` SET `status`=1, `runby`=:runby, `sse`=:sse, `lastrun`=UTC_TIMESTAMP() WHERE `status`<>2 AND `runby` IS NULL AND `nextrun`<=UTC_TIMESTAMP() ORDER BY `priority` DESC, `nextrun` LIMIT :limit;',
                             [
                                 ':runby'=>$randomId,
                                 ':sse'=>[!self::$CLI, 'bool'],
@@ -121,7 +122,7 @@ class Cron
                         }
                         #Get tasks
                         $tasks = self::$dbController->SelectAll(
-                            'SELECT `cron__schedule`.`task`, `arguments`, `frequency`, `dayofmonth`, `dayofweek`, `message`, `nextrun` FROM `cron__schedule` INNER JOIN `cron__tasks` ON `cron__schedule`.`task`=`cron__tasks`.`task` WHERE `runby`=:runby ORDER BY `priority` DESC, `nextrun`',
+                            'SELECT `'.self::dbPrefix.'schedule`.`task`, `arguments`, `frequency`, `dayofmonth`, `dayofweek`, `message`, `nextrun` FROM `'.self::dbPrefix.'schedule` INNER JOIN `'.self::dbPrefix.'tasks` ON `'.self::dbPrefix.'schedule`.`task`=`'.self::dbPrefix.'tasks`.`task` WHERE `runby`=:runby ORDER BY `priority` DESC, `nextrun`;',
                             [
                                 ':runby'=>$randomId,
                             ]
@@ -210,7 +211,7 @@ class Cron
                 #Sanitize arguments
                 $arguments = $this->sanitize($arguments);
                 #Get full details
-                $task = self::$dbController->SelectRow('SELECT * FROM `cron__schedule` INNER JOIN `cron__tasks` ON `cron__schedule`.`task`=`cron__tasks`.`task` WHERE `status`<>2 AND `cron__schedule`.`task`=:task AND `arguments`=:arguments', [
+                $task = self::$dbController->SelectRow('SELECT * FROM `'.self::dbPrefix.'schedule` INNER JOIN `'.self::dbPrefix.'tasks` ON `'.self::dbPrefix.'schedule`.`task`=`'.self::dbPrefix.'tasks`.`task` WHERE `status`<>2 AND `'.self::dbPrefix.'schedule`.`task`=:task AND `arguments`=:arguments', [
                     ':task' => [$taskName, 'string'],
                     ':arguments' => [$arguments, 'string']
                 ]);
@@ -226,7 +227,7 @@ class Cron
                     return false;
                 }
                 #Update last run
-                self::$dbController->query('UPDATE `cron__schedule` SET `status`=2, `lastrun` = UTC_TIMESTAMP() WHERE `task`=:task AND `arguments`=:arguments;', [
+                self::$dbController->query('UPDATE `'.self::dbPrefix.'schedule` SET `status`=2, `lastrun` = UTC_TIMESTAMP() WHERE `task`=:task AND `arguments`=:arguments;', [
                     ':task' => [$task['task'], 'string'],
                     ':arguments' => [strval($task['arguments']), 'string'],
                 ]);
@@ -355,7 +356,7 @@ class Cron
         if (in_array($setting, ['enabled', 'sseLoop']) && $value > 1) {
             $value = 1;
         }
-        if (self::$dbController->query('UPDATE `cron__settings` SET `value`=:value WHERE `setting`=:setting;', [
+        if (self::$dbController->query('UPDATE `'.self::dbPrefix.'settings` SET `value`=:value WHERE `setting`=:setting;', [
                 ':setting' => [$setting, 'string'],
                 ':value' => [$value, 'int'],
             ]) === true) {
@@ -394,7 +395,7 @@ class Cron
             if ($time <= 0) {
                 $time = time();
             }
-            return self::$dbController->query('INSERT INTO `cron__schedule` (`task`, `arguments`, `frequency`, `dayofmonth`, `dayofweek`, `priority`, `message`, `nextrun`) VALUES (:task, :arguments, :frequency, :dayofmonth, :dayofweek, :priority, :message, :nextrun) ON DUPLICATE KEY UPDATE `frequency`=:frequency, `dayofmonth`=:dayofmonth, `dayofweek`=:dayofweek, `nextrun`=:nextrun, `priority`=:priority, `message`=:message, `updated`=UTC_TIMESTAMP();', [
+            return self::$dbController->query('INSERT INTO `'.self::dbPrefix.'schedule` (`task`, `arguments`, `frequency`, `dayofmonth`, `dayofweek`, `priority`, `message`, `nextrun`) VALUES (:task, :arguments, :frequency, :dayofmonth, :dayofweek, :priority, :message, :nextrun) ON DUPLICATE KEY UPDATE `frequency`=:frequency, `dayofmonth`=:dayofmonth, `dayofweek`=:dayofweek, `nextrun`=:nextrun, `priority`=:priority, `message`=:message, `updated`=UTC_TIMESTAMP();', [
                 ':task' => [$task, 'string'],
                 ':arguments' => [$arguments, 'string'],
                 ':frequency' => [$frequency, 'int'],
@@ -419,7 +420,7 @@ class Cron
         if (self::$dbReady) {
             #Sanitize arguments
             $arguments = $this->sanitize($arguments);
-            return self::$dbController->query('DELETE FROM `cron__schedule` WHERE `task`=:task AND `arguments`=:arguments;', [
+            return self::$dbController->query('DELETE FROM `'.self::dbPrefix.'schedule` WHERE `task`=:task AND `arguments`=:arguments;', [
                 ':task' => [$task, 'string'],
                 ':arguments' => [$arguments, 'string'],
             ]);
@@ -439,7 +440,7 @@ class Cron
             #Sanitize parameters and return
             $parameters = $this->sanitize($parameters);
             $returns = $this->sanitize($returns);
-            return self::$dbController->query('INSERT INTO `cron__tasks`(`task`, `function`, `object`, `parameters`, `allowedreturns`, `description`) VALUES (:task, :function, :object, :parameters, :returns, :desc) ON DUPLICATE KEY UPDATE `function`=:function, `object`=:object, `parameters`=:parameters, `allowedreturns`=:returns, `description`=:desc;', [
+            return self::$dbController->query('INSERT INTO `'.self::dbPrefix.'tasks`(`task`, `function`, `object`, `parameters`, `allowedreturns`, `description`) VALUES (:task, :function, :object, :parameters, :returns, :desc) ON DUPLICATE KEY UPDATE `function`=:function, `object`=:object, `parameters`=:parameters, `allowedreturns`=:returns, `description`=:desc;', [
                 ':task' => [$task, 'string'],
                 ':function' => [$function, 'string'],
                 ':object' => [$object, 'string'],
@@ -460,7 +461,7 @@ class Cron
     public function deleteTask(string $task): bool
     {
         if (self::$dbReady) {
-            return self::$dbController->query('DELETE FROM `cron__tasks` WHERE `task`=:task;', [
+            return self::$dbController->query('DELETE FROM `'.self::dbPrefix.'tasks` WHERE `task`=:task;', [
                 ':task' => [$task, 'string'],
             ]);
         } else {
@@ -476,7 +477,7 @@ class Cron
     public function unHang(): bool
     {
         if (self::$dbReady) {
-            return self::$dbController->query('UPDATE `cron__schedule` SET `status`=0, `runby`=NULL, `sse`=0, `nextrun`='.$this->sqlNextRun.', `lastrun`=IF(`lastrun` IS NULL, UTC_TIMESTAMP(), `lastrun`), `lasterror`=UTC_TIMESTAMP() WHERE `status`<>0 AND UTC_TIMESTAMP()>DATE_ADD(IF(`lastrun` IS NOT NULL, `lastrun`, `nextrun`), INTERVAL :maxTime SECOND);', [
+            return self::$dbController->query('UPDATE `'.self::dbPrefix.'schedule` SET `status`=0, `runby`=NULL, `sse`=0, `nextrun`='.$this->sqlNextRun.', `lastrun`=IF(`lastrun` IS NULL, UTC_TIMESTAMP(), `lastrun`), `lasterror`=UTC_TIMESTAMP() WHERE `status`<>0 AND UTC_TIMESTAMP()>DATE_ADD(IF(`lastrun` IS NOT NULL, `lastrun`, `nextrun`), INTERVAL :maxTime SECOND);', [
                 ':time' => [self::$retry, 'int'],
                 ':maxTime' => [self::$maxTime, 'int'],
             ]);
@@ -493,7 +494,7 @@ class Cron
     public function errorPurge(): bool
     {
         if (self::$dbReady) {
-            return self::$dbController->query('DELETE FROM `cron__errors` WHERE `time` <= DATE_SUB(UTC_TIMESTAMP(), INTERVAL :errorLife DAY);', [
+            return self::$dbController->query('DELETE FROM `'.self::dbPrefix.'errors` WHERE `time` <= DATE_SUB(UTC_TIMESTAMP(), INTERVAL :errorLife DAY);', [
                 ':errorLife' => [self::$errorLife, 'int'],
             ]);
         } else {
@@ -532,7 +533,7 @@ class Cron
             } else {
                 #Actually reschedule. One task time task will be rescheduled for the retry time from settings
                 /** @noinspection SqlResolve */
-                self::$dbController->query('UPDATE `cron__schedule` SET `status`=0, `runby`=NULL, `sse`=0, `nextrun`='.$this->sqlNextRun.', `'.($result === true ? 'lastsuccess' : 'lasterror').'`=UTC_TIMESTAMP() WHERE `task`=:task AND `arguments`=:arguments;', [
+                self::$dbController->query('UPDATE `'.self::dbPrefix.'schedule` SET `status`=0, `runby`=NULL, `sse`=0, `nextrun`='.$this->sqlNextRun.', `'.($result === true ? 'lastsuccess' : 'lasterror').'`=UTC_TIMESTAMP() WHERE `task`=:task AND `arguments`=:arguments;', [
                     ':time' => [self::$retry, 'int'],
                     ':task' => [$task, 'string'],
                     ':arguments' => [$arguments, 'string'],
@@ -551,7 +552,7 @@ class Cron
         if (self::$dbReady) {
             #Insert error
             self::$dbController->query(
-                'INSERT INTO `cron__errors` (`time`, `task`, `arguments`, `text`) VALUES (UTC_TIMESTAMP(), :task, :arguments, :text) ON DUPLICATE KEY UPDATE `time`=UTC_TIMESTAMP(), `text`=:text;',
+                'INSERT INTO `'.self::dbPrefix.'errors` (`time`, `task`, `arguments`, `text`) VALUES (UTC_TIMESTAMP(), :task, :arguments, :text) ON DUPLICATE KEY UPDATE `time`=UTC_TIMESTAMP(), `text`=:text;',
                 [
                     ':task' => [$task, 'string'],
                     ':arguments' => [$arguments, 'string'],
@@ -640,7 +641,7 @@ class Cron
     private function threadAvailable(): bool
     {
         #Get current count
-        $current = self::$dbController->count('SELECT COUNT(DISTINCT(`runby`)) FROM `cron__schedule` WHERE `runby` IS NOT NULL;');
+        $current = self::$dbController->count('SELECT COUNT(DISTINCT(`runby`)) FROM `'.self::dbPrefix.'schedule` WHERE `runby` IS NOT NULL;');
         if ($current < self::$maxThreads) {
             return true;
         } else {
@@ -653,7 +654,7 @@ class Cron
     {
         #Get settings
         try {
-            $settings = self::$dbController->selectPair('SELECT `setting`, `value` FROM `cron__settings`');
+            $settings = self::$dbController->selectPair('SELECT `setting`, `value` FROM `'.self::dbPrefix.'settings`');
         } catch (\Exception) {
             #Implies, that DB went away, for example
             self::$dbReady = false;
