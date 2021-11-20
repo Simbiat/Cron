@@ -617,20 +617,22 @@ class Cron
         #Sanitize
         $values = $this->sanitize($values);
         #Actually decode
-        $values = json_decode($values, flags: JSON_THROW_ON_ERROR|JSON_INVALID_UTF8_SUBSTITUTE|JSON_BIGINT_AS_STRING|JSON_OBJECT_AS_ARRAY);
-        #If not an array - allow run
-        if (is_array($values)) {
-            #If empty - allow run
-            if (!empty($values)) {
-                #Filter non-integers, negative integers and too large integers
-                $values = array_filter($values, function($item) use ($maxValue) {
-                    return (is_int($item) && $item >= 1 && $item <= $maxValue);
-                });
-                #If empty after filtering - allow run
+        if (!empty($values)) {
+            $values = json_decode($values, flags: JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_BIGINT_AS_STRING | JSON_OBJECT_AS_ARRAY);
+            #If not an array - allow run
+            if (is_array($values)) {
+                #If empty - allow run
                 if (!empty($values)) {
-                    #If current day is in array - allow run
-                    if (!in_array(intval(date($format, time())), $values)) {
-                        return false;
+                    #Filter non-integers, negative integers and too large integers
+                    $values = array_filter($values, function ($item) use ($maxValue) {
+                        return (is_int($item) && $item >= 1 && $item <= $maxValue);
+                    });
+                    #If empty after filtering - allow run
+                    if (!empty($values)) {
+                        #If current day is in array - allow run
+                        if (!in_array(intval(date($format, time())), $values)) {
+                            return false;
+                        }
                     }
                 }
             }
