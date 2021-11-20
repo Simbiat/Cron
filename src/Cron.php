@@ -181,7 +181,7 @@ class Cron
                 return true;
             } catch(\Exception $e) {
                 #Attempt to register error
-                $this->error('General cycle failure:'."\r\n".$e->getMessage()."\r\n".$e->getTraceAsString(), '');
+                error_log('General cron cycle failure:'."\r\n".$e->getMessage()."\r\n".$e->getTraceAsString());
                 #Notify of end of stream
                 if (self::$CLI === false) {
                     $this->streamEcho('Cron processing failed', 'CronEnd');
@@ -486,8 +486,7 @@ class Cron
         }
     }
 
-    #Function to cleanup errors
-
+    #Function to clean up errors
     /**
      * @throws \Exception
      */
@@ -554,7 +553,9 @@ class Cron
             self::$dbController->query(
                 'INSERT INTO `'.self::dbPrefix.'errors` (`time`, `task`, `arguments`, `text`) VALUES (UTC_TIMESTAMP(), :task, :arguments, :text) ON DUPLICATE KEY UPDATE `time`=UTC_TIMESTAMP(), `text`=:text;',
                 [
-                    ':task' => [$task, 'string'],
+                    ':task' => [
+                        $task, 'string'
+                    ],
                     ':arguments' => [$arguments, 'string'],
                     ':text' => [$text, 'string'],
                 ]
@@ -600,6 +601,9 @@ class Cron
     }
 
     #Helper function to validate whether job is allowed to run today
+    /**
+     * @throws \JsonException
+     */
     private function dayOfCheck(?string $values = NULL, bool $month = true): bool
     {
         #Set the settings
