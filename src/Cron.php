@@ -689,22 +689,22 @@ class Cron
             }
         }
         #Update maximum time
-        if (isset($settings['maxtime'])) {
-            $settings['maxTime'] = intval($settings['maxtime']);
+        if (isset($settings['maxTime'])) {
+            $settings['maxTime'] = intval($settings['maxTime']);
             if ($settings['maxTime'] > 0) {
                 self::$maxTime = $settings['maxTime'];
             }
         }
         #Update maximum number of threads
-        if (isset($settings['maxthreads'])) {
-            $settings['maxThreads'] = intval($settings['maxthreads']);
+        if (isset($settings['maxThreads'])) {
+            $settings['maxThreads'] = intval($settings['maxThreads']);
             if ($settings['maxThreads'] > 0) {
                 self::$maxThreads = $settings['maxThreads'];
             }
         }
         #Update maximum life of an error
-        if (isset($settings['errorlife'])) {
-            $settings['errorLife'] = intval($settings['errorlife']);
+        if (isset($settings['errorLife'])) {
+            $settings['errorLife'] = intval($settings['errorLife']);
             if ($settings['errorLife'] > 0) {
                 self::$errorLife = $settings['errorLife'];
             }

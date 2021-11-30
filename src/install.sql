@@ -74,3 +74,6 @@ ALTER TABLE `cron__errors` CHANGE `task` `task` VARCHAR(100) CHARACTER SET utf8m
 ALTER TABLE `cron__errors` DROP INDEX `task`, ADD PRIMARY KEY (`task`, `arguments`) USING BTREE;
 ALTER TABLE `cron__errors` CHANGE `task` `task` VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '\'\'' COMMENT 'Optional task ID' FIRST, CHANGE `arguments` `arguments` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '\'\'' COMMENT 'Optional task arguments' AFTER `task`;
 ALTER TABLE `cron__schedule` ADD `sse` TINYINT(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Flag to indicate whether job is being ran by SSE call.' AFTER `runby`;
+UPDATE `cron__settings` SET `setting` = 'maxTime' WHERE `cron__settings`.`setting` = 'maxtime';
+UPDATE `cron__settings` SET `setting` = 'maxThreads' WHERE `cron__settings`.`setting` = 'maxthreads';
+UPDATE `cron__settings` SET `setting` = 'errorLife' WHERE `cron__settings`.`setting` = 'errorlife';
