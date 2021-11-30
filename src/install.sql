@@ -77,3 +77,5 @@ ALTER TABLE `cron__schedule` ADD `sse` TINYINT(1) UNSIGNED NOT NULL DEFAULT '0' 
 UPDATE `cron__settings` SET `setting` = 'maxTime' WHERE `cron__settings`.`setting` = 'maxtime';
 UPDATE `cron__settings` SET `setting` = 'maxThreads' WHERE `cron__settings`.`setting` = 'maxthreads';
 UPDATE `cron__settings` SET `setting` = 'errorLife' WHERE `cron__settings`.`setting` = 'errorlife';
+ALTER TABLE `cron__tasks` ADD `maxTime` INT(10) UNSIGNED NOT NULL DEFAULT '3600' COMMENT 'Maximum time allowed for the task to run. If exceeded, it will be terminated by PHP.' AFTER `allowedreturns`;
+DELETE FROM `cron__settings` WHERE `cron__settings`.`setting` = 'maxTime';

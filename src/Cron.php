@@ -67,8 +67,6 @@ class Cron
      */
     public function process(int $items = 1): bool
     {
-        #ALlow long runs
-        set_time_limit(0);
         #Start stream if not in CLI
         if (self::$CLI === false) {
             ignore_user_abort(true);
@@ -200,7 +198,6 @@ class Cron
     }
 
     #Run the function based on the task details
-
     /**
      * @throws \Exception
      */
@@ -226,6 +223,8 @@ class Cron
                     $this->reSchedule($task['task'], $task['arguments'], $task['frequency'], false);
                     return false;
                 }
+                #Set time limit for the task
+                set_time_limit(intval($task['maxTime']));
                 #Update last run
                 self::$dbController->query('UPDATE `'.self::dbPrefix.'schedule` SET `status`=2, `lastrun` = UTC_TIMESTAMP() WHERE `task`=:task AND `arguments`=:arguments;', [
                     ':task' => [$task['task'], 'string'],
@@ -347,7 +346,7 @@ class Cron
             $value = match($setting) {
                 'enabled', 'sseLoop' => 0,
                 'errorLife' => 30,
-                'maxTime', 'retry' => 3600,
+                'retry' => 3600,
                 'sseRetry' => 10000,
                 'maxThreads' => 4,
             };
@@ -372,7 +371,6 @@ class Cron
     }
 
     #Schedule a task or update its frequency
-
     /**
      * @throws \Exception
      */
@@ -411,7 +409,6 @@ class Cron
     }
 
     #Remove a task from schedule
-
     /**
      * @throws \Exception
      */
@@ -430,22 +427,22 @@ class Cron
     }
 
     #Add (or update) task type
-
     /**
      * @throws \Exception
      */
-    public function addTask(string $task, string $function, ?string $object = NULL, null|array|string $parameters = NULL, null|array|string $returns = NULL, ?string $desc = NULL): bool
+    public function addTask(string $task, string $function, ?string $object = NULL, null|array|string $parameters = NULL, null|array|string $returns = NULL, int $maxTime = 3600, ?string $desc = NULL): bool
     {
         if (self::$dbReady) {
             #Sanitize parameters and return
             $parameters = $this->sanitize($parameters);
             $returns = $this->sanitize($returns);
-            return self::$dbController->query('INSERT INTO `'.self::dbPrefix.'tasks`(`task`, `function`, `object`, `parameters`, `allowedreturns`, `description`) VALUES (:task, :function, :object, :parameters, :returns, :desc) ON DUPLICATE KEY UPDATE `function`=:function, `object`=:object, `parameters`=:parameters, `allowedreturns`=:returns, `description`=:desc;', [
+            return self::$dbController->query('INSERT INTO `'.self::dbPrefix.'tasks`(`task`, `function`, `object`, `parameters`, `allowedreturns`, `maxTime`, `description`) VALUES (:task, :function, :object, :parameters, :returns, :maxTime, :desc) ON DUPLICATE KEY UPDATE `function`=:function, `object`=:object, `parameters`=:parameters, `allowedreturns`=:returns, `maxTime`=:maxTime, `description`=:desc;', [
                 ':task' => [$task, 'string'],
                 ':function' => [$function, 'string'],
                 ':object' => [$object, 'string'],
                 ':parameters' => [$parameters, (empty($parameters) ? 'null' : 'string')],
                 ':returns' => [$returns, (empty($returns) ? 'null' : 'string')],
+                ':maxTime' => [$maxTime, 'int'],
                 ':desc' => [$desc, 'string'],
             ]);
         } else {
@@ -454,7 +451,6 @@ class Cron
     }
 
     #Delete task type
-
     /**
      * @throws \Exception
      */
@@ -477,9 +473,8 @@ class Cron
     public function unHang(): bool
     {
         if (self::$dbReady) {
-            return self::$dbController->query('UPDATE `'.self::dbPrefix.'schedule` SET `status`=0, `runby`=NULL, `sse`=0, `nextrun`='.$this->sqlNextRun.', `lastrun`=IF(`lastrun` IS NULL, UTC_TIMESTAMP(), `lastrun`), `lasterror`=UTC_TIMESTAMP() WHERE `status`<>0 AND UTC_TIMESTAMP()>DATE_ADD(IF(`lastrun` IS NOT NULL, `lastrun`, `nextrun`), INTERVAL :maxTime SECOND);', [
+            return self::$dbController->query('UPDATE `'.self::dbPrefix.'schedule` AS `a` SET `status`=0, `runby`=NULL, `sse`=0, `nextrun`='.$this->sqlNextRun.', `lastrun`=IF(`lastrun` IS NULL, UTC_TIMESTAMP(), `lastrun`), `lasterror`=UTC_TIMESTAMP() WHERE `status`<>0 AND UTC_TIMESTAMP()>DATE_ADD(IF(`lastrun` IS NOT NULL, `lastrun`, `nextrun`), INTERVAL (SELECT `maxTime` FROM `'.self::dbPrefix.'tasks` WHERE `'.self::dbPrefix.'tasks`.`task`=`a`.`task`) SECOND);', [
                 ':time' => [self::$retry, 'int'],
-                ':maxTime' => [self::$maxTime, 'int'],
             ]);
         } else {
             return false;
@@ -686,13 +681,6 @@ class Cron
             $settings['sseRetry'] = intval($settings['sseRetry']);
             if ($settings['sseRetry'] > 0) {
                 self::$retry = $settings['sseRetry'];
-            }
-        }
-        #Update maximum time
-        if (isset($settings['maxTime'])) {
-            $settings['maxTime'] = intval($settings['maxTime']);
-            if ($settings['maxTime'] > 0) {
-                self::$maxTime = $settings['maxTime'];
             }
         }
         #Update maximum number of threads
