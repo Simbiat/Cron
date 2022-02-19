@@ -120,7 +120,7 @@ class Cron
                         }
                         #Get tasks
                         $tasks = self::$dbController->SelectAll(
-                            'SELECT `'.self::dbPrefix.'schedule`.`task`, `arguments`, `frequency`, `dayofmonth`, `dayofweek`, `message`, `nextrun` FROM `'.self::dbPrefix.'schedule` INNER JOIN `'.self::dbPrefix.'tasks` ON `'.self::dbPrefix.'schedule`.`task`=`'.self::dbPrefix.'tasks`.`task` WHERE `runby`=:runby ORDER BY `priority` DESC, `nextrun`;',
+                            'SELECT `'.self::dbPrefix.'schedule`.`task`, `arguments`, `frequency`, `dayofmonth`, `dayofweek`, `message`, `nextrun` FROM `'.self::dbPrefix.'schedule` INNER JOIN `'.self::dbPrefix.'tasks` ON `'.self::dbPrefix.'schedule`.`task`=`'.self::dbPrefix.'tasks`.`task` WHERE `runby`=:runby ORDER BY IF(`frequency`=0, IF(DATEDIFF(UTC_TIMESTAMP, `nextrun`)>0, DATEDIFF(UTC_TIMESTAMP, `nextrun`), 0), CEIL(IF(TIMEDIFF(UTC_TIMESTAMP, `nextrun`)/`frequency`>1, TIMEDIFF(UTC_TIMESTAMP, `nextrun`)/`frequency`, 0)))+`priority` DESC, `nextrun`;',
                             [
                                 ':runby'=>$randomId,
                             ]
@@ -393,7 +393,7 @@ class Cron
             if ($time <= 0) {
                 $time = time();
             }
-            return self::$dbController->query('INSERT INTO `'.self::dbPrefix.'schedule` (`task`, `arguments`, `frequency`, `dayofmonth`, `dayofweek`, `priority`, `message`, `nextrun`) VALUES (:task, :arguments, :frequency, :dayofmonth, :dayofweek, :priority, :message, :nextrun) ON DUPLICATE KEY UPDATE `frequency`=:frequency, `dayofmonth`=:dayofmonth, `dayofweek`=:dayofweek, `nextrun`=:nextrun, `priority`=:priority, `message`=:message, `updated`=UTC_TIMESTAMP();', [
+            return self::$dbController->query('INSERT INTO `'.self::dbPrefix.'schedule` (`task`, `arguments`, `frequency`, `dayofmonth`, `dayofweek`, `priority`, `message`, `nextrun`) VALUES (:task, :arguments, :frequency, :dayofmonth, :dayofweek, :priority, :message, :nextrun) ON DUPLICATE KEY UPDATE `frequency`=:frequency, `dayofmonth`=:dayofmonth, `dayofweek`=:dayofweek, `nextrun`=IF(:frequency=0, `nextrun`, :nextrun), `priority`=IF(:frequency=0, IF(`priority`>:priority, `priority`, :priority), :priority), `message`=:message, `updated`=UTC_TIMESTAMP();', [
                 ':task' => [$task, 'string'],
                 ':arguments' => [$arguments, 'string'],
                 ':frequency' => [$frequency, 'int'],
