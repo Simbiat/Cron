@@ -42,7 +42,9 @@ Originally my [fftracker](https://github.com/Simbiat/FFTracker) was hosted on se
 (new \Simbiat\Cron('prefix__', false));
 ```
 `'prefix__'` - the optional prefix your tables will have. Defaults to `'cron__'`.
+
 `false` is required for installation, as a flag that indicates whether tables are "installed" (defaults to `true`). `false` will trigger the installation process.
+
 Due to current design, after the tables are created this way, you will need to recreate the object for future use, in case you will be using the same script.
 
 ## Trigger processing
@@ -64,9 +66,13 @@ Step 6 will call
 $this->runTask(string $task, null|array|string $arguments = NULL);
 ```
 This function can also be called separately if you want to trigger a specific job (if it is not already running). It takes 2 arguments, that compile a `UNIQUE` key on database level:
+
 `$task` - name of the task type.
+
 `$arguments` - arguments for the function.
+
 If a task with these values and status `0` (not running) or `1` (pending) is not found - `false` will be returned by the function, but this **will not** be treated as an error (it is possible, that a task was a one-time job and was finished already).
+
 Task run here are expected to return `boolean` values by default, but this can be expanded (read below). Only `true` is considered as actual success unless values are expanded. Any other value will be treated as `false`. This value will be converted to string and logged in error log, thus it is encouraged to your own error handling inside the called function, especially considering, that, by design, this library **cannot guarantee** catching those errors.
 
 ## Tasks management
@@ -76,12 +82,19 @@ In order to use this library you will need to add at least 1 task using below co
 addTask(string $task, string $function, ?string $object = NULL, null|array|string $parameters = NULL, null|array|string $returns = NULL, ?string $desc = NULL);
 ```
 `$task` is mandatory name of the task, that will be treated as a `UNIQUE` ID. Limited to `VARCHAR(100)`.
+
 `$function` is mandatory name of the function, that will be called. Limited to `VARCHAR(255)`.
+
 `$object` can be used, if your `$function` can be called only from an object. You must specify full name of the object with all namespaces, for example `\Simbiat\FFTracker`. Limited to `VARCHAR(255)`.
+
 `$parameters` are optional parameters that will be used when creating the optional `$object`. Needs to be either pure array or JSON encoded array of values, that can be expanded (`...` operator). Stored in database as JSON string and limited to `VARCHAR(5000)`.
+
 `$returns` are optional return values, that will be considered as "success". By default, the library relies on `boolean` values to determine if the task was completed successfully, but this option allows to expand the possible values. Needs to be either pure array or JSON encoded array of values, that can be expanded (`...` operator). Stored in database as JSON string and limited to `VARCHAR(5000)`.
+
 `$desc` is an optional description of the task. Limited to `VARCHAR(1000)`.
+
 Calling this function with `$task`, that is already registered, will update respective values.
+
 `$parameters` argument also supports special array key `'extramethods'`. This is a multidimensional array like this:
 ```php
 'extramethods' =>
@@ -97,6 +110,7 @@ Calling this function with `$task`, that is already registered, will update resp
     ]
 ```
 Every `method` in each sub-array is the name of the method, that needs to be called on an `$object` and `arguments` - expandable array of arguments, that needs to be passed to that `method`. These methods will be executed in the order registered in the array.
+
 Keep in mind, that each method should be returning an object (normally `return $this`), otherwise the chain can fail.
 
 ### Deleting a task
@@ -111,10 +125,15 @@ To schedule a task use this function:
 add(string $task, null|array|string $arguments = NULL, int|string $frequency = 0, int $priority = 0, ?string $message = NULL, null|array|string $dayofmonth = NULL, null|array|string $dayofweek = NULL, int $time = 0);
 ```
 `$task` is mandatory name of the task, with which it was added using `addTask`.
+
 `$arguments` are optional arguments, that will be passed to the function. Needs to be either pure array or JSON encoded array of values, that can be expanded (`...` operator). Stored in database as JSON string and limited to `VARCHAR(255)` (due to MySQL limitations).
+
 `$frequency` governs how frequent (in seconds) a task is supposed to be run. If set to 0, it will mean that the task is one-time, thus it will be removed from schedule (not from list of tasks) after successful run.
+
 `$message` is an optional custom message to be shown, when running in SSE mode.
+
 `$dayofmonth` is an optional array of integers, that limits days of a month on which a task can be run. It is recommended to use it only with `$frequency` set to `86400` (1 day), because otherwise it can cause unexpected shifts and delays. Needs to be either pure array or JSON encoded array of values, that can be expanded (`...` operator). Stored in database as JSON string and limited to `VARCHAR(255)`.
+
 `$dayofweek` is an optional array of integers, that limits days of a week on which a task can be run. It is recommended to use it only with `$frequency` set to `86400` (1 day), because otherwise it can cause unexpected shifts and delays. Needs to be either pure array or JSON encoded array of values, that can be expanded (`...` operator). Stored in database as JSON string and limited to `VARCHAR(60)`.
 
 ### Removing task from schedule
@@ -129,7 +148,9 @@ To change any settings, use
 setSetting(string $setting, int $value);
 ```
 `$setting` is name of the setting to change.
+
 `$value` is the new value for the setting.
+
 All settings are grabbed from database on object creation (unless created with `false` for installation).
 Supported settings are as follows:
 1. `enabled` governs whether processing is available. Does not block tasks management. Boolean value, thus as per MySQL/MariaDB design accepts only `0` and `1`. Default is `1`.
