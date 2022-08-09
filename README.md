@@ -129,7 +129,7 @@ To change any settings, use
 setSetting(string $setting, int $value);
 ```
 `$setting` is name of the setting to change.
-`$value` is the new value for the setting.
+`$value` is the new value for the setting.  
 All settings are grabbed from database on object creation (unless created with `false` for installation).
 Supported settings are as follows:
 1. `enabled` governs whether processing is available. Does not block tasks management. Boolean value, thus as per MySQL/MariaDB design accepts only `0` and `1`. Default is `1`.
