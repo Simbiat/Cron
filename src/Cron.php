@@ -7,7 +7,7 @@ use Simbiat\Database\Pool;
 
 class Cron
 {
-    const dbPrefix = 'cron__';
+    const string dbPrefix = 'cron__';
     #Flag to indicate that we are ready to work with DB
     public static bool $dbReady = false;
     #Cached database controller for performance
@@ -36,7 +36,7 @@ class Cron
     public function __construct(bool $installed = true)
     {
         #Check if we are in CLI
-        if (preg_match('/^cli(-server)?$/i', php_sapi_name()) === 1) {
+        if (preg_match('/^cli(-server)?$/i', PHP_SAPI) === 1) {
             self::$CLI = true;
         }
         #Check that database connection is established
@@ -146,23 +146,19 @@ class Cron
                                     }
                                 }
                             }
-                        } else {
-                            if (self::$CLI === false) {
-                                $this->streamEcho('Cron list is empty', 'CronEmpty');
-                                #Sleep for a bit
-                                sleep(self::$sseRetry/20);
-                            }
+                        } elseif (self::$CLI === false) {
+                            $this->streamEcho('Cron list is empty', 'CronEmpty');
+                            #Sleep for a bit
+                            sleep(self::$sseRetry/20);
                         }
                         #Additionally reschedule hanged jobs if we're in SSE
                         if (self::$CLI === false && self::$sseLoop === true) {
                             $this->unHang();
                         }
-                    } else {
-                        if (self::$CLI === false) {
-                            $this->streamEcho('Cron threads are exhausted', 'CronNoThreads');
-                            #Sleep for a bit
-                            sleep(self::$sseRetry/20);
-                        }
+                    } elseif (self::$CLI === false) {
+                        $this->streamEcho('Cron threads are exhausted', 'CronNoThreads');
+                        #Sleep for a bit
+                        sleep(self::$sseRetry/20);
                     }
                 } while ($this->getSettings() === true && self::$enabled === true && self::$CLI === false && self::$sseLoop === true && connection_status() === 0);
                 #Notify of end of stream
@@ -218,11 +214,11 @@ class Cron
                     return false;
                 }
                 #Set time limit for the task
-                set_time_limit(intval($task['maxTime']));
+                set_time_limit((int)$task['maxTime']);
                 #Update last run
                 self::$dbController->query('UPDATE `'.self::dbPrefix.'schedule` SET `status`=2, `lastrun` = CURRENT_TIMESTAMP() WHERE `task`=:task AND `arguments`=:arguments;', [
                     ':task' => [$task['task'], 'string'],
-                    ':arguments' => [strval($task['arguments']), 'string'],
+                    ':arguments' => [(string)$task['arguments'], 'string'],
                 ]);
                 #Check if object is required
                 if (!empty($task['object'])) {
@@ -281,14 +277,14 @@ class Cron
                 }
                 #Run function
                 if (empty($task['arguments'])) {
-                    $result = call_user_func($function);
+                    $result = $function();
                 } else {
                     #Decode arguments
                     $finalArguments = $this->json_decode_alt($task['arguments']);
                     if (is_array($finalArguments)) {
                         $result = call_user_func_array($function, $finalArguments);
                     } else {
-                        $result = call_user_func($function);
+                        $result = $function();
                     }
                 }
                 #Decode allowed returns if any
@@ -306,12 +302,12 @@ class Cron
             #Validate result
             if ($result !== true) {
                 #Check if it's an allowed return value
-                if (!empty($task['allowedreturns']) && in_array($result, $task['allowedreturns']) === true) {
+                if (!empty($task['allowedreturns']) && in_array($result, $task['allowedreturns'], true) === true) {
                     #Override the value
                     $result = true;
                 } else {
                     #Register error. strval is silenced to avoid warning in case result is an array or object, that can't be converted
-                    $this->error(@strval($result), $taskName, $arguments);
+                    $this->error(@(string)$result, $taskName, $arguments);
                     $result = false;
                 }
             }
@@ -319,20 +315,18 @@ class Cron
             $this->reSchedule($taskName, $arguments, (empty($task['frequency']) ? 0 : $task['frequency']), $result);
             #Return
             return $result;
-        } else {
-            return false;
         }
+        return false;
     }
 
     #Adjust settings
-
     /**
      * @throws \Exception
      */
     public function setSetting(string $setting, int $value): self
     {
         #Check setting name
-        if (!in_array($setting, $this->settings)) {
+        if (!in_array($setting, $this->settings, true)) {
             throw new \InvalidArgumentException('Attempt to set unsupported setting');
         }
         #Handle values lower than 0
@@ -346,7 +340,7 @@ class Cron
             };
         }
         #Handle booleans
-        if (in_array($setting, ['enabled', 'sseLoop']) && $value > 1) {
+        if ($value > 1 && in_array($setting, ['enabled', 'sseLoop'])) {
             $value = 1;
         }
         if (self::$dbController->query('UPDATE `'.self::dbPrefix.'settings` SET `value`=:value WHERE `setting`=:setting;', [
@@ -354,14 +348,13 @@ class Cron
                 ':value' => [$value, 'int'],
             ]) === true) {
             if (in_array($setting, ['enabled', 'sseLoop'])) {
-                self::${$setting} = boolval($value);
+                self::${$setting} = (bool)$value;
             } else {
                 self::${$setting} = $value;
             }
             return $this;
-        } else {
-            throw new \UnexpectedValueException('Failed to set setting `'.$setting.'` to '.$value);
         }
+        throw new \UnexpectedValueException('Failed to set setting `'.$setting.'` to '.$value);
     }
 
     #Schedule a task or update its frequency
@@ -375,7 +368,7 @@ class Cron
             $arguments = $this->sanitize($arguments);
             $dayofmonth = $this->sanitize($dayofmonth);
             $dayofweek = $this->sanitize($dayofweek);
-            $frequency = intval($frequency);
+            $frequency = (int)$frequency;
             if ($frequency < 0) {
                 $frequency = 0;
             }
@@ -397,9 +390,8 @@ class Cron
                 ':message' => [$message, (empty($message) ? 'null' : 'string')],
                 ':nextrun' => [$time, 'datetime'],
             ]);
-        } else {
-            return false;
         }
+        return false;
     }
 
     #Remove a task from schedule
@@ -415,9 +407,8 @@ class Cron
                 ':task' => [$task, 'string'],
                 ':arguments' => [$arguments, 'string'],
             ]);
-        } else {
-            return false;
         }
+        return false;
     }
 
     #Add (or update) task type
@@ -439,9 +430,8 @@ class Cron
                 ':maxTime' => [$maxTime, 'int'],
                 ':desc' => [$desc, 'string'],
             ]);
-        } else {
-            return false;
         }
+        return false;
     }
 
     #Delete task type
@@ -515,14 +505,13 @@ class Cron
     {
         if (self::$dbReady) {
             #Ensure schedule is INT
-            $frequency = intval($frequency);
+            $frequency = (int)$frequency;
             #Check whether this is a successful one-time job
             if ($frequency === 0 && $result === true) {
                 #Since this is a one-time task, we can just remove it
                 $this->delete($task, $arguments);
             } else {
                 #Actually reschedule. One task time task will be rescheduled for the retry time from settings
-                /** @noinspection SqlResolve */
                 self::$dbController->query('UPDATE `'.self::dbPrefix.'schedule` SET `status`=0, `runby`=NULL, `sse`=0, `nextrun`='.$this->sqlNextRun.', `'.($result === true ? 'lastsuccess' : 'lasterror').'`=CURRENT_TIMESTAMP() WHERE `task`=:task AND `arguments`=:arguments;', [
                     ':time' => [self::$retry, 'int'],
                     ':task' => [$task, 'string'],
@@ -550,31 +539,32 @@ class Cron
         }
     }
 
-    #Helper function to sanitize the arguments/parameters into JSON string or NULL
+    #Helper function to sanitize the arguments/parameters into JSON string or empty string
+    /**
+     * @throws \JsonException
+     */
     private function sanitize(null|array|string $arguments = NULL): string
     {
         #Return NULL if empty
         if (empty($arguments)) {
             return '';
-        } else {
-            #Check if string
-            if (is_string($arguments)) {
-                #Check if JSON
-                $this->json_decode_alt($arguments);
-                return $arguments;
-            } else {
-                #We have an array
-                return json_encode($arguments, JSON_INVALID_UTF8_SUBSTITUTE|JSON_UNESCAPED_UNICODE|JSON_PRESERVE_ZERO_FRACTION);
-            }
         }
+        #Check if string
+        if (is_string($arguments)) {
+            #Check if JSON
+            $this->json_decode_alt($arguments);
+            return $arguments;
+        }
+        #We have an array
+        return json_encode($arguments, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION);
     }
 
     #Helper function to throw better JSON errors
     private function json_decode_alt(string $arguments): bool|array
     {
         try {
-            return json_decode($arguments, flags: JSON_THROW_ON_ERROR|JSON_INVALID_UTF8_SUBSTITUTE|JSON_BIGINT_AS_STRING|JSON_OBJECT_AS_ARRAY);
-        } catch(\Exception $e) {
+            return json_decode($arguments, flags: JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_BIGINT_AS_STRING | JSON_OBJECT_AS_ARRAY);
+        } catch(\Throwable $e) {
             throw new \InvalidArgumentException('JSON decoding of \''.$arguments.'\' string failed with \''.$e->getMessage().'\' error.');
         }
     }
@@ -584,7 +574,7 @@ class Cron
     {
         echo 'retry: '.self::$sseRetry."\n".'id: '.hrtime(true)."\n".(empty($event) ? '' : 'event: '.$event."\n").'data: '.$message."\n\n";
         ob_flush();
-		flush();
+        flush();
     }
 
     #Helper function to validate whether job is allowed to run today
@@ -606,21 +596,15 @@ class Cron
         #Actually decode
         if (!empty($values)) {
             $values = json_decode($values, flags: JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_BIGINT_AS_STRING | JSON_OBJECT_AS_ARRAY);
-            #If not an array - allow run
-            if (is_array($values)) {
-                #If empty - allow run
-                if (!empty($values)) {
-                    #Filter non-integers, negative integers and too large integers
-                    $values = array_filter($values, function ($item) use ($maxValue) {
-                        return (is_int($item) && $item >= 1 && $item <= $maxValue);
-                    });
-                    #If empty after filtering - allow run
-                    if (!empty($values)) {
-                        #If current day is in array - allow run
-                        if (!in_array(intval(date($format, time())), $values)) {
-                            return false;
-                        }
-                    }
+            #If empty - allow run
+            if (!empty($values)) {
+                #Filter non-integers, negative integers and too large integers
+                $values = array_filter($values, static function ($item) use ($maxValue) {
+                    return (is_int($item) && $item >= 1 && $item <= $maxValue);
+                });
+                #If empty after filtering or if current day is in array - allow run
+                if (!empty($values) && !in_array((int)date($format), $values, true)) {
+                    return false;
                 }
             }
         }
@@ -635,11 +619,7 @@ class Cron
     {
         #Get current count
         $current = self::$dbController->count('SELECT COUNT(DISTINCT(`runby`)) FROM `'.self::dbPrefix.'schedule` WHERE `runby` IS NOT NULL;');
-        if ($current < self::$maxThreads) {
-            return true;
-        } else {
-            return false;
-        }
+        return $current < self::$maxThreads;
     }
 
     #Helper function to get/update settings
@@ -655,36 +635,36 @@ class Cron
         }
         #Update enabled flag
         if (isset($settings['enabled'])) {
-            self::$enabled = boolval(intval($settings['enabled']));
+            self::$enabled = (bool)(int)$settings['enabled'];
         }
         #Update SSE loop flag
         if (isset($settings['sseLoop'])) {
-            self::$sseLoop = boolval(intval($settings['sseLoop']));
+            self::$sseLoop = (bool)(int)$settings['sseLoop'];
         }
         #Update retry time
         if (isset($settings['retry'])) {
-            $settings['retry'] = intval($settings['retry']);
+            $settings['retry'] = (int)$settings['retry'];
             if ($settings['retry'] > 0) {
                 self::$retry = $settings['retry'];
             }
         }
         #Update SSE retry time
         if (isset($settings['sseRetry'])) {
-            $settings['sseRetry'] = intval($settings['sseRetry']);
+            $settings['sseRetry'] = (int)$settings['sseRetry'];
             if ($settings['sseRetry'] > 0) {
                 self::$retry = $settings['sseRetry'];
             }
         }
         #Update maximum number of threads
         if (isset($settings['maxThreads'])) {
-            $settings['maxThreads'] = intval($settings['maxThreads']);
+            $settings['maxThreads'] = (int)$settings['maxThreads'];
             if ($settings['maxThreads'] > 0) {
                 self::$maxThreads = $settings['maxThreads'];
             }
         }
         #Update maximum life of an error
         if (isset($settings['errorLife'])) {
-            $settings['errorLife'] = intval($settings['errorLife']);
+            $settings['errorLife'] = (int)$settings['errorLife'];
             if ($settings['errorLife'] > 0) {
                 self::$errorLife = $settings['errorLife'];
             }
