@@ -632,7 +632,7 @@ class Cron
         if (is_string($arguments)) {
             #Check if JSON
             if (json_validate($arguments)) {
-                return json_decode($arguments, flags: JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_BIGINT_AS_STRING | JSON_OBJECT_AS_ARRAY);
+                return $arguments;
             }
             throw new \InvalidArgumentException('Invalid JSON found in arguments string `'.$arguments.'`.');
         }
