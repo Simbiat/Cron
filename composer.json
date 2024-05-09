@@ -1,7 +1,11 @@
 {
     "name": "simbiat/cron",
     "type": "library",
-    "keywords": ["cron","php","scheduler"],
+    "keywords": [
+        "cron",
+        "php",
+        "scheduler"
+    ],
     "description": "Cron utilizing a database to store tasks.",
     "homepage": "https://github.com/Simbiat/cron",
     "license": "AGPL-3.0-or-later",
@@ -22,8 +26,8 @@
             "Simbiat\\": "src/"
         }
     },
-	"support": {
-		"issues": "https://github.com/Simbiat/cron/issues",
-		"source": "https://github.com/Simbiat/cron"
-	}
+    "support": {
+        "issues": "https://github.com/Simbiat/cron/issues",
+        "source": "https://github.com/Simbiat/cron"
+    }
 }
