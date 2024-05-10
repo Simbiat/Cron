@@ -222,7 +222,6 @@ class Cron
     public function runTask(string $taskName, null|array|string $arguments = NULL): bool
     {
         if (self::$enabled) {
-            $result = false;
             try {
                 #Sanitize arguments
                 $arguments = $this->sanitize($arguments);
@@ -311,7 +310,7 @@ class Cron
                     }
                     #Decode arguments
                     $finalArguments = json_decode($task['arguments'], flags: JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_BIGINT_AS_STRING | JSON_OBJECT_AS_ARRAY);
-                    \call_user_func_array($function, $finalArguments);
+                    $result = \call_user_func_array($function, $finalArguments);
                 }
                 #Decode allowed returns if any
                 if (!empty($task['allowedreturns'])) {
@@ -326,12 +325,17 @@ class Cron
             #Validate result
             if ($result !== true) {
                 #Check if it's an allowed return value
-                if (!empty($task['allowedreturns']) && in_array($result, $task['allowedreturns'], true) === true) {
-                    #Override the value
-                    $result = true;
+                if (!empty($task['allowedreturns'])) {
+                    if (in_array($result, $task['allowedreturns'], true) === true) {
+                        #Override the value
+                        $result = true;
+                    } else {
+                        $this->error('Unexpected return `'.json_encode($result, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION).'`.', $taskName, $arguments);
+                        $result = false;
+                    }
                 } else {
                     #Register error.
-                    $this->error(json_encode($result, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION), $taskName, $arguments);
+                    $this->error('Function call returned `false`.', $taskName, $arguments);
                     $result = false;
                 }
             }
