@@ -19,11 +19,12 @@
     ],
     "require": {
         "php": "^8.3",
-        "simbiat/database": "^2"
+        "simbiat/database": "^2",
+        "simbiat/sand-clock": "^2.3.3"
     },
     "autoload": {
         "psr-4": {
-            "Simbiat\\": "src/"
+            "Simbiat\\Cron": "src/"
         }
     },
     "support": {
