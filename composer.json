@@ -24,7 +24,7 @@
     },
     "autoload": {
         "psr-4": {
-            "Simbiat\\Cron": "src/"
+            "Simbiat\\Cron\\": "src/"
         }
     },
     "support": {
