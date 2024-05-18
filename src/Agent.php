@@ -215,7 +215,7 @@ class Agent
             #Attemp to run
             $result = $taskInstance->run();
         } catch (\Throwable $exception) {
-            self::log('Failed to run task `'.$task['task'].'`', 'CronFail', true, $exception, ($taskInstance ?? null));
+            self::log('Failed to run task `'.$task['task'].'`', 'CronTaskFail', true, $exception, ($taskInstance ?? null));
             return;
         }
         #Notify of the task finishing
