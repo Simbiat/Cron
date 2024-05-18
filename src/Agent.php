@@ -215,7 +215,7 @@ class Agent
             #Attemp to run
             $result = $taskInstance->run();
         } catch (\Throwable $exception) {
-            self::log('Failed to run task `'.$task['task'].'`', 'CronTaskFail', true, $exception, ($taskInstance ?? null));
+            self::log('Failed to run task `'.$task['task'].'`', 'CronTaskFail', false, $exception, ($taskInstance ?? null));
             return;
         }
         #Notify of the task finishing
@@ -470,15 +470,18 @@ class Agent
             echo 'retry: '.((($endStream || $error !== null)) ? 0 : self::$sseRetry)."\n".'id: '.hrtime(true)."\n".(empty($event) ? '' : 'event: '.$event."\n").'data: '.$message."\n\n";
             ob_flush();
             flush();
-            if (($endStream || $error !== null)) {
+        }
+        if ($endStream) {
+            if (self::$CLI === false) {
                 if (!headers_sent()) {
                     header('Connection: close');
                 }
+            }
+            if ($error !== null) {
+                throw new \RuntimeException($message, previous: $error);
+            } else {
                 exit;
             }
-        }
-        if ($error !== null) {
-            throw new \RuntimeException($message, previous: $error);
         }
     }
 }
