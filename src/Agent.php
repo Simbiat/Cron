@@ -161,10 +161,10 @@ class Agent
                 #Check if enough threads are available
                 try {
                     if (self::$dbController->count('SELECT COUNT(DISTINCT(`runby`)) as `count` FROM `'.self::dbPrefix.'schedule` WHERE `runby` IS NOT NULL;') < self::$maxThreads === false) {
+                        self::log('Cron threads are exhausted', self::$CLI ? 'CronEnd' : 'CronNoThreads');
                         if (self::$CLI) {
                             return false;
                         }
-                        self::log('Cron threads are exhausted', 'CronNoThreads');
                         #Sleep for a bit
                         sleep(self::$sseRetry / 20);
                         continue;
