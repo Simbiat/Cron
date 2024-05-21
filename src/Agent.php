@@ -182,8 +182,9 @@ class Agent
                         sleep(self::$sseRetry / 20);
                     }
                 } else {
-                    foreach ($tasks as $task) {
-                        $this->runTask($task);
+                    $totalTasks = count($tasks);
+                    foreach ($tasks as $number => $task) {
+                        $this->runTask($task, $number + 1, $totalTasks);
                     }
                 }
                 #Additionally reschedule hanged jobs if we're in SSE
@@ -202,27 +203,29 @@ class Agent
     
     /**
      * Wrapper for running the task
-     * @param array $task
+     * @param array $task       Task object
+     * @param int   $number     Current task number
+     * @param int   $totalTasks Total number of tasks
      *
      * @return void
      */
-    private function runTask(array $task): void
+    private function runTask(array $task, int $number, int $totalTasks): void
     {
         try {
             $taskInstance = (new TaskInstance($task['task'], $task['arguments'], $task['instance']));
             #Notify of the task starting
-            self::log((empty($task['message']) ? $task['task'].' starting' : $task['message']), 'CronTaskStart', task: $taskInstance);
+            self::log($number.'/'.$totalTasks.' '.(empty($task['message']) ? $task['task'].' starting' : $task['message']), 'CronTaskStart', task: $taskInstance);
             #Attemp to run
             $result = $taskInstance->run();
         } catch (\Throwable $exception) {
-            self::log('Failed to run task `'.$task['task'].'`', 'CronTaskFail', false, $exception, ($taskInstance ?? null));
+            self::log('Failed to run task `'.$task['task'].'` ('.$number.'/'.$totalTasks.')', 'CronTaskFail', false, $exception, ($taskInstance ?? null));
             return;
         }
         #Notify of the task finishing
         if ($result) {
-            self::log($task['task'].' finished', 'CronTaskEnd', task: $taskInstance);
+            self::log($number.'/'.$totalTasks.' '.$task['task'].' finished', 'CronTaskEnd', task: $taskInstance);
         } else {
-            self::log($task['task'].' failed', 'CronTaskFail', task: $taskInstance);
+            self::log($number.'/'.$totalTasks.' '.$task['task'].' failed', 'CronTaskFail', task: $taskInstance);
         }
     }
     
@@ -389,9 +392,10 @@ class Agent
     public function unHang(): bool
     {
         if (self::$dbReady) {
-            $tasks = self::$dbController->selectAll('SELECT `task`, `arguments`, `instance` FROM `'.self::dbPrefix.'schedule` as `a` WHERE `runby` IS NOT NULL AND CURRENT_TIMESTAMP()>DATE_ADD(IF(`lastrun` IS NOT NULL, `lastrun`, `nextrun`), INTERVAL (SELECT `maxTime` FROM `'.self::dbPrefix.'tasks` WHERE `'.self::dbPrefix.'tasks`.`task`=`a`.`task`) SECOND);');
+            $tasks = self::$dbController->selectAll('SELECT `task`, `arguments`, `instance`, `frequency` FROM `'.self::dbPrefix.'schedule` as `a` WHERE `runby` IS NOT NULL AND CURRENT_TIMESTAMP()>DATE_ADD(IF(`lastrun` IS NOT NULL, `lastrun`, `nextrun`), INTERVAL (SELECT `maxTime` FROM `'.self::dbPrefix.'tasks` WHERE `'.self::dbPrefix.'tasks`.`task`=`a`.`task`) SECOND);');
             foreach ($tasks as $task) {
-                (new TaskInstance($task['task'], $task['arguments'], $task['instance']))->reSchedule(false);
+                #If this was a one-time task, schedule it for right now, to avoid delaying it for double the time
+                (new TaskInstance($task['task'], $task['arguments'], $task['instance']))->reSchedule(false, ($task['frequency'] === 0 ? time() : null));
             }
         } else {
             return false;

@@ -421,9 +421,11 @@ class TaskInstance
             if (empty($this->arguments)) {
                 $result = $function();
             } else {
-                $result = \call_user_func_array($function, json_decode($this->arguments, flags: JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_BIGINT_AS_STRING | JSON_OBJECT_AS_ARRAY));
+                #Replace instance reference
+                $arguments = str_replace('"$cronInstance"', (string)$this->instance, $this->arguments);
+                $result = \call_user_func_array($function, json_decode($arguments, flags: JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_BIGINT_AS_STRING | JSON_OBJECT_AS_ARRAY));
             }
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             $result = $e->getMessage()."\r\n".$e->getTraceAsString();
         }
         #Validate result
@@ -439,6 +441,7 @@ class TaskInstance
                 }
             } elseif ($result !== false) {
                 Agent::log('Unexpected return `'.json_encode($result, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION).'`.', 'CronTaskFail', task: $this);
+                $result = false;
             }
         }
         #Reschedule
