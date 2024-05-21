@@ -160,7 +160,7 @@ To schedule a task use this function:
 
 `$task` is mandatory name of the task.
 
-`$arguments` are optional arguments, that will be passed to the function. Needs to be either pure array or JSON encoded array of values, that can be expanded (`...` operator). Stored in database as JSON or empty string and limited to `VARCHAR(255)` (due to MySQL limitations).
+`$arguments` are optional arguments, that will be passed to the function. Needs to be either pure array or JSON encoded array of values, that can be expanded (`...` operator). Stored in database as JSON or empty string and limited to `VARCHAR(255)` (due to MySQL limitations). Also supports special string `"$cronInstance"` (when JSON encoded, that is) that will be replaced by task instance value, when run (useful, when you need multiple instances, and need to offset their processing logic).
 
 `$instance` is optional instance number (or ID if you like). By default, it is `1`. This is useful, if you want to create multiple instances for the same task with same arguments, which you want to run in parallel, when possible.
 
