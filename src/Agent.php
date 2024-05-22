@@ -244,12 +244,9 @@ class Agent
             self::$dbController->query('UPDATE `'.self::dbPrefix.'schedule` AS `toUpdate`
                         INNER JOIN
                         (
-                            SELECT * FROM
-                                (
-                                    SELECT `task`, `arguments`, `instance` FROM `'.self::dbPrefix.'schedule`
-                                    WHERE `runby` IS NULL AND `nextrun`<=CURRENT_TIMESTAMP() '.self::$sqlOrderBy.'
-                                ) `toOrder`
-                            GROUP BY `task`, `arguments` LIMIT :limit
+                            SELECT `task`, `arguments`, `instance` FROM `'.self::dbPrefix.'schedule`
+                            WHERE `runby` IS NULL AND `nextrun`<=CURRENT_TIMESTAMP() GROUP BY `task`, `arguments` '.self::$sqlOrderBy.'
+                            LIMIT :limit
                         ) `toSelect`
                         ON `toUpdate`.`task`=`toSelect`.`task`
                             AND `toUpdate`.`arguments`=`toSelect`.`arguments`
