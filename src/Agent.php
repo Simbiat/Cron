@@ -425,8 +425,61 @@ class Agent
      */
     public function install(): bool|string
     {
-        #Get contents from SQL file
-        $sql = file_get_contents(__DIR__.'\install.sql');
+        #Check if settings table exists
+        if (self::$dbController->checkTable(self::dbPrefix.'settings') === 1) {
+            #Assume that we have installed the database, try to get version
+            $version = self::$dbController->selectValue('SELECT `value` FROM `'.self::dbPrefix.'settings` WHERE `setting`=\'version\'');
+            #If empty install script was ran before 2.1.2, so need to determine what version we have based on other things
+            if (empty($version)) {
+                #If errors table does not exist, and log table does - we are on version 2.0.0
+                if (self::$dbController->checkTable(self::dbPrefix.'errors') === 0 && self::$dbController->checkTable(self::dbPrefix.'log') === 1) {
+                    $version = '2.0.0';
+                    #If one of schedule columns is datetime, it's 1.5.0
+                } elseif (self::$dbController->getColumnType(self::dbPrefix.'schedule', 'registered') === 'datetime') {
+                    $version = '1.5.0';
+                    #If `maxTime` column is present in `tasks` table - 1.3.0
+                } elseif (self::$dbController->checkColumn(self::dbPrefix.'tasks', 'maxTime')) {
+                    $version = '1.3.0';
+                    #If `maxTime` column is present in `tasks` table - 1.2.0
+                } elseif (self::$dbController->checkColumn(self::dbPrefix.'schedule', 'sse')) {
+                    $version = '1.2.0';
+                    #If one of the settings has name `errorLife` (and not `errorlife`) - 1.1.14
+                } elseif (self::$dbController->selectValue('SELECT `setting` FROM `'.self::dbPrefix.'settings` WHERE `setting`=\'errorLife\'') === 'errorLife') {
+                    $version = '1.1.14';
+                    #If `arguments` column is not nullable - 1.1.12
+                } elseif (self::$dbController->isNullable(self::dbPrefix.'schedule', 'arguments') === false) {
+                    $version = '1.1.12';
+                    #If `errors_to_arguments` Foreign Key exists in `errors` table - 1.1.8
+                } elseif (self::$dbController->checkFK(self::dbPrefix.'errors', 'errors_to_arguments')) {
+                    $version = '1.1.8';
+                    #It's 1.1.7 if old column description is used
+                } elseif (self::$dbController->getColumnDescription(self::dbPrefix.'schedule', 'arguments') === 'Optional task arguments') {
+                    $version = '1.1.7';
+                    #If `maxthreads` setting exists - it's 1.1.0
+                } elseif (self::$dbController->selectValue('SELECT `setting` FROM `'.self::dbPrefix.'settings` WHERE `setting`=\'maxthreads\'') === 'maxthreads') {
+                    $version = '1.1.0';
+                    #Otherwise - version 1.0.0
+                } else {
+                    $version = '1.0.0';
+                }
+            }
+        } else {
+            $version = '0.0.0';
+        }
+        #Get SQL from all files
+        $sqlFiles = glob(__DIR__.'/installer/*.sql');
+        $sql = '';
+        foreach ($sqlFiles as $file) {
+            #Compare version and take only newer ones
+            if (version_compare(basename($file, '.sql'), $version, 'gt')) {
+                #Get contents from SQL file
+                $sql .= file_get_contents($file);
+            }
+        }
+        #If empty - we are up-to-date
+        if (empty($sql)) {
+            return true;
+        }
         #Split file content into queries
         $sql = self::$dbController->stringToQueries($sql);
         try {
