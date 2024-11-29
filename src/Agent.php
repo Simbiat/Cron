@@ -6,6 +6,7 @@ namespace Simbiat\Cron;
 use JetBrains\PhpStorm\ExpectedValues;
 use Simbiat\Database\Controller;
 use Simbiat\Database\Pool;
+use Simbiat\http\SSE;
 
 use function in_array;
 
@@ -120,13 +121,7 @@ class Agent
     {
         #Start stream if not in CLI
         if (self::$CLI === false) {
-            ignore_user_abort(true);
-            if (!headers_sent()) {
-                header('Content-Type: text/event-stream');
-                header('Transfer-Encoding: chunked');
-                #Forbid caching, since stream is not supposed to be cached
-                header('Cache-Control: no-cache');
-            }
+            SSE::open();
         }
         #Generate random ID
         try {
@@ -182,7 +177,7 @@ class Agent
                         sleep(self::$sseRetry / 20);
                     }
                 } else {
-                    $totalTasks = count($tasks);
+                    $totalTasks = \count($tasks);
                     foreach ($tasks as $number => $task) {
                         $this->runTask($task, $number + 1, $totalTasks);
                     }
@@ -429,7 +424,7 @@ class Agent
         if (self::$dbController->checkTable(self::dbPrefix.'settings') === 1) {
             #Assume that we have installed the database, try to get version
             $version = self::$dbController->selectValue('SELECT `value` FROM `'.self::dbPrefix.'settings` WHERE `setting`=\'version\'');
-            #If empty install script was ran before 2.1.2, so need to determine what version we have based on other things
+            #If empty installer script was ran before 2.1.2, so need to determine what version we have based on other things
             if (empty($version)) {
                 #If errors table does not exist, and log table does - we are on version 2.0.0
                 if (self::$dbController->checkTable(self::dbPrefix.'errors') === 0 && self::$dbController->checkTable(self::dbPrefix.'log') === 1) {
@@ -521,21 +516,16 @@ class Agent
             );
         }
         if (self::$CLI === false) {
-            echo 'retry: '.((($endStream || $error !== null)) ? 0 : self::$sseRetry)."\n".'id: '.hrtime(true)."\n".(empty($event) ? '' : 'event: '.$event."\n").'data: '.$message."\n\n";
-            ob_flush();
-            flush();
+            SSE::send($message, $event, ((($endStream || $error !== null)) ? 0 : self::$sseRetry));
         }
         if ($endStream) {
             if (self::$CLI === false) {
-                if (!headers_sent()) {
-                    header('Connection: close');
-                }
+                SSE::close();
             }
             if ($error !== null) {
                 throw new \RuntimeException($message, previous: $error);
-            } else {
-                exit;
             }
+            exit;
         }
     }
 }

@@ -18,9 +18,10 @@
         }
     ],
     "require": {
-        "php": "^8.3",
+        "php": "^8.4",
         "simbiat/database": "^2.12",
-        "simbiat/sand-clock": "^2.3.3"
+        "simbiat/sand-clock": "^2.3.3",
+        "simbiat/sse": "^1.0"
     },
     "autoload": {
         "psr-4": {
