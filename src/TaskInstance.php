@@ -115,6 +115,10 @@ class TaskInstance
      */
     public function settingsFromArray(array $settings): self
     {
+        #We need to process system status first, since frequency depends on it
+        if (isset($settings['system'])) {
+            $this->system = (bool)$settings['system'];
+        }
         foreach ($settings as $setting => $value) {
             switch ($setting) {
                 case 'task':
@@ -138,9 +142,6 @@ class TaskInstance
                 case 'dayofweek':
                     $this->setDayOfWeek($value);
                     break;
-                case 'system':
-                    $this->system = (bool)$value;
-                    break;
                 case 'nextrun':
                     $this->nextTime = strtotime($value);
                     break;
@@ -150,6 +151,9 @@ class TaskInstance
                     } else {
                         $this->message = $value;
                     }
+                    break;
+                default:
+                    #Do nothing
                     break;
             }
         }
@@ -253,6 +257,9 @@ class TaskInstance
             }
             if ($frequency > 0 && $frequency < $this->taskObject->minFrequency) {
                 throw new \UnexpectedValueException('`frequency` for `'.$this->taskName.'` should be either 0 (one-time job) or equal or more than '.$this->taskObject->minFrequency.' seconds');
+            }
+            if ($frequency === 0 && $this->system) {
+                throw new \UnexpectedValueException('`frequency` cannot be set to 0 (one-time job), if task instance is system one');
             }
             $this->frequency = $frequency;
         } else {
