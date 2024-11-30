@@ -98,6 +98,7 @@ In order to use this library you will need to add at least 1 task using below co
 7. `system` whether a task can be removed by this class or not.
 8. `maxTime` maximum time in seconds to allow the function to run (will update execution time limit before running the task). `3600` by default.
 9. `minFrequency` minimal allowed frequency (in seconds) at which a task instance can run. Does not apply to one-time jobs.
+10. `retry` custom number of seconds to reschedule a failed task instance for instead of determining next run based on `frequency`. `0` (default) disables the functionality, since this can (and most likely will) introduce drift, so best be used on tasks that, do not require precise time to be run on. Applies to one-time jobs as well.
 
 Calling this function with `$task`, that is already registered, will update respective values, except for `system`.
 
@@ -228,10 +229,10 @@ You can also manually reschedule a task using
 You can execute
 
 ```php
-(new \Simbiat\Cron\TaskInstance('taskName', 'arguments', 1))->updateNextRun();
+(new \Simbiat\Cron\TaskInstance('taskName', 'arguments', 1))->updateNextRun($result);
 ```
 
-to get suggested UNIX timestamp for next run of a task. It will calculate how many jobs were potentially missed based on time difference between current `nextrun` value in database and current time as well as instance frequency. This is required to keep the schedule consistent, so that if you schedule a task at `02:34` daily, it would always run at `02:34` (or try, at least). If instance has `dayofweek` or `dayofmonth`, the function will find the earliest day that will satisfy both limitations starting from the date, which was determined based on instance frequency.
+to get suggested UNIX timestamp for next run of a task. It will calculate how many jobs were potentially missed based on time difference between current `nextrun` value in database and current time as well as instance frequency. This is required to keep the schedule consistent, so that if you schedule a task at `02:34` daily, it would always run at `02:34` (or try, at least). If instance has `dayofweek` or `dayofmonth`, the function will find the earliest day that will satisfy both limitations starting from the date, which was determined based on instance frequency. `result` value is optional (`true` by default), and will affect logic only if set to `false` and `retry` value for the task is more than 0, essentially overriding the normal logic.
 
 ## Settings
 

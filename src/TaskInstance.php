@@ -14,51 +14,51 @@ class TaskInstance
     /**
      * @var string Unique name of the task
      */
-    public string $taskName = '';
+    public private(set) string $taskName = '';
     /**
      * @var string Optional object reference
      */
-    public string $arguments = '';
+    public private(set) string $arguments = '';
     /**
      * @var int Task instance
      */
-    public int $instance = 1;
+    public private(set) int $instance = 1;
     /**
      * @var bool Whether task instance is system one or not
      */
-    public bool $system = false;
+    public private(set) bool $system = false;
     /**
      * @var int Task instance frequency
      */
-    public int $frequency = 0;
+    public private(set) int $frequency = 0;
     /**
      * @var string|null Day of month limitation
      */
-    public ?string $dayofmonth = null;
+    public private(set) ?string $dayofmonth = null;
     /**
      * @var string|null Day of week limitation
      */
-    public ?string $dayofweek = null;
+    public private(set) ?string $dayofweek = null;
     /**
      * @var int Task instance priority
      */
-    public int $priority = 0;
+    public private(set) int $priority = 0;
     /**
      * @var string|null Message to show in SSE mode
      */
-    public ?string $message = null;
+    public private(set) ?string $message = null;
     /**
      * @var int Time of the next run
      */
-    public int $nextTime = 0;
+    public private(set) int $nextTime = 0;
     /**
      * @var bool Whether task was found in database
      */
-    public bool $foundInDB = false;
+    public private(set) bool $foundInDB = false;
     /**
      * @var Task|null Task object
      */
-    public ?Task $taskObject = null;
+    public private(set) ?Task $taskObject = null;
     
     /**
      * Create a Cron task object
@@ -97,10 +97,10 @@ class TaskInstance
                 ]
             );
             if (!empty($settings)) {
-                #Process settings
-                $this->settingsFromArray($settings);
                 #Get task object
                 $this->taskObject = (new Task($this->taskName));
+                #Process settings
+                $this->settingsFromArray($settings);
                 #If nothing failed at this point, set the flag to `true`
                 $this->foundInDB = $this->taskObject->foundInDB;
             }
@@ -115,6 +115,10 @@ class TaskInstance
      */
     public function settingsFromArray(array $settings): self
     {
+        #If we are creating a task instance from outside the class (for example new instance), we may not have all details, so ensure we get them
+        if ($this->taskObject === null && !empty($settings['task'])) {
+            $this->taskObject = (new Task($settings['task']));
+        }
         #We need to process system status first, since frequency depends on it
         if (isset($settings['system'])) {
             $this->system = (bool)$settings['system'];
@@ -378,7 +382,7 @@ class TaskInstance
             }
             #Actually reschedule. One task time task will be rescheduled for the retry time from settings
             return Agent::$dbController->query('UPDATE `'.Agent::dbPrefix.'schedule` SET `status`=0, `runby`=NULL, `sse`=0, `nextrun`=:time, `'.($result === true ? 'lastsuccess' : 'lasterror').'`=CURRENT_TIMESTAMP() WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance;', [
-                ':time' => [$timestamp ?? $this->updateNextRun(), 'datetime'],
+                ':time' => [$timestamp ?? $this->updateNextRun($result), 'datetime'],
                 ':task' => [$this->taskName, 'string'],
                 ':arguments' => [$this->arguments, 'string'],
                 ':instance' => [$this->instance, 'int'],
@@ -524,10 +528,12 @@ class TaskInstance
     /**
      * Calculate time for the next run
      *
+     * @param bool $result Flag to determine if we are determining new time for a successful job (`true`, default) or failed one
+     *
      * @return int
      * @throws \JsonException
      */
-    public function updateNextRun(): int
+    public function updateNextRun(bool $result = true): int
     {
         if ($this->foundInDB === false) {
             throw new \UnexpectedValueException('Not found in database.');
@@ -536,18 +542,22 @@ class TaskInstance
         if (empty($this->nextTime)) {
             $this->nextTime = $currentTime;
         }
-        #Determine minimum seconds to move the time by
-        if ($this->frequency > 0) {
-            $seconds = $this->frequency;
+        if (!$result && $this->taskObject->retry && $this->taskObject->retry > 0) {
+            $newTime = $this->nextTime + $this->taskObject->retry;
         } else {
-            $seconds = Agent::$retry;
+            #Determine minimum seconds to move the time by
+            if ($this->frequency > 0) {
+                $seconds = $this->frequency;
+            } else {
+                $seconds = Agent::$retry;
+            }
+            #Determine time difference between current time and run time, that was initially set
+            $timeDiff = $currentTime - $this->nextTime;
+            #Determine how many runs (based on frequency) could have happened within the time difference, essentially to "skip" over the missed runs
+            $possibleRuns = (int)ceil($timeDiff / $seconds);
+            #Increase time value by
+            $newTime = $this->nextTime + (max($possibleRuns, 1) * $seconds);
         }
-        #Determine time difference between current time and run time, that was initially set
-        $timeDiff = $currentTime - $this->nextTime;
-        #Determine how many runs (based on frequency) could have happened within the time difference, essentially to "skip" over the missed runs
-        $possibleRuns = (int)ceil($timeDiff / $seconds);
-        #Increase time value by
-        $newTime = $this->nextTime + (max($possibleRuns, 1) * $seconds);
         if (empty($this->dayofmonth) && empty($this->dayofweek)) {
             return $newTime;
         }

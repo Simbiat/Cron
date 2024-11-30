@@ -1,3 +1,4 @@
 ALTER TABLE `cron__log` CHANGE `message` `message` TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_nopad_ci NOT NULL COMMENT 'Message provided by the event';
 ALTER TABLE `cron__tasks` ADD `minFrequency` INT(10) UNSIGNED NOT NULL DEFAULT '60' COMMENT 'Minimal allowed frequency (in seconds) at which a task instance can run. Does not apply to one-time jobs.' AFTER `maxTime`;
+ALTER TABLE `cron__tasks` ADD `retry` INT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Custom number of seconds to reschedule a failed task instance for. 0 disables the functionality.' AFTER `minFrequency`;
 UPDATE `cron__settings` SET `value` = '2.2.0' WHERE `cron__settings`.`setting` = 'version';
