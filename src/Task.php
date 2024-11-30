@@ -13,47 +13,47 @@ class Task
     /**
      * @var string Unique name of the task
      */
-    public string $taskName = '';
+    public private(set) string $taskName = '';
     /**
      * @var string Name of the task
      */
-    public string $function = '';
+    public private(set) string $function = '';
     /**
      * @var string|null Optional object reference
      */
-    public ?string $object = null;
+    public private(set) ?string $object = null;
     /**
      * @var string|null Parameters to set for the object (passed to construct)
      */
-    public ?string $parameters = '';
+    public private(set) ?string $parameters = '';
     /**
      * @var string|null Expected (and allowed) return values
      */
-    public ?string $returns = '';
+    public private(set) ?string $returns = '';
     /**
      * @var int Maximum execution time
      */
-    public int $maxTime = 3600;
+    public private(set) int $maxTime = 3600;
     /**
      * @var int Minimal allowed frequency (in seconds) at which a task instance can run. Does not apply to one-time jobs.
      */
-    public int $minFrequency = 3600;
+    public private(set) int $minFrequency = 3600;
     /**
      * @var int Custom number of seconds to reschedule a failed task instance for. 0 disables the functionality.
      */
-    public int $retry = 3600;
+    public private(set) int $retry = 3600;
     /**
      * @var bool Whether task is system one or not
      */
-    public bool $system = false;
+    public private(set) bool $system = false;
     /**
      * @var string|null Description of the task
      */
-    public ?string $description = null;
+    public private(set) ?string $description = null;
     /**
      * @var bool Whether task was found in database
      */
-    public bool $foundInDB = false;
+    public private(set) bool $foundInDB = false;
     
     /**
      * Create a Cron task object

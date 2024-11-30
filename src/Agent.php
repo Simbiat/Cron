@@ -24,12 +24,12 @@ class Agent
      * Flag to indicate that we are ready to work with DB
      * @var bool
      */
-    public static bool $dbReady = false;
+    public private(set) static bool $dbReady = false;
     /**
      * Cached database controller for performance
      * @var Controller|null
      */
-    public static ?Controller $dbController = NULL;
+    public private(set) static ?Controller $dbController = NULL;
     /**
      * Flag to indicate, whether Cron is enabled
      * @var bool
@@ -39,7 +39,7 @@ class Agent
      * Retry time for one-time jobs
      * @var int
      */
-    public static int $retry = 3600;
+    public private(set) static int $retry = 3600;
     /**
      * Days to store errors for
      * @var int
