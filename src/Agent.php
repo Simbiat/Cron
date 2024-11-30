@@ -218,7 +218,7 @@ class Agent
         }
         #Notify of the task finishing
         if ($result) {
-            self::log($number.'/'.$totalTasks.' '.$task['task'].' finished', 'CronTaskEnd', task: $taskInstance);
+            self::log($number.'/'.$totalTasks.' '.$task['task'].' finished'.($taskInstance->frequency === 0 ? ' and deleted' : ''), 'CronTaskEnd', task: $taskInstance);
         } else {
             self::log($number.'/'.$totalTasks.' '.$task['task'].' failed', 'CronTaskFail', task: $taskInstance);
         }

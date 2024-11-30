@@ -351,8 +351,8 @@ class TaskInstance
             } catch (\Throwable $e) {
                 Agent::log('Failed to delete task instance.', 'InstanceDeleteFail', error: $e, task: $this);
             }
-            #Log only if something was actually deleted
-            if (Agent::$dbController->getResult() > 0) {
+            #Log only if something was actually deleted, and if it's not a one-time job
+            if ($this->frequency > 0 && Agent::$dbController->getResult() > 0) {
                 Agent::log('Deleted task instance.', 'InstanceDelete', task: $this);
             }
             return $result;
