@@ -35,6 +35,10 @@ class Task
      */
     public int $maxTime = 3600;
     /**
+     * @var int Minimal allowed frequency (in seconds) at which a task instance can run. Does not apply to one-time jobs.
+     */
+    public int $minFrequency = 3600;
+    /**
      * @var bool Whether task is system one or not
      */
     public bool $system = false;
@@ -117,6 +121,9 @@ class Task
                 case 'maxTime':
                     $this->setMaxTime($value);
                     break;
+                case 'minFrequency':
+                    $this->setMinFrequency($value);
+                    break;
                 case 'system':
                     $this->system = (bool)$value;
                     break;
@@ -193,6 +200,26 @@ class Task
     }
     
     /**
+     * Set minimum frequency allowed for task instances
+     * @param mixed $value
+     *
+     * @return void
+     */
+    private function setMinFrequency(mixed $value): void
+    {
+        if (empty($value)) {
+            $this->minFrequency = 0;
+        } elseif (is_numeric($value)) {
+            $this->minFrequency = (int)$value;
+            if ($this->minFrequency < 0) {
+                $this->minFrequency = 0;
+            }
+        } else {
+            throw new \UnexpectedValueException('`minFrequency` is not a valid numeric value');
+        }
+    }
+    
+    /**
      * Add (or update) task
      *
      * @return bool
@@ -206,13 +233,14 @@ class Task
             throw new \UnexpectedValueException('Function name is not set');
         }
         if (Agent::$dbReady) {
-            return Agent::$dbController->query('INSERT INTO `'.Agent::dbPrefix.'tasks` (`task`, `function`, `object`, `parameters`, `allowedreturns`, `maxTime`, `system`, `description`) VALUES (:task, :function, :object, :parameters, :returns, :maxTime, :system, :desc) ON DUPLICATE KEY UPDATE `function`=:function, `object`=:object, `parameters`=:parameters, `allowedreturns`=:returns, `maxTime`=:maxTime, `system`=:system, `description`=:desc;', [
+            return Agent::$dbController->query('INSERT INTO `'.Agent::dbPrefix.'tasks` (`task`, `function`, `object`, `parameters`, `allowedreturns`, `maxTime`, `minFrequency`, `system`, `description`) VALUES (:task, :function, :object, :parameters, :returns, :maxTime, :minFrequency, :system, :desc) ON DUPLICATE KEY UPDATE `function`=:function, `object`=:object, `parameters`=:parameters, `allowedreturns`=:returns, `maxTime`=:maxTime, `minFrequency`=:minFrequency, `system`=:system, `description`=:desc;', [
                 ':task' => [$this->taskName, 'string'],
                 ':function' => [$this->function, 'string'],
                 ':object' => [$this->object, (empty($this->object) ? 'null' : 'string')],
                 ':parameters' => [$this->parameters, (empty($this->parameters) ? 'null' : 'string')],
                 ':returns' => [$this->returns, (empty($this->returns) ? 'null' : 'string')],
                 ':maxTime' => [$this->maxTime, 'int'],
+                ':minFrequency' => [$this->minFrequency, 'int'],
                 ':system' => [$this->system, 'bool'],
                 ':desc' => [$this->description, (empty($this->description) ? 'null' : 'string')],
             ]);

@@ -97,6 +97,7 @@ In order to use this library you will need to add at least 1 task using below co
 6. `desccription` is an optional description of the task. Limited to `VARCHAR(1000)`.
 7. `system` whether a task can be removed by this class or not.
 8. `maxTime` maximum time in seconds to allow the function to run (will update execution time limit before running the task). `3600` by default.
+9. `minFrequency` minimal allowed frequency (in seconds) at which a task instance can run. Does not apply to one-time jobs.
 
 Calling this function with `$task`, that is already registered, will update respective values, except for `system`.
 

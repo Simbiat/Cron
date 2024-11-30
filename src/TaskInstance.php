@@ -247,10 +247,14 @@ class TaskInstance
         if (empty($value)) {
             $this->frequency = 0;
         } elseif (is_numeric($value)) {
-            $this->frequency = (int)$value;
-            if ($this->frequency < 0) {
-                $this->frequency = 0;
+            $frequency = (int)$value;
+            if ($frequency < 0) {
+                $frequency = 0;
             }
+            if ($frequency > 0 && $frequency < $this->taskObject->minFrequency) {
+                throw new \UnexpectedValueException('`frequency` for `'.$this->taskName.'` should be either 0 (one-time job) or equal or more than '.$this->taskObject->minFrequency.' seconds');
+            }
+            $this->frequency = $frequency;
         } else {
             throw new \UnexpectedValueException('`frequency` is not a valid numeric value');
         }
