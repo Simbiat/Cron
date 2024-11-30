@@ -321,7 +321,10 @@ class TaskInstance
             } catch (\Throwable $e) {
                 Agent::log('Failed to add or update task instance.', 'InstanceAddFail', error: $e, task: $this);
             }
-            Agent::log('Added or updated task instance.', 'InstanceAdd', task: $this);
+            #Log only if something was actually changed
+            if (Agent::$dbController->getResult() > 0) {
+                Agent::log('Added or updated task instance.', 'InstanceAdd', task: $this);
+            }
             return $result;
         }
         return false;
@@ -348,7 +351,10 @@ class TaskInstance
             } catch (\Throwable $e) {
                 Agent::log('Failed to delete task instance.', 'InstanceDeleteFail', error: $e, task: $this);
             }
-            Agent::log('Deleted task instance.', 'InstanceDelete', task: $this);
+            #Log only if something was actually deleted
+            if (Agent::$dbController->getResult() > 0) {
+                Agent::log('Deleted task instance.', 'InstanceDelete', task: $this);
+            }
             return $result;
         }
         return false;
@@ -377,7 +383,10 @@ class TaskInstance
             } catch (\Throwable $e) {
                 Agent::log('Failed to mark task instance as system one.', 'InstanceToSystemFail', error: $e, task: $this);
             }
-            Agent::log('Marked task instance as system one.', 'InstanceToSystem', task: $this);
+            #Log only if something was actually changed
+            if (Agent::$dbController->getResult() > 0) {
+                Agent::log('Marked task instance as system one.', 'InstanceToSystem', task: $this);
+            }
             return $result;
         }
         return false;
@@ -416,7 +425,10 @@ class TaskInstance
             } catch (\Throwable $e) {
                 Agent::log('Failed to reschedule task instance for '.SandClock::format($time, 'c').'.', 'RescheduleFail', error: $e, task: $this);
             }
-            Agent::log('Task instance rescheduled for '.SandClock::format($time, 'c').'.', 'Reschedule', task: $this);
+            #Log only if something was actually changed
+            if (Agent::$dbController->getResult() > 0) {
+                Agent::log('Task instance rescheduled for '.SandClock::format($time, 'c').'.', 'Reschedule', task: $this);
+            }
             return $result;
         }
         return false;

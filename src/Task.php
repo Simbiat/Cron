@@ -281,7 +281,10 @@ class Task
             } catch (\Throwable $e) {
                 Agent::log('Failed to add or update task with following details: '.$taskDetailsString.'.', 'TaskAddFail', error: $e);
             }
-            Agent::log('Added or updated task with following details: '.$taskDetailsString.'.', 'TaskAdd');
+            #Log only if something was actually changed
+            if (Agent::$dbController->getResult() > 0) {
+                Agent::log('Added or updated task with following details: '.$taskDetailsString.'.', 'TaskAdd');
+            }
             return $result;
         }
         return false;
@@ -306,7 +309,10 @@ class Task
             } catch (\Throwable $e) {
                 Agent::log('Failed delete task `'.$this->taskName.'`.', 'TaskDeleteFail', error: $e);
             }
-            Agent::log('Deleted task  `'.$this->taskName.'`.', 'TaskDelete');
+            #Log only if something was actually deleted
+            if (Agent::$dbController->getResult() > 0) {
+                Agent::log('Deleted task  `'.$this->taskName.'`.', 'TaskDelete');
+            }
             return $result;
         }
         return false;
@@ -330,7 +336,10 @@ class Task
             } catch (\Throwable $e) {
                 Agent::log('Failed to mark task `'.$this->taskName.'` as system one.', 'TaskToSystemFail', error: $e);
             }
-            Agent::log('Marked task `'.$this->taskName.'` as system one.', 'TaskToSystem');
+            #Log only if something was actually changed
+            if (Agent::$dbController->getResult() > 0) {
+                Agent::log('Marked task `'.$this->taskName.'` as system one.', 'TaskToSystem');
+            }
             return $result;
         }
         return false;
