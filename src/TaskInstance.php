@@ -304,18 +304,25 @@ class TaskInstance
             throw new \UnexpectedValueException('Task name is not set');
         }
         if (Agent::$dbReady) {
-            return Agent::$dbController->query('INSERT INTO `'.Agent::dbPrefix.'schedule` (`task`, `arguments`, `instance`, `system`, `frequency`, `dayofmonth`, `dayofweek`, `priority`, `message`, `nextrun`) VALUES (:task, :arguments, :instance, :system, :frequency, :dayofmonth, :dayofweek, :priority, :message, :nextrun) ON DUPLICATE KEY UPDATE `frequency`=:frequency, `dayofmonth`=:dayofmonth, `dayofweek`=:dayofweek, `nextrun`=IF(:frequency=0, `nextrun`, :nextrun), `priority`=IF(:frequency=0, IF(`priority`>:priority, `priority`, :priority), :priority), `message`=:message, `updated`=CURRENT_TIMESTAMP();', [
-                ':task' => [$this->taskName, 'string'],
-                ':arguments' => [$this->arguments, 'string'],
-                ':instance' => [$this->instance, 'int'],
-                ':system' => [$this->system, 'bool'],
-                ':frequency' => [(empty($this->frequency) ? 0 : $this->frequency), 'int'],
-                ':dayofmonth' => [$this->dayofmonth, (empty($this->dayofmonth) ? 'null' : 'string')],
-                ':dayofweek' => [$this->dayofweek, (empty($this->dayofweek) ? 'null' : 'string')],
-                ':priority' => [(empty($this->priority) ? 0 : $this->priority), 'int'],
-                ':message' => [$this->message, (empty($this->message) ? 'null' : 'string')],
-                ':nextrun' => [(empty($this->time) ? time() : $this->nextTime), 'datetime'],
-            ]);
+            $result = false;
+            try {
+                $result = Agent::$dbController->query('INSERT INTO `'.Agent::dbPrefix.'schedule` (`task`, `arguments`, `instance`, `system`, `frequency`, `dayofmonth`, `dayofweek`, `priority`, `message`, `nextrun`) VALUES (:task, :arguments, :instance, :system, :frequency, :dayofmonth, :dayofweek, :priority, :message, :nextrun) ON DUPLICATE KEY UPDATE `frequency`=:frequency, `dayofmonth`=:dayofmonth, `dayofweek`=:dayofweek, `nextrun`=IF(:frequency=0, `nextrun`, :nextrun), `priority`=IF(:frequency=0, IF(`priority`>:priority, `priority`, :priority), :priority), `message`=:message, `updated`=CURRENT_TIMESTAMP();', [
+                    ':task' => [$this->taskName, 'string'],
+                    ':arguments' => [$this->arguments, 'string'],
+                    ':instance' => [$this->instance, 'int'],
+                    ':system' => [$this->system, 'bool'],
+                    ':frequency' => [(empty($this->frequency) ? 0 : $this->frequency), 'int'],
+                    ':dayofmonth' => [$this->dayofmonth, (empty($this->dayofmonth) ? 'null' : 'string')],
+                    ':dayofweek' => [$this->dayofweek, (empty($this->dayofweek) ? 'null' : 'string')],
+                    ':priority' => [(empty($this->priority) ? 0 : $this->priority), 'int'],
+                    ':message' => [$this->message, (empty($this->message) ? 'null' : 'string')],
+                    ':nextrun' => [(empty($this->time) ? time() : $this->nextTime), 'datetime'],
+                ]);
+            } catch (\Throwable $e) {
+                Agent::log('Failed to add or update task instance.', 'InstanceAddFail', error: $e, task: $this);
+            }
+            Agent::log('Added or updated task instance.', 'InstanceAdd', task: $this);
+            return $result;
         }
         return false;
     }
@@ -331,12 +338,18 @@ class TaskInstance
             throw new \UnexpectedValueException('Task name is not set');
         }
         if (Agent::$dbReady) {
-            #Sanitize arguments
-            return Agent::$dbController->query('DELETE FROM `'.Agent::dbPrefix.'schedule` WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance AND `system`=0;', [
-                ':task' => [$this->taskName, 'string'],
-                ':arguments' => [$this->arguments, 'string'],
-                ':instance' => [$this->instance, 'int'],
-            ]);
+            $result = false;
+            try {
+                $result = Agent::$dbController->query('DELETE FROM `'.Agent::dbPrefix.'schedule` WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance AND `system`=0;', [
+                    ':task' => [$this->taskName, 'string'],
+                    ':arguments' => [$this->arguments, 'string'],
+                    ':instance' => [$this->instance, 'int'],
+                ]);
+            } catch (\Throwable $e) {
+                Agent::log('Failed to delete task instance.', 'InstanceDeleteFail', error: $e, task: $this);
+            }
+            Agent::log('Deleted task instance.', 'InstanceDelete', task: $this);
+            return $result;
         }
         return false;
     }
@@ -350,12 +363,22 @@ class TaskInstance
         if ($this->foundInDB === false) {
             throw new \UnexpectedValueException('Not found in database.');
         }
+        if ($this->frequency === 0) {
+            throw new \UnexpectedValueException('One-time job cannot be made system one');
+        }
         if (Agent::$dbReady) {
-            return Agent::$dbController->query('UPDATE `'.Agent::dbPrefix.'schedule` SET `system`=1 WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance `system`=0;', [
-                ':task' => [$this->taskName, 'string'],
-                ':arguments' => [$this->arguments, 'string'],
-                ':instance' => [$this->instance, 'int'],
-            ]);
+            $result = false;
+            try {
+                $result = Agent::$dbController->query('UPDATE `'.Agent::dbPrefix.'schedule` SET `system`=1 WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance `system`=0;', [
+                    ':task' => [$this->taskName, 'string'],
+                    ':arguments' => [$this->arguments, 'string'],
+                    ':instance' => [$this->instance, 'int'],
+                ]);
+            } catch (\Throwable $e) {
+                Agent::log('Failed to mark task instance as system one.', 'InstanceToSystemFail', error: $e, task: $this);
+            }
+            Agent::log('Marked task instance as system one.', 'InstanceToSystem', task: $this);
+            return $result;
         }
         return false;
     }
@@ -380,13 +403,21 @@ class TaskInstance
                 #Since this is a one-time task, we can just remove it
                 return $this->delete();
             }
+            #Determine new time
+            $time = $timestamp ?? $this->updateNextRun($result);
             #Actually reschedule. One task time task will be rescheduled for the retry time from settings
-            return Agent::$dbController->query('UPDATE `'.Agent::dbPrefix.'schedule` SET `status`=0, `runby`=NULL, `sse`=0, `nextrun`=:time, `'.($result === true ? 'lastsuccess' : 'lasterror').'`=CURRENT_TIMESTAMP() WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance;', [
-                ':time' => [$timestamp ?? $this->updateNextRun($result), 'datetime'],
-                ':task' => [$this->taskName, 'string'],
-                ':arguments' => [$this->arguments, 'string'],
-                ':instance' => [$this->instance, 'int'],
-            ]);
+            try {
+                Agent::$dbController->query('UPDATE `'.Agent::dbPrefix.'schedule` SET `status`=0, `runby`=NULL, `sse`=0, `nextrun`=:time, `'.($result === true ? 'lastsuccess' : 'lasterror').'`=CURRENT_TIMESTAMP() WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance;', [
+                    ':time' => [$time, 'datetime'],
+                    ':task' => [$this->taskName, 'string'],
+                    ':arguments' => [$this->arguments, 'string'],
+                    ':instance' => [$this->instance, 'int'],
+                ]);
+            } catch (\Throwable $e) {
+                Agent::log('Failed to reschedule task instance for '.SandClock::format($time, 'c').'.', 'RescheduleFail', error: $e, task: $this);
+            }
+            Agent::log('Task instance rescheduled for '.SandClock::format($time, 'c').'.', 'Reschedule', task: $this);
+            return $result;
         }
         return false;
     }

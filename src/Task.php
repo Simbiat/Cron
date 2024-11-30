@@ -263,18 +263,26 @@ class Task
             throw new \UnexpectedValueException('Function name is not set');
         }
         if (Agent::$dbReady) {
-            return Agent::$dbController->query('INSERT INTO `'.Agent::dbPrefix.'tasks` (`task`, `function`, `object`, `parameters`, `allowedreturns`, `maxTime`, `minFrequency`, `retry`, `system`, `description`) VALUES (:task, :function, :object, :parameters, :returns, :maxTime, :minFrequency, :retry, :system, :desc) ON DUPLICATE KEY UPDATE `function`=:function, `object`=:object, `parameters`=:parameters, `allowedreturns`=:returns, `maxTime`=:maxTime, `minFrequency`=:minFrequency, `retry`=:retry, `system`=:system, `description`=:desc;', [
-                ':task' => [$this->taskName, 'string'],
-                ':function' => [$this->function, 'string'],
-                ':object' => [$this->object, (empty($this->object) ? 'null' : 'string')],
-                ':parameters' => [$this->parameters, (empty($this->parameters) ? 'null' : 'string')],
-                ':returns' => [$this->returns, (empty($this->returns) ? 'null' : 'string')],
-                ':maxTime' => [$this->maxTime, 'int'],
-                ':minFrequency' => [$this->minFrequency, 'int'],
-                ':retry' => [$this->retry, 'int'],
-                ':system' => [$this->system, 'bool'],
-                ':desc' => [$this->description, (empty($this->description) ? 'null' : 'string')],
-            ]);
+            $result = false;
+            try {
+                $taskDetailsString = json_encode($this, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION);
+                $result = Agent::$dbController->query('INSERT INTO `'.Agent::dbPrefix.'tasks` (`task`, `function`, `object`, `parameters`, `allowedreturns`, `maxTime`, `minFrequency`, `retry`, `system`, `description`) VALUES (:task, :function, :object, :parameters, :returns, :maxTime, :minFrequency, :retry, :system, :desc) ON DUPLICATE KEY UPDATE `function`=:function, `object`=:object, `parameters`=:parameters, `allowedreturns`=:returns, `maxTime`=:maxTime, `minFrequency`=:minFrequency, `retry`=:retry, `system`=:system, `description`=:desc;', [
+                    ':task' => [$this->taskName, 'string'],
+                    ':function' => [$this->function, 'string'],
+                    ':object' => [$this->object, (empty($this->object) ? 'null' : 'string')],
+                    ':parameters' => [$this->parameters, (empty($this->parameters) ? 'null' : 'string')],
+                    ':returns' => [$this->returns, (empty($this->returns) ? 'null' : 'string')],
+                    ':maxTime' => [$this->maxTime, 'int'],
+                    ':minFrequency' => [$this->minFrequency, 'int'],
+                    ':retry' => [$this->retry, 'int'],
+                    ':system' => [$this->system, 'bool'],
+                    ':desc' => [$this->description, (empty($this->description) ? 'null' : 'string')],
+                ]);
+            } catch (\Throwable $e) {
+                Agent::log('Failed to add or update task with following details: '.$taskDetailsString.'.', 'TaskAddFail', error: $e);
+            }
+            Agent::log('Added or updated task with following details: '.$taskDetailsString.'.', 'TaskAdd');
+            return $result;
         }
         return false;
     }
@@ -290,16 +298,18 @@ class Task
             throw new \UnexpectedValueException('Task name is not set');
         }
         if (Agent::$dbReady) {
+            $result = false;
             try {
-                return Agent::$dbController->query('DELETE FROM `'.Agent::dbPrefix.'tasks` WHERE `task`=:task AND `system`=0;', [
+                $result = Agent::$dbController->query('DELETE FROM `'.Agent::dbPrefix.'tasks` WHERE `task`=:task AND `system`=0;', [
                     ':task' => [$this->taskName, 'string'],
                 ]);
-            } catch (\Throwable) {
-                return false;
+            } catch (\Throwable $e) {
+                Agent::log('Failed delete task `'.$this->taskName.'`.', 'TaskDeleteFail', error: $e);
             }
-        } else {
-            return false;
+            Agent::log('Deleted task  `'.$this->taskName.'`.', 'TaskDelete');
+            return $result;
         }
+        return false;
     }
     
     /**
@@ -312,9 +322,16 @@ class Task
             throw new \UnexpectedValueException('Task name is not set');
         }
         if (Agent::$dbReady && $this->foundInDB) {
-            return Agent::$dbController->query('UPDATE `'.Agent::dbPrefix.'tasks` SET `system`=1 WHERE `task`=:task AND `system`=0;', [
-                ':task' => [$this->taskName, 'string'],
-            ]);
+            $result = false;
+            try {
+                $result = Agent::$dbController->query('UPDATE `'.Agent::dbPrefix.'tasks` SET `system`=1 WHERE `task`=:task AND `system`=0;', [
+                    ':task' => [$this->taskName, 'string'],
+                ]);
+            } catch (\Throwable $e) {
+                Agent::log('Failed to mark task `'.$this->taskName.'` as system one.', 'TaskToSystemFail', error: $e);
+            }
+            Agent::log('Marked task `'.$this->taskName.'` as system one.', 'TaskToSystem');
+            return $result;
         }
         return false;
     }

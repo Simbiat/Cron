@@ -24,12 +24,12 @@ class Agent
      * Flag to indicate that we are ready to work with DB
      * @var bool
      */
-    public private(set) static bool $dbReady = false;
+    public static bool $dbReady = false;
     /**
      * Cached database controller for performance
      * @var Controller|null
      */
-    public private(set) static ?Controller $dbController = NULL;
+    public static ?Controller $dbController = NULL;
     /**
      * Flag to indicate, whether Cron is enabled
      * @var bool
@@ -39,7 +39,7 @@ class Agent
      * Retry time for one-time jobs
      * @var int
      */
-    public private(set) static int $retry = 3600;
+    public static int $retry = 3600;
     /**
      * Days to store errors for
      * @var int
@@ -84,7 +84,7 @@ class Agent
      * List of allowed SSE statuses
      * @var array
      */
-    private const array sseStatuses = ['CronStart', 'CronFail', 'CronTaskSkip', 'CronTaskStart', 'CronTaskEnd', 'CronTaskFail', 'CronEmpty', 'CronNoThreads', 'CronEnd'];
+    private const array sseStatuses = ['CronStart', 'CronFail', 'CronTaskSkip', 'CronTaskStart', 'CronTaskEnd', 'CronTaskFail', 'CronEmpty', 'CronNoThreads', 'CronEnd', 'Reschedule', 'RescheduleFail', 'TaskToSystem', 'TaskToSystemFail', 'InstanceDelete', 'InstanceDeleteFail', 'InstanceAdd', 'InstanceAddFail', 'InstanceToSystem', 'InstanceToSystemFail', 'TaskAdd', 'TaskAddFail', 'TaskDelete', 'TaskDeleteFail'];
     
     /**
      * Class constructor
