@@ -260,12 +260,25 @@ Supported settings are as follows:
 
 Below is the list of event types, that are used when logging and when outputting SSE stream:
 
-1. `CronStart` - start of processing.
-2. `CronFail` - failure of processing.
-3. `CronTaskSkip` - task was skipped.
-4. `CronTaskStart` - task was started.
-5. `CronTaskEnd` - task completed successfully.
-6. `CronTaskFail` - task failed.
-7. `CronEmpty` - empty list of tasks in the cycle.
-8. `CronNoThreads` - no free threads on this cycle.
-9. `CronEnd` - end of processing.
+1. `CronStart` - start of cron processing.
+2. `CronFail` - failure of cron processing.
+3. `CronTaskStart` - a task instance was started.
+4. `CronTaskEnd` - a task instance completed successfully.
+5. `CronTaskFail` - a task instance failed.
+6. `CronEmpty` - empty list of tasks in the cycle.
+7. `CronNoThreads` - no free threads in this cycle.
+8. `CronEnd` - end of processing.
+9. `Reschedule` - a task instance was rescheduled.
+10. `RescheduleFail` - a task instance failed to be rescheduled.
+11. `TaskAdd` - a task was added or updated.
+12. `TaskAddFail` - a task failed to be added or updated.
+13. `TaskDelete` - a task was deleted.
+14. `TaskDeleteFail` - a task failed to be deleted.
+15. `TaskToSystem` - a task was marked as system one.
+16. `TaskToSystemFail` - a task failed to be marked as system one.
+17. `InstanceAdd` - a task instance was added or updated.
+18. `InstanceAddFail` - a task instance failed to be added or updated.
+19. `InstanceDelete` - a task instance was deleted.
+20. `InstanceDeleteFail` - a task instance failed to be deleted.
+21. `InstanceToSystem` - a task instance was marked as system one.
+22. `InstanceToSystemFail` - a task instance failed to be marked as system one.

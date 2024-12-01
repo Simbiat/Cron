@@ -84,7 +84,7 @@ class Agent
      * List of allowed SSE statuses
      * @var array
      */
-    private const array sseStatuses = ['CronStart', 'CronFail', 'CronTaskSkip', 'CronTaskStart', 'CronTaskEnd', 'CronTaskFail', 'CronEmpty', 'CronNoThreads', 'CronEnd', 'Reschedule', 'RescheduleFail', 'TaskToSystem', 'TaskToSystemFail', 'InstanceDelete', 'InstanceDeleteFail', 'InstanceAdd', 'InstanceAddFail', 'InstanceToSystem', 'InstanceToSystemFail', 'TaskAdd', 'TaskAddFail', 'TaskDelete', 'TaskDeleteFail'];
+    private const array sseStatuses = ['CronStart', 'CronFail', 'CronTaskStart', 'CronTaskEnd', 'CronTaskFail', 'CronEmpty', 'CronNoThreads', 'CronEnd', 'Reschedule', 'RescheduleFail', 'TaskToSystem', 'TaskToSystemFail', 'InstanceDelete', 'InstanceDeleteFail', 'InstanceAdd', 'InstanceAddFail', 'InstanceToSystem', 'InstanceToSystemFail', 'TaskAdd', 'TaskAddFail', 'TaskDelete', 'TaskDeleteFail'];
     
     /**
      * Class constructor
