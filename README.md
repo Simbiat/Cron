@@ -252,7 +252,7 @@ Supported settings are as follows:
 1. `enabled` governs whether processing is available. Does not block tasks management. Boolean value, thus as per MySQL/MariaDB design accepts only `0` and `1`. Default is `1`.
 2. `errorLife` is number of days to store error logs. Default is `30`.
 3. `retry` is the number of seconds to delay execution of failed one-time jobs. Such jobs have frequency set to `0`, thus in case of failure this can result in them spamming. This setting can help avoid that. Default is`3600`.
-4. `sseLoop` governs whether processing can be done in a loop if used in SSE mode. If set to `0` after running `process` cycle SSE will send `CronEnd` event. If set to `1` - it will continue processing in a loop until stream is closed. Default is `0`.
+4. `sseLoop` governs whether processing can be done in a loop if used in SSE mode. If set to `0` after running `process` cycle SSE will send `SSEEnd` event. If set to `1` - it will continue processing in a loop until stream is closed. Default is `0`.
 5. `sseRetry` is number of milliseconds for connection retry for SSE. Will also be used to determine how long should the loop sleep if no threads or jobs, but will be treated as number of seconds divided by 20. Default is `10000` (or roughly 8 minutes for empty cycles).
 6. `maxThreads` is maximum number of threads (or rather loops) to be allowed to run at the same time. Does not affect singular `runTask()` calls, only `process()`. Number of current threads is determined by the number of distinct values of `runby` in the `schedule` table, thus be careful with bad (or no) error catching, or otherwise it can be easily overrun by hanged jobs. Default is `4`.
 
@@ -260,11 +260,11 @@ Supported settings are as follows:
 
 Below is the list of event types, that are used when logging and when outputting SSE stream:
 
-1. `CronStart` - start of cron processing.
+1. `SSEStart` - start of cron processing in SSE mode.
 2. `CronFail` - failure of cron processing.
 3. `CronEmpty` - empty list of tasks in the cycle.
 4. `CronNoThreads` - no free threads in this cycle.
-5. `CronEnd` - end of processing.
+5. `SSEEnd` - end of processing in SSE mode.
 6. `TaskAdd` - a task was added or updated.
 7. `TaskAddFail` - a task failed to be added or updated.
 8. `TaskDelete` - a task was deleted.

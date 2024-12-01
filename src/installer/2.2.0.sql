@@ -12,4 +12,8 @@ ALTER TABLE `cron__log` ADD CONSTRAINT `cron_log_to_event_type` FOREIGN KEY (`ty
 UPDATE `cron__event_types` SET `type` = 'InstanceEnd' WHERE `cron__event_types`.`type` = 'CronTaskEnd';
 UPDATE `cron__event_types` SET `type` = 'InstanceFail' WHERE `cron__event_types`.`type` = 'CronTaskFail';
 UPDATE `cron__event_types` SET `type` = 'InstanceStart' WHERE `cron__event_types`.`type` = 'CronTaskStart';
+UPDATE `cron__event_types` SET `type` = 'SSEEnd' WHERE `cron__event_types`.`type` = 'CronEnd';
+UPDATE `cron__event_types` SET `description` = 'End of cron processing in SSE mode.' WHERE `cron__event_types`.`type` = 'SSEEnd';
+UPDATE `cron__event_types` SET `type` = 'SSEStart' WHERE `cron__event_types`.`type` = 'CronStart';
+UPDATE `cron__event_types` SET `description` = 'Start of cron processing in SSE mode.' WHERE `cron__event_types`.`type` = 'SSEStart';
 UPDATE `cron__settings` SET `value` = '2.2.0' WHERE `cron__settings`.`setting` = 'version';

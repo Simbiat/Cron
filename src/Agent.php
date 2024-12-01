@@ -79,7 +79,7 @@ class Agent
      * List of allowed SSE statuses
      * @var array
      */
-    private const array sseStatuses = ['CronStart', 'CronFail', 'InstanceStart', 'InstanceEnd', 'InstanceFail', 'CronEmpty', 'CronNoThreads', 'CronEnd', 'Reschedule', 'RescheduleFail', 'TaskToSystem', 'TaskToSystemFail', 'InstanceDelete', 'InstanceDeleteFail', 'InstanceAdd', 'InstanceAddFail', 'InstanceToSystem', 'InstanceToSystemFail', 'TaskAdd', 'TaskAddFail', 'TaskDelete', 'TaskDeleteFail'];
+    private const array sseStatuses = ['SSEStart', 'CronFail', 'InstanceStart', 'InstanceEnd', 'InstanceFail', 'CronEmpty', 'CronNoThreads', 'SSEEnd', 'Reschedule', 'RescheduleFail', 'TaskToSystem', 'TaskToSystemFail', 'InstanceDelete', 'InstanceDeleteFail', 'InstanceAdd', 'InstanceAddFail', 'InstanceToSystem', 'InstanceToSystemFail', 'TaskAdd', 'TaskAddFail', 'TaskDelete', 'TaskDeleteFail'];
     
     /**
      * Class constructor
@@ -121,7 +121,9 @@ class Agent
             self::log('Failed to generate random ID', 'CronFail', true, $exception);
             return false;
         }
-        self::log('Cron processing started', 'CronStart');
+        if (SSE::$SSE) {
+            self::log('Cron processing started in SSE mode', 'SSEStart');
+        }
         #Regular maintenance
         if (self::$dbReady) {
             #Reschedule hanged jobs
@@ -147,7 +149,7 @@ class Agent
                 #Check if enough threads are available
                 try {
                     if (self::$dbController->count('SELECT COUNT(DISTINCT(`runby`)) as `count` FROM `'.self::dbPrefix.'schedule` WHERE `runby` IS NOT NULL;') < self::$maxThreads === false) {
-                        self::log('Cron threads are exhausted', !SSE::$SSE ? 'CronEnd' : 'CronNoThreads');
+                        self::log('Cron threads are exhausted', 'CronNoThreads');
                         if (SSE::$SSE) {
                             return false;
                         }
@@ -179,7 +181,9 @@ class Agent
                 }
             } while (self::$enabled === true && SSE::$SSE && self::$sseLoop === true && connection_status() === 0);
             #Notify of end of stream
-            self::log('Cron processing finished', 'CronEnd', true);
+            if (SSE::$SSE) {
+                self::log('Cron processing finished', 'SSEEnd', true);
+            }
             return true;
         }
         #Notify of end of stream
