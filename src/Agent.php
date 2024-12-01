@@ -84,7 +84,7 @@ class Agent
      * List of allowed SSE statuses
      * @var array
      */
-    private const array sseStatuses = ['CronStart', 'CronFail', 'CronTaskStart', 'CronTaskEnd', 'CronTaskFail', 'CronEmpty', 'CronNoThreads', 'CronEnd', 'Reschedule', 'RescheduleFail', 'TaskToSystem', 'TaskToSystemFail', 'InstanceDelete', 'InstanceDeleteFail', 'InstanceAdd', 'InstanceAddFail', 'InstanceToSystem', 'InstanceToSystemFail', 'TaskAdd', 'TaskAddFail', 'TaskDelete', 'TaskDeleteFail'];
+    private const array sseStatuses = ['CronStart', 'CronFail', 'InstanceStart', 'InstanceEnd', 'InstanceFail', 'CronEmpty', 'CronNoThreads', 'CronEnd', 'Reschedule', 'RescheduleFail', 'TaskToSystem', 'TaskToSystemFail', 'InstanceDelete', 'InstanceDeleteFail', 'InstanceAdd', 'InstanceAddFail', 'InstanceToSystem', 'InstanceToSystemFail', 'TaskAdd', 'TaskAddFail', 'TaskDelete', 'TaskDeleteFail'];
     
     /**
      * Class constructor
@@ -209,18 +209,18 @@ class Agent
         try {
             $taskInstance = (new TaskInstance($task['task'], $task['arguments'], $task['instance']));
             #Notify of the task starting
-            self::log($number.'/'.$totalTasks.' '.(empty($task['message']) ? $task['task'].' starting' : $task['message']), 'CronTaskStart', task: $taskInstance);
+            self::log($number.'/'.$totalTasks.' '.(empty($task['message']) ? $task['task'].' starting' : $task['message']), 'InstanceStart', task: $taskInstance);
             #Attemp to run
             $result = $taskInstance->run();
         } catch (\Throwable $exception) {
-            self::log('Failed to run task `'.$task['task'].'` ('.$number.'/'.$totalTasks.')', 'CronTaskFail', false, $exception, ($taskInstance ?? null));
+            self::log('Failed to run task `'.$task['task'].'` ('.$number.'/'.$totalTasks.')', 'InstanceFail', false, $exception, ($taskInstance ?? null));
             return;
         }
         #Notify of the task finishing
         if ($result) {
-            self::log($number.'/'.$totalTasks.' '.$task['task'].' finished'.($taskInstance->frequency === 0 ? ' and deleted' : ''), 'CronTaskEnd', task: $taskInstance);
+            self::log($number.'/'.$totalTasks.' '.$task['task'].' finished'.($taskInstance->frequency === 0 ? ' and deleted' : ''), 'InstanceEnd', task: $taskInstance);
         } else {
-            self::log($number.'/'.$totalTasks.' '.$task['task'].' failed', 'CronTaskFail', task: $taskInstance);
+            self::log($number.'/'.$totalTasks.' '.$task['task'].' failed', 'InstanceFail', task: $taskInstance);
         }
     }
     

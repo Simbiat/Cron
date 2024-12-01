@@ -9,4 +9,7 @@ INSERT INTO `cron__event_types` (`type`, `description`) VALUES ('CronStart', 'St
 ALTER TABLE `cron__log` DROP FOREIGN KEY `log_to_tasks`;
 ALTER TABLE `cron__log` ADD CONSTRAINT `cron_log_to_tasks` FOREIGN KEY (`task`) REFERENCES `cron__tasks`(`task`) ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE `cron__log` ADD CONSTRAINT `cron_log_to_event_type` FOREIGN KEY (`type`) REFERENCES `cron__event_types`(`type`) ON DELETE CASCADE ON UPDATE CASCADE;
+UPDATE `cron__event_types` SET `type` = 'InstanceEnd' WHERE `cron__event_types`.`type` = 'CronTaskEnd';
+UPDATE `cron__event_types` SET `type` = 'InstanceFail' WHERE `cron__event_types`.`type` = 'CronTaskFail';
+UPDATE `cron__event_types` SET `type` = 'InstanceStart' WHERE `cron__event_types`.`type` = 'CronTaskStart';
 UPDATE `cron__settings` SET `value` = '2.2.0' WHERE `cron__settings`.`setting` = 'version';

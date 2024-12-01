@@ -457,7 +457,7 @@ class TaskInstance
                 (!empty($this->dayofmonth) ? json_decode($this->dayofmonth, flags: JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_BIGINT_AS_STRING | JSON_OBJECT_AS_ARRAY) : []))
         ) {
             #Register error.
-            Agent::log('Attempted to run function during forbidden day of week or day of month.', 'CronTaskFail', task: $this);
+            Agent::log('Attempted to run function during forbidden day of week or day of month.', 'InstanceFail', task: $this);
             $this->reSchedule(false);
             return false;
         }
@@ -494,11 +494,11 @@ class TaskInstance
                     #Override the value
                     $result = true;
                 } else {
-                    Agent::log('Unexpected return `'.json_encode($result, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION).'`.', 'CronTaskFail', task: $this);
+                    Agent::log('Unexpected return `'.json_encode($result, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION).'`.', 'InstanceFail', task: $this);
                     $result = false;
                 }
             } elseif ($result !== false) {
-                Agent::log('Unexpected return `'.json_encode($result, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION).'`.', 'CronTaskFail', task: $this);
+                Agent::log('Unexpected return `'.json_encode($result, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION).'`.', 'InstanceFail', task: $this);
                 $result = false;
             }
         }
