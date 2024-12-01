@@ -61,11 +61,6 @@ class Agent
      */
     private static int $maxThreads = 4;
     /**
-     * CLI mode flag
-     * @var bool
-     */
-    private static bool $CLI = false;
-    /**
      * Supported settings
      * @var array
      */
@@ -92,10 +87,6 @@ class Agent
      */
     public function __construct()
     {
-        #Check if we are in CLI
-        if (preg_match('/^cli(-server)?$/i', PHP_SAPI) === 1) {
-            self::$CLI = true;
-        }
         #Check that database connection is established
         if (self::$dbReady === false) {
             #Establish, if possible
@@ -120,7 +111,7 @@ class Agent
     public function process(int $items = 1): bool
     {
         #Start stream if not in CLI
-        if (self::$CLI === false) {
+        if (SSE::isPossible()) {
             SSE::open();
         }
         #Generate random ID
@@ -156,8 +147,8 @@ class Agent
                 #Check if enough threads are available
                 try {
                     if (self::$dbController->count('SELECT COUNT(DISTINCT(`runby`)) as `count` FROM `'.self::dbPrefix.'schedule` WHERE `runby` IS NOT NULL;') < self::$maxThreads === false) {
-                        self::log('Cron threads are exhausted', self::$CLI ? 'CronEnd' : 'CronNoThreads');
-                        if (self::$CLI) {
+                        self::log('Cron threads are exhausted', !SSE::$SSE ? 'CronEnd' : 'CronNoThreads');
+                        if (SSE::$SSE) {
                             return false;
                         }
                         #Sleep for a bit
@@ -172,7 +163,7 @@ class Agent
                 $tasks = $this->getTasks($items);
                 if (empty($tasks)) {
                     self::log('Cron list is empty', 'CronEmpty');
-                    if (self::$CLI === false) {
+                    if (SSE::$SSE) {
                         #Sleep for a bit
                         sleep(self::$sseRetry / 20);
                     }
@@ -183,10 +174,10 @@ class Agent
                     }
                 }
                 #Additionally reschedule hanged jobs if we're in SSE
-                if (self::$CLI === false && self::$sseLoop === true) {
+                if (SSE::$SSE && self::$sseLoop === true) {
                     $this->unHang();
                 }
-            } while (self::$enabled === true && self::$CLI === false && self::$sseLoop === true && connection_status() === 0);
+            } while (self::$enabled === true && SSE::$SSE && self::$sseLoop === true && connection_status() === 0);
             #Notify of end of stream
             self::log('Cron processing finished', 'CronEnd', true);
             return true;
@@ -249,7 +240,7 @@ class Agent
                         SET `status`=1, `runby`=:runby, `sse`=:sse, `lastrun`=CURRENT_TIMESTAMP();',
                 [
                     ':runby' => self::$runby,
-                    ':sse' => [!self::$CLI, 'bool'],
+                    ':sse' => [SSE::$SSE, 'bool'],
                     ':limit' => [$items, 'int']
                 ]);
         } catch (\Throwable $exception) {
@@ -501,13 +492,13 @@ class Agent
             $event = 'CronFail';
         }
         if (self::$dbReady) {
-            #Insert error
+            #Insert log entry
             self::$dbController->query(
                 'INSERT INTO `'.self::dbPrefix.'log` (`type`, `runby`, `sse`, `task`, `arguments`, `instance`, `message`) VALUES (:type,:runby,:sse,:task, :arguments, :instance, :message);',
                 [
                     ':type' => $event,
                     ':runby' => [empty(self::$runby) ? null : self::$runby, empty(self::$runby) ? 'null' : 'string'],
-                    ':sse' => [!self::$CLI, 'bool'],
+                    ':sse' => [SSE::$SSE, 'bool'],
                     ':task' => [$task?->taskName, $task === null ? 'null' : 'string'],
                     ':arguments' => [$task?->arguments, $task === null ? 'null' : 'string'],
                     ':instance' => [$task?->instance, $task === null ? 'null' : 'int'],
@@ -515,11 +506,11 @@ class Agent
                 ]
             );
         }
-        if (self::$CLI === false) {
+        if (SSE::$SSE) {
             SSE::send($message, $event, ((($endStream || $error !== null)) ? 0 : self::$sseRetry));
         }
         if ($endStream) {
-            if (self::$CLI === false) {
+            if (SSE::$SSE) {
                 SSE::close();
             }
             if ($error !== null) {
