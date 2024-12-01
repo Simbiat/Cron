@@ -260,25 +260,26 @@ Supported settings are as follows:
 
 Below is the list of event types, that are used when logging and when outputting SSE stream:
 
-1. `SSEStart` - start of cron processing in SSE mode.
-2. `CronFail` - failure of cron processing.
-3. `CronEmpty` - empty list of tasks in the cycle.
-4. `CronNoThreads` - no free threads in this cycle.
-5. `SSEEnd` - end of processing in SSE mode.
-6. `TaskAdd` - a task was added or updated.
-7. `TaskAddFail` - a task failed to be added or updated.
-8. `TaskDelete` - a task was deleted.
-9. `TaskDeleteFail` - a task failed to be deleted.
-10. `TaskToSystem` - a task was marked as system one.
-11. `TaskToSystemFail` - a task failed to be marked as system one.
-12. `InstanceStart` - a task instance was started.
-13. `InstanceEnd` - a task instance completed successfully.
-14. `InstanceFail` - a task instance failed.
-15. `InstanceAdd` - a task instance was added or updated.
-16. `InstanceAddFail` - a task instance failed to be added or updated.
-17. `InstanceDelete` - a task instance was deleted.
-18. `InstanceDeleteFail` - a task instance failed to be deleted.
-19. `InstanceToSystem` - a task instance was marked as system one.
-20. `InstanceToSystemFail` - a task instance failed to be marked as system one.
-21. `Reschedule` - a task instance was rescheduled.
-22. `RescheduleFail` - a task instance failed to be rescheduled.
+1. `CronFail` - failure of cron processing.
+2. `CronEmpty` - empty list of tasks in the cycle.
+3. `CronNoThreads` - no free threads in this cycle.
+4. `CronDisabled` - cron processing is disabled in settings.
+5. `TaskAdd` - a task was added or updated.
+6. `TaskAddFail` - a task failed to be added or updated.
+7. `TaskDelete` - a task was deleted.
+8. `TaskDeleteFail` - a task failed to be deleted.
+9. `TaskToSystem` - a task was marked as system one.
+10. `TaskToSystemFail` - a task failed to be marked as system one.
+11. `InstanceStart` - a task instance was started.
+12. `InstanceEnd` - a task instance completed successfully.
+13. `InstanceFail` - a task instance failed.
+14. `InstanceAdd` - a task instance was added or updated.
+15. `InstanceAddFail` - a task instance failed to be added or updated.
+16. `InstanceDelete` - a task instance was deleted.
+17. `InstanceDeleteFail` - a task instance failed to be deleted.
+18. `InstanceToSystem` - a task instance was marked as system one.
+19. `InstanceToSystemFail` - a task instance failed to be marked as system one.
+20. `Reschedule` - a task instance was rescheduled.
+21. `RescheduleFail` - a task instance failed to be rescheduled.
+22. `SSEStart` - start of cron processing in SSE mode.
+23. `SSEEnd` - end of processing in SSE mode.

@@ -16,4 +16,5 @@ UPDATE `cron__event_types` SET `type` = 'SSEEnd' WHERE `cron__event_types`.`type
 UPDATE `cron__event_types` SET `description` = 'End of cron processing in SSE mode.' WHERE `cron__event_types`.`type` = 'SSEEnd';
 UPDATE `cron__event_types` SET `type` = 'SSEStart' WHERE `cron__event_types`.`type` = 'CronStart';
 UPDATE `cron__event_types` SET `description` = 'Start of cron processing in SSE mode.' WHERE `cron__event_types`.`type` = 'SSEStart';
+INSERT INTO `cron__event_types` (`type`, `description`) VALUES ('CronDisabled', 'Cron processing is disabled in settings.');
 UPDATE `cron__settings` SET `value` = '2.2.0' WHERE `cron__settings`.`setting` = 'version';

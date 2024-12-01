@@ -79,7 +79,7 @@ class Agent
      * List of allowed SSE statuses
      * @var array
      */
-    private const array sseStatuses = ['SSEStart', 'CronFail', 'InstanceStart', 'InstanceEnd', 'InstanceFail', 'CronEmpty', 'CronNoThreads', 'SSEEnd', 'Reschedule', 'RescheduleFail', 'TaskToSystem', 'TaskToSystemFail', 'InstanceDelete', 'InstanceDeleteFail', 'InstanceAdd', 'InstanceAddFail', 'InstanceToSystem', 'InstanceToSystemFail', 'TaskAdd', 'TaskAddFail', 'TaskDelete', 'TaskDeleteFail'];
+    private const array sseStatuses = ['SSEStart', 'CronFail', 'InstanceStart', 'InstanceEnd', 'InstanceFail', 'CronEmpty', 'CronNoThreads', 'SSEEnd', 'Reschedule', 'RescheduleFail', 'TaskToSystem', 'TaskToSystemFail', 'InstanceDelete', 'InstanceDeleteFail', 'InstanceAdd', 'InstanceAddFail', 'InstanceToSystem', 'InstanceToSystemFail', 'TaskAdd', 'TaskAddFail', 'TaskDelete', 'TaskDeleteFail', 'CronDisabled'];
     
     /**
      * Class constructor
@@ -187,7 +187,7 @@ class Agent
             return true;
         }
         #Notify of end of stream
-        self::log('Cron processing is disabled', 'CronFail', true);
+        self::log('Cron processing is disabled', 'CronDisabled', true);
         return false;
     }
     
