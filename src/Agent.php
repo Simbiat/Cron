@@ -7,6 +7,7 @@ use JetBrains\PhpStorm\ExpectedValues;
 use Simbiat\Database\Controller;
 use Simbiat\Database\Pool;
 use Simbiat\http\SSE;
+use Simbiat\SandClock;
 
 use function in_array;
 
@@ -136,59 +137,59 @@ class Agent
             return false;
         }
         #Check if cron is enabled and process only if it is
-        if (self::$enabled) {
-            #Sanitize number of items
-            if ($items < 1) {
-                $items = 1;
-            }
-            do {
-                if ($this->getSettings() === false) {
-                    self::log('Failed to get CRON settings', 'CronFail', true);
-                    return false;
-                }
-                #Check if enough threads are available
-                try {
-                    if (self::$dbController->count('SELECT COUNT(DISTINCT(`runby`)) as `count` FROM `'.self::dbPrefix.'schedule` WHERE `runby` IS NOT NULL;') < self::$maxThreads === false) {
-                        self::log('Cron threads are exhausted', 'CronNoThreads');
-                        if (SSE::$SSE) {
-                            return false;
-                        }
-                        #Sleep for a bit
-                        sleep(self::$sseRetry / 20);
-                        continue;
-                    }
-                } catch (\Throwable $exception) {
-                    self::log('Failed to check for available threads', 'CronFail', true, $exception);
-                    return false;
-                }
-                #Queue tasks for this random ID
-                $tasks = $this->getTasks($items);
-                if (empty($tasks)) {
-                    self::log('Cron list is empty', 'CronEmpty');
-                    if (SSE::$SSE) {
-                        #Sleep for a bit
-                        sleep(self::$sseRetry / 20);
-                    }
-                } else {
-                    $totalTasks = \count($tasks);
-                    foreach ($tasks as $number => $task) {
-                        $this->runTask($task, $number + 1, $totalTasks);
-                    }
-                }
-                #Additionally reschedule hanged jobs if we're in SSE
-                if (SSE::$SSE && self::$sseLoop === true) {
-                    $this->unHang();
-                }
-            } while (self::$enabled === true && SSE::$SSE && self::$sseLoop === true && connection_status() === 0);
+        if (!self::$enabled) {
             #Notify of end of stream
-            if (SSE::$SSE) {
-                self::log('Cron processing finished', 'SSEEnd', true);
-            }
-            return true;
+            self::log('Cron processing is disabled', 'CronDisabled', true);
+            return false;
         }
+        #Sanitize number of items
+        if ($items < 1) {
+            $items = 1;
+        }
+        do {
+            if ($this->getSettings() === false) {
+                self::log('Failed to get CRON settings', 'CronFail', true);
+                return false;
+            }
+            #Check if enough threads are available
+            try {
+                if (self::$dbController->count('SELECT COUNT(DISTINCT(`runby`)) as `count` FROM `'.self::dbPrefix.'schedule` WHERE `runby` IS NOT NULL;') < self::$maxThreads === false) {
+                    self::log('Cron threads are exhausted', 'CronNoThreads');
+                    if (!SSE::$SSE) {
+                        return false;
+                    }
+                    #Sleep for a bit
+                    sleep(self::$sseRetry / 20);
+                    continue;
+                }
+            } catch (\Throwable $exception) {
+                self::log('Failed to check for available threads', 'CronFail', true, $exception);
+                return false;
+            }
+            #Queue tasks for this random ID
+            $tasks = $this->getTasks($items);
+            if (empty($tasks)) {
+                self::log('Cron list is empty', 'CronEmpty');
+                if (SSE::$SSE) {
+                    #Sleep for a bit
+                    sleep(self::$sseRetry / 20);
+                }
+            } else {
+                $totalTasks = \count($tasks);
+                foreach ($tasks as $number => $task) {
+                    $this->runTask($task, $number + 1, $totalTasks);
+                }
+            }
+            #Additionally reschedule hanged jobs if we're in SSE
+            if (SSE::$SSE && self::$sseLoop === true) {
+                $this->unHang();
+            }
+        } while (self::$enabled === true && SSE::$SSE && self::$sseLoop === true && connection_status() === 0);
         #Notify of end of stream
-        self::log('Cron processing is disabled', 'CronDisabled', true);
-        return false;
+        if (SSE::$SSE) {
+            self::log('Cron processing finished', 'SSEEnd', true);
+        }
+        return true;
     }
     
     /**
@@ -496,19 +497,44 @@ class Agent
             $event = 'CronFail';
         }
         if (self::$dbReady) {
-            #Insert log entry
-            self::$dbController->query(
-                'INSERT INTO `'.self::dbPrefix.'log` (`type`, `runby`, `sse`, `task`, `arguments`, `instance`, `message`) VALUES (:type,:runby,:sse,:task, :arguments, :instance, :message);',
-                [
-                    ':type' => $event,
-                    ':runby' => [empty(self::$runby) ? null : self::$runby, empty(self::$runby) ? 'null' : 'string'],
-                    ':sse' => [SSE::$SSE, 'bool'],
-                    ':task' => [$task?->taskName, $task === null ? 'null' : 'string'],
-                    ':arguments' => [$task?->arguments, $task === null ? 'null' : 'string'],
-                    ':instance' => [$task?->instance, $task === null ? 'null' : 'int'],
-                    ':message' => [$message.($error !== null ? "\r\n".$error->getMessage()."\r\n".$error->getTraceAsString() : ''), 'string'],
-                ]
-            );
+            $skipInsert = false;
+            $runBy = self::$runby;
+            #To reduce amount of NoThreads, Empty and Disabled events in DB log, we check if latest event is the same we want to write
+            if ($event === 'CronNoThreads' || $event === 'CronEmpty' || $event === 'CronDisabled') {
+                #Reset runby value to null, since these entries can belong to multiple threads
+                $runBy = null;
+                #Update message with curren time
+                $message .= ' (last check at '.SandClock::format(0, 'c').')';
+                #Get last event time and type
+                $lastEvent = self::$dbController->selectRow('SELECT `time`, `type` FROM `'.self::dbPrefix.'log` ORDER BY `time` DESC LIMIT 1');
+                if ($lastEvent['type'] === $event) {
+                    #Update the message of last event with current time
+                    self::$dbController->query(
+                        'UPDATE `'.self::dbPrefix.'log` SET `message`=:message WHERE `time`=:time AND `type`=:type;',
+                        [
+                            ':type' => $event,
+                            ':time' => [$lastEvent['time'], 'datetime'],
+                            ':message' => [$message, 'string'],
+                        ]
+                    );
+                    $skipInsert = true;
+                }
+            }
+            #Insert log entry, only if we did not update last log on previous check
+            if (!$skipInsert) {
+                self::$dbController->query(
+                    'INSERT INTO `'.self::dbPrefix.'log` (`type`, `runby`, `sse`, `task`, `arguments`, `instance`, `message`) VALUES (:type,:runby,:sse,:task, :arguments, :instance, :message);',
+                    [
+                        ':type' => $event,
+                        ':runby' => [empty($runBy) ? null : $runBy, empty($runBy) ? 'null' : 'string'],
+                        ':sse' => [SSE::$SSE, 'bool'],
+                        ':task' => [$task?->taskName, $task === null ? 'null' : 'string'],
+                        ':arguments' => [$task?->arguments, $task === null ? 'null' : 'string'],
+                        ':instance' => [$task?->instance, $task === null ? 'null' : 'int'],
+                        ':message' => [$message.($error !== null ? "\r\n".$error->getMessage()."\r\n".$error->getTraceAsString() : ''), 'string'],
+                    ]
+                );
+            }
         }
         if (SSE::$SSE) {
             SSE::send($message, $event, ((($endStream || $error !== null)) ? 0 : self::$sseRetry));

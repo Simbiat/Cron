@@ -20,7 +20,7 @@
     "require": {
         "php": "^8.4",
         "simbiat/database": "^2.12",
-        "simbiat/sand-clock": "^2.3.3",
+        "simbiat/sand-clock": "^2.3.5",
         "simbiat/sse": "^1.1"
     },
     "autoload": {
