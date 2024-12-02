@@ -48,9 +48,9 @@ class TaskInstance
      */
     public private(set) ?string $message = null;
     /**
-     * @var int Time of the next run
+     * @var null|\DateTimeImmutable Time of the next run
      */
-    public private(set) int $nextTime = 0;
+    public private(set) ?\DateTimeImmutable $nextTime = null;
     /**
      * @var bool Whether task was found in database
      */
@@ -147,7 +147,7 @@ class TaskInstance
                     $this->setDayOfWeek($value);
                     break;
                 case 'nextrun':
-                    $this->nextTime = strtotime($value);
+                    $this->nextTime = SandClock::valueToDateTime($value);
                     break;
                 case 'message':
                     if (empty($value)) {
@@ -316,7 +316,7 @@ class TaskInstance
                     ':dayofweek' => [$this->dayofweek, (empty($this->dayofweek) ? 'null' : 'string')],
                     ':priority' => [(empty($this->priority) ? 0 : $this->priority), 'int'],
                     ':message' => [$this->message, (empty($this->message) ? 'null' : 'string')],
-                    ':nextrun' => [(empty($this->time) ? time() : $this->nextTime), 'datetime'],
+                    ':nextrun' => [$this->nextTime, 'datetime'],
                 ]);
             } catch (\Throwable $e) {
                 Agent::log('Failed to add or update task instance.', 'InstanceAddFail', error: $e, task: $this);
@@ -395,13 +395,14 @@ class TaskInstance
     /**
      * Reschedule a task (or remove it if it's onetime)
      *
-     * @param bool     $result    Whether task was successful
-     * @param int|null $timestamp Optional timestamp to use
+     * @param bool                                               $result    Whether task was successful
+     * @param string|float|int|\DateTime|\DateTimeImmutable|null $timestamp Optional timestamp to use
      *
      * @return bool
+     * @throws \DateMalformedStringException
      * @throws \JsonException
      */
-    public function reSchedule(bool $result = true, ?int $timestamp = null): bool
+    public function reSchedule(bool $result = true, string|float|int|\DateTime|\DateTimeImmutable|null $timestamp = null): bool
     {
         if ($this->foundInDB === false) {
             throw new \UnexpectedValueException('Not found in database.');
@@ -413,7 +414,11 @@ class TaskInstance
                 return $this->delete();
             }
             #Determine new time
-            $time = $timestamp ?? $this->updateNextRun($result);
+            if (empty($timestamp)) {
+                $time = $this->updateNextRun($result);
+            } else {
+                $time = SandClock::valueToDateTime($timestamp);
+            }
             #Actually reschedule. One task time task will be rescheduled for the retry time from settings
             try {
                 Agent::$dbController->query('UPDATE `'.Agent::dbPrefix.'schedule` SET `status`=0, `runby`=NULL, `sse`=0, `nextrun`=:time, `'.($result === true ? 'lastsuccess' : 'lasterror').'`=CURRENT_TIMESTAMP() WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance;', [
@@ -573,20 +578,21 @@ class TaskInstance
      *
      * @param bool $result Flag to determine if we are determining new time for a successful job (`true`, default) or failed one
      *
-     * @return int
+     * @return \DateTimeImmutable
      * @throws \JsonException
+     * @throws \DateMalformedStringException
      */
-    public function updateNextRun(bool $result = true): int
+    public function updateNextRun(bool $result = true): \DateTimeImmutable
     {
         if ($this->foundInDB === false) {
             throw new \UnexpectedValueException('Not found in database.');
         }
-        $currentTime = time();
+        $currentTime = SandClock::valueToDateTime();
         if (empty($this->nextTime)) {
             $this->nextTime = $currentTime;
         }
         if (!$result && $this->taskObject->retry && $this->taskObject->retry > 0) {
-            $newTime = $this->nextTime + $this->taskObject->retry;
+            $newTime = $this->nextTime->modify('+'.$this->taskObject->retry.' seconds');
         } else {
             #Determine minimum seconds to move the time by
             if ($this->frequency > 0) {
@@ -595,11 +601,11 @@ class TaskInstance
                 $seconds = Agent::$retry;
             }
             #Determine time difference between current time and run time, that was initially set
-            $timeDiff = $currentTime - $this->nextTime;
+            $timeDiff = $currentTime->getTimestamp() - $this->nextTime->getTimestamp();
             #Determine how many runs (based on frequency) could have happened within the time difference, essentially to "skip" over the missed runs
             $possibleRuns = (int)ceil($timeDiff / $seconds);
             #Increase time value by
-            $newTime = $this->nextTime + (max($possibleRuns, 1) * $seconds);
+            $newTime = $this->nextTime->modify('+'.(max($possibleRuns, 1) * $seconds).' seconds');
         }
         if (empty($this->dayofmonth) && empty($this->dayofweek)) {
             return $newTime;

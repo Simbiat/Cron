@@ -232,7 +232,7 @@ You can execute
 (new \Simbiat\Cron\TaskInstance('taskName', 'arguments', 1))->updateNextRun($result);
 ```
 
-to get suggested UNIX timestamp for next run of a task. It will calculate how many jobs were potentially missed based on time difference between current `nextrun` value in database and current time as well as instance frequency. This is required to keep the schedule consistent, so that if you schedule a task at `02:34` daily, it would always run at `02:34` (or try, at least). If instance has `dayofweek` or `dayofmonth`, the function will find the earliest day that will satisfy both limitations starting from the date, which was determined based on instance frequency. `result` value is optional (`true` by default), and will affect logic only if set to `false` and `retry` value for the task is more than 0, essentially overriding the normal logic.
+to get suggested a `DateTimeImmutable` for next run of a task. It will calculate how many jobs were potentially missed based on time difference between current `nextrun` value in database and current time as well as instance frequency. This is required to keep the schedule consistent, so that if you schedule a task at `02:34` daily, it would always run at `02:34` (or try, at least). If instance has `dayofweek` or `dayofmonth`, the function will find the earliest day that will satisfy both limitations starting from the date, which was determined based on instance frequency. `result` value is optional (`true` by default), and will affect logic only if set to `false` and `retry` value for the task is more than 0, essentially overriding the normal logic.
 
 ## Settings
 

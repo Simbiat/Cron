@@ -108,6 +108,7 @@ class Agent
      *
      * @return bool
      * @throws \JsonException
+     * @throws \DateMalformedStringException
      */
     public function process(int $items = 1): bool
     {
@@ -376,6 +377,7 @@ class Agent
      *
      * @return bool
      * @throws \JsonException
+     * @throws \DateMalformedStringException
      */
     public function unHang(): bool
     {
@@ -503,8 +505,6 @@ class Agent
             if ($event === 'CronNoThreads' || $event === 'CronEmpty' || $event === 'CronDisabled') {
                 #Reset runby value to null, since these entries can belong to multiple threads
                 $runBy = null;
-                #Update message with curren time
-                $message .= ' (last check at '.SandClock::format(0, 'c').')';
                 #Get last event time and type
                 $lastEvent = self::$dbController->selectRow('SELECT `time`, `type` FROM `'.self::dbPrefix.'log` ORDER BY `time` DESC LIMIT 1');
                 if ($lastEvent['type'] === $event) {
@@ -514,7 +514,7 @@ class Agent
                         [
                             ':type' => $event,
                             ':time' => [$lastEvent['time'], 'datetime'],
-                            ':message' => [$message, 'string'],
+                            ':message' => [$message.' (last check at '.SandClock::format(0, 'c').')', 'string'],
                         ]
                     );
                     $skipInsert = true;
