@@ -352,7 +352,7 @@ class Agent
         if (isset($settings['sseRetry'])) {
             $settings['sseRetry'] = (int)$settings['sseRetry'];
             if ($settings['sseRetry'] > 0) {
-                self::$retry = $settings['sseRetry'];
+                self::$sseRetry = $settings['sseRetry'];
             }
         }
         #Update maximum number of threads
