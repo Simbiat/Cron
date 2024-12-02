@@ -59,6 +59,11 @@ class TaskInstance
      * @var Task|null Task object
      */
     public private(set) ?Task $taskObject = null;
+    /**
+     * Random ID
+     * @var null|string
+     */
+    public private(set) ?string $runby = null;
     
     /**
      * Create a Cron task object
@@ -97,6 +102,10 @@ class TaskInstance
                 ]
             );
             if (!empty($settings)) {
+                #Set `runby` value, if present
+                if (!empty($settings['runby'])) {
+                    $this->runby = $settings['runby'];
+                }
                 #Get task object
                 $this->taskObject = (new Task($this->taskName));
                 #Process settings
@@ -466,13 +475,18 @@ class TaskInstance
             $this->reSchedule(false);
             return false;
         }
+        #If runby value is empty (job is being run manually) - generate it
+        if (empty($this->runby)) {
+            $this->runby = Agent::generateRunBy();
+        }
         #Set time limit for the task
         set_time_limit($this->taskObject->maxTime);
         #Update last run
-        Agent::$dbController->query('UPDATE `'.Agent::dbPrefix.'schedule` SET `status`=2, `lastrun` = CURRENT_TIMESTAMP() WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance;', [
+        Agent::$dbController->query('UPDATE `'.Agent::dbPrefix.'schedule` SET `status`=2, `runby`=:runby, `lastrun` = CURRENT_TIMESTAMP() WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance;', [
             ':task' => [$this->taskName, 'string'],
             ':arguments' => [$this->arguments, 'string'],
             ':instance' => [$this->instance, 'int'],
+            ':runby' => [$this->runby, 'string'],
         ]);
         #Decode allowed returns if any
         if (!empty($this->taskObject->returns)) {

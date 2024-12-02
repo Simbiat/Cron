@@ -73,9 +73,9 @@ class Agent
     private static string $sqlOrderBy = 'ORDER BY IF(`frequency`=0, IF(TIMESTAMPDIFF(day, `nextrun`, CURRENT_TIMESTAMP(6))>0, TIMESTAMPDIFF(day, `nextrun`, CURRENT_TIMESTAMP(6)), 0), CEIL(IF(TIMESTAMPDIFF(second, `nextrun`, CURRENT_TIMESTAMP(6))/`frequency`>1, TIMESTAMPDIFF(second, `nextrun`, CURRENT_TIMESTAMP(6))/`frequency`, 0)))+`priority` DESC, `nextrun`';
     /**
      * Random ID
-     * @var string
+     * @var null|string
      */
-    private static string $runby = '';
+    private static ?string $runby = null;
     /**
      * List of allowed SSE statuses
      * @var array
@@ -102,6 +102,20 @@ class Agent
     }
     
     /**
+     * Generate random ID to be used by threads
+     * @return false|string
+     */
+    public static function generateRunBy(): false|string
+    {
+        try {
+            return bin2hex(random_bytes(15));
+        } catch (\Throwable $exception) {
+            self::log('Failed to generate random ID', 'CronFail', true, $exception);
+            return false;
+        }
+    }
+    
+    /**
      * Process Cron items
      *
      * @param int $items Number of items to process
@@ -117,12 +131,7 @@ class Agent
             SSE::open();
         }
         #Generate random ID
-        try {
-            self::$runby = bin2hex(random_bytes(15));
-        } catch (\Throwable $exception) {
-            self::log('Failed to generate random ID', 'CronFail', true, $exception);
-            return false;
-        }
+        self::$runby = self::generateRunBy();
         if (SSE::$SSE) {
             self::log('Cron processing started in SSE mode', 'SSEStart');
         }
@@ -229,9 +238,6 @@ class Agent
      */
     private function getTasks(int $items): bool|array
     {
-        if (empty(self::$runby)) {
-            throw new \UnexpectedValueException('Empty `runby` ID');
-        }
         try {
             self::$dbController->query('UPDATE `'.self::dbPrefix.'schedule` AS `toUpdate`
                         INNER JOIN
@@ -500,10 +506,11 @@ class Agent
         }
         if (self::$dbReady) {
             $skipInsert = false;
-            $runBy = self::$runby;
+            #If $task was passed, use its value for runby (should be valid only in case task was ran manually)
+            $runBy = $task?->runby ?? self::$runby;
             #To reduce amount of NoThreads, Empty and Disabled events in DB log, we check if latest event is the same we want to write
             if ($event === 'CronNoThreads' || $event === 'CronEmpty' || $event === 'CronDisabled') {
-                #Reset runby value to null, since these entries can belong to multiple threads
+                #Reset runby value to null, since these entries can belong to multiple threads, and we don't really care about which one was the last one
                 $runBy = null;
                 #Get last event time and type
                 $lastEvent = self::$dbController->selectRow('SELECT `time`, `type` FROM `'.self::dbPrefix.'log` ORDER BY `time` DESC LIMIT 1');
