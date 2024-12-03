@@ -278,6 +278,7 @@ class Task
                     ':system' => [$this->system, 'bool'],
                     ':desc' => [$this->description, (empty($this->description) ? 'null' : 'string')],
                 ]);
+                $this->foundInDB = true;
             } catch (\Throwable $e) {
                 Agent::log('Failed to add or update task with following details: '.$taskDetailsString.'.', 'TaskAddFail', error: $e);
             }
@@ -306,6 +307,7 @@ class Task
                 $result = Agent::$dbController->query('DELETE FROM `'.Agent::dbPrefix.'tasks` WHERE `task`=:task AND `system`=0;', [
                     ':task' => [$this->taskName, 'string'],
                 ]);
+                $this->foundInDB = false;
             } catch (\Throwable $e) {
                 Agent::log('Failed delete task `'.$this->taskName.'`.', 'TaskDeleteFail', error: $e);
             }

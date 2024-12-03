@@ -327,6 +327,7 @@ class TaskInstance
                     ':message' => [$this->message, (empty($this->message) ? 'null' : 'string')],
                     ':nextrun' => [$this->nextTime, 'datetime'],
                 ]);
+                $this->foundInDB = true;
             } catch (\Throwable $e) {
                 Agent::log('Failed to add or update task instance.', 'InstanceAddFail', error: $e, task: $this);
             }
@@ -357,6 +358,7 @@ class TaskInstance
                     ':arguments' => [$this->arguments, 'string'],
                     ':instance' => [$this->instance, 'int'],
                 ]);
+                $this->foundInDB = false;
             } catch (\Throwable $e) {
                 Agent::log('Failed to delete task instance.', 'InstanceDeleteFail', error: $e, task: $this);
             }
