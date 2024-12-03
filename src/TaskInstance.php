@@ -458,14 +458,14 @@ class TaskInstance
      */
     public function run(): bool
     {
+        #If runby value is empty (job is being run manually) - generate it
+        if (empty($this->runby)) {
+            $this->runby = Agent::generateRunBy();
+        }
+        Agent::setCurrentTask($this);
         if ($this->foundInDB === false) {
-            #Check if this is called from Agent class
-            $caller = debug_backtrace();
-            if (empty($caller[1]) || $caller[1]['function'] !== 'runTask' || $caller[1]['class'] !== 'Simbiat\\Cron\\Agent') {
-                #Not called from Agent class, so assume that instance is not properly initiated, thus we need to throw an error
-                throw new \UnexpectedValueException('Not found in database.');
-            }
-            #Call is from Agent class, so assume that it was a one-time job, that has already been run and removed
+            #Assume that it was a [one-time job], that has already been run and removed by other (possibly manual) process
+            Agent::setCurrentTask(null);
             return true;
         }
         if ($this->nextTime !== SandClock::suggestNextDay($this->nextTime,
@@ -475,21 +475,23 @@ class TaskInstance
             #Register error.
             Agent::log('Attempted to run function during forbidden day of week or day of month.', 'InstanceFail', task: $this);
             $this->reSchedule(false);
+            Agent::setCurrentTask(null);
             return false;
-        }
-        #If runby value is empty (job is being run manually) - generate it
-        if (empty($this->runby)) {
-            $this->runby = Agent::generateRunBy();
         }
         #Set time limit for the task
         set_time_limit($this->taskObject->maxTime);
         #Update last run
-        Agent::$dbController->query('UPDATE `'.Agent::dbPrefix.'schedule` SET `status`=2, `runby`=:runby, `lastrun` = CURRENT_TIMESTAMP() WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance;', [
+        Agent::$dbController->query('UPDATE `'.Agent::dbPrefix.'schedule` SET `status`=2, `runby`=:runby, `lastrun` = CURRENT_TIMESTAMP() WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance AND `status`!=2;', [
             ':task' => [$this->taskName, 'string'],
             ':arguments' => [$this->arguments, 'string'],
             ':instance' => [$this->instance, 'int'],
             ':runby' => [$this->runby, 'string'],
         ]);
+        if (Agent::$dbController->getResult() <= 0) {
+            #The task was either picked up by some manual process or has been removed
+            Agent::setCurrentTask(null);
+            return true;
+        }
         #Decode allowed returns if any
         if (!empty($this->taskObject->returns)) {
             $allowedreturns = json_decode($this->taskObject->returns, flags: JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_BIGINT_AS_STRING | JSON_OBJECT_AS_ARRAY);
@@ -525,6 +527,7 @@ class TaskInstance
         }
         #Reschedule
         $this->reSchedule($result);
+        Agent::setCurrentTask(null);
         #Return
         return $result;
     }

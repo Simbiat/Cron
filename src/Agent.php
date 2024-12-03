@@ -77,10 +77,15 @@ class Agent
      */
     private static ?string $runby = null;
     /**
-     * List of allowed SSE statuses
+     * Current task object
+     * @var null|TaskInstance
+     */
+    private static ?TaskInstance $currentTask = null;
+    /**
+     * List of event types, that are allowed to not have TaskInstance object with them
      * @var array
      */
-    private const array sseStatuses = ['SSEStart', 'CronFail', 'InstanceStart', 'InstanceEnd', 'InstanceFail', 'CronEmpty', 'CronNoThreads', 'SSEEnd', 'Reschedule', 'RescheduleFail', 'TaskToSystem', 'TaskToSystemFail', 'InstanceDelete', 'InstanceDeleteFail', 'InstanceAdd', 'InstanceAddFail', 'InstanceToSystem', 'InstanceToSystemFail', 'TaskAdd', 'TaskAddFail', 'TaskDelete', 'TaskDeleteFail', 'CronDisabled'];
+    private const array eventsNoInstance = ['SSEStart', 'CronFail', 'CronEmpty', 'CronNoThreads', 'SSEEnd', 'TaskToSystem', 'TaskToSystemFail', 'TaskAdd', 'TaskAddFail', 'TaskDelete', 'TaskDeleteFail', 'CronDisabled'];
     
     /**
      * Class constructor
@@ -99,6 +104,15 @@ class Agent
                 $this->getSettings();
             }
         }
+    }
+    
+    /**
+     * Set current task instance
+     * @param \Simbiat\Cron\TaskInstance|null $currentTask
+     */
+    public static function setCurrentTask(?TaskInstance $currentTask): void
+    {
+        self::$currentTask = $currentTask;
     }
     
     /**
@@ -221,6 +235,8 @@ class Agent
         } catch (\Throwable $exception) {
             self::log('Failed to run task `'.$task['task'].'` ('.$number.'/'.$totalTasks.')', 'InstanceFail', false, $exception, ($taskInstance ?? null));
             return;
+        } finally {
+            self::$currentTask = null;
         }
         #Notify of the task finishing
         if ($result) {
@@ -499,15 +515,19 @@ class Agent
      *
      * @return void
      */
-    public static function log(string $message, #[ExpectedValues(self::sseStatuses)] string $event = 'CronFail', bool $endStream = false, ?\Throwable $error = null, ?TaskInstance $task = null): void
+    public static function log(string $message, string $event, bool $endStream = false, ?\Throwable $error = null, ?TaskInstance $task = null): void
     {
-        if (!in_array($event, self::sseStatuses, true)) {
-            $event = 'CronFail';
+        #In case log is called from outside of Agent, attempt to use current task instance in Agent, if available (set by TaskInstance's `run` method)
+        $currentTask = $task ?? self::$currentTask;
+        if ($currentTask === null && !in_array($event, self::eventsNoInstance)) {
+            #Something is trying to use Cron log to write custom message and does not have associated TaskInstance with it, so probably was called outside Cron classes.
+            #We do not want to flood DB with unsupported logs, and for SSE separate function can be used
+            return;
         }
         if (self::$dbReady) {
             $skipInsert = false;
-            #If $task was passed, use its value for runby (should be valid only in case task was ran manually)
-            $runBy = $task?->runby ?? self::$runby;
+            #If $task was passed, use its value for runby
+            $runBy = $currentTask?->runby ?? self::$runby;
             #To reduce amount of NoThreads, Empty and Disabled events in DB log, we check if latest event is the same we want to write
             if ($event === 'CronNoThreads' || $event === 'CronEmpty' || $event === 'CronDisabled') {
                 #Reset runby value to null, since these entries can belong to multiple threads, and we don't really care about which one was the last one
@@ -535,9 +555,9 @@ class Agent
                         ':type' => $event,
                         ':runby' => [empty($runBy) ? null : $runBy, empty($runBy) ? 'null' : 'string'],
                         ':sse' => [SSE::$SSE, 'bool'],
-                        ':task' => [$task?->taskName, $task === null ? 'null' : 'string'],
-                        ':arguments' => [$task?->arguments, $task === null ? 'null' : 'string'],
-                        ':instance' => [$task?->instance, $task === null ? 'null' : 'int'],
+                        ':task' => [$currentTask?->taskName, $currentTask === null ? 'null' : 'string'],
+                        ':arguments' => [$currentTask?->arguments, $currentTask === null ? 'null' : 'string'],
+                        ':instance' => [$currentTask?->instance, $currentTask === null ? 'null' : 'int'],
                         ':message' => [$message.($error !== null ? "\r\n".$error->getMessage()."\r\n".$error->getTraceAsString() : ''), 'string'],
                     ]
                 );

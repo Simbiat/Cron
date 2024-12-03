@@ -283,3 +283,26 @@ Below is the list of event types, that are used when logging and when outputting
 21. `RescheduleFail` - a task instance failed to be rescheduled.
 22. `SSEStart` - start of cron processing in SSE mode.
 23. `SSEEnd` - end of processing in SSE mode.
+24. `CustomEmergency` - custom event indicating an emergency (SysLog standard level 0).
+25. `CustomAlert` - custom event indicating an alert (SysLog standard level 1).
+26. `CustomCritical` - custom event indicating a critical condition (SysLog standard level 2).
+27. `CustomError` - custom event indicating an error (SysLog standard level 3).
+28. `CustomWarning` - custom event indicating a warning (SysLog standard level 4).
+29. `CustomNotice` - custom event indicating a notice (SysLog standard level 5).
+30. `CustomInformation` - custom event indicating an informative message (SysLog standard level 6).
+31. `CustomDebug` - custom event indicating a debugging message (SysLog standard level 7).
+
+## Custom events
+
+You might have noticed, that among the event types there are a few starting with `Custom` prefix. They are added to allow you to log custom events from functions called by Cron. These are just default ones, and if required you can add new ones to `cron__event_types` table.  
+To log events call
+
+```php
+\Simbiat\Cron\Agent::log(string $message, string $event, bool $endStream = false, ?\Throwable $error = null, ?TaskInstance $task = null);
+```
+
+`$message` is the text of your message you want to send.  
+`$event` is the event type.  
+`$endStream` is a `bool` value indicating whether the execution should stop after sending the message. This will also end SSE stream.  
+`$error` is optional `\Throwable` object, that will be used to log details of an error, that you have caught.  
+`$task` is an optional `\Simbiat\Cron\TaskInstance` object, that you ***SHOULD NOT*** pass to this function normally. If you are using the class normally, it will be populated automatically. Treat this as internally used parameter. At the same time all event types besides `Cron*`, `Task*` and `SSE*` ones require it, and if not passed, no messages will be logged neither in DB nor in SSE stream.

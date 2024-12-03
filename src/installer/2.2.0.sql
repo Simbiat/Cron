@@ -17,4 +17,12 @@ UPDATE `cron__event_types` SET `description` = 'End of cron processing in SSE mo
 UPDATE `cron__event_types` SET `type` = 'SSEStart' WHERE `cron__event_types`.`type` = 'CronStart';
 UPDATE `cron__event_types` SET `description` = 'Start of cron processing in SSE mode.' WHERE `cron__event_types`.`type` = 'SSEStart';
 INSERT INTO `cron__event_types` (`type`, `description`) VALUES ('CronDisabled', 'Cron processing is disabled in settings.');
+INSERT INTO `cron__event_types` (`type`, `description`) VALUES ('CustomEmergency', 'Custom event indicating an emergency (SysLog standard level 0).');
+INSERT INTO `cron__event_types` (`type`, `description`) VALUES ('CustomAlert', 'Custom event indicating an alert (SysLog standard level 1).');
+INSERT INTO `cron__event_types` (`type`, `description`) VALUES ('CustomCritical', 'Custom event indicating a critical condition (SysLog standard level 2).');
+INSERT INTO `cron__event_types` (`type`, `description`) VALUES ('CustomError', 'Custom event indicating an error (SysLog standard level 3).');
+INSERT INTO `cron__event_types` (`type`, `description`) VALUES ('CustomWarning', 'Custom event indicating a warning (SysLog standard level 4).');
+INSERT INTO `cron__event_types` (`type`, `description`) VALUES ('CustomNotice', 'Custom event indicating a notice (SysLog standard level 5).');
+INSERT INTO `cron__event_types` (`type`, `description`) VALUES ('CustomInformation', 'Custom event indicating an informative message (SysLog standard level 6).');
+INSERT INTO `cron__event_types` (`type`, `description`) VALUES ('CustomDebug', 'Custom event indicating a debugging message (SysLog standard level 7).');
 UPDATE `cron__settings` SET `value` = '2.2.0' WHERE `cron__settings`.`setting` = 'version';
