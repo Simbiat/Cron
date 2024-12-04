@@ -47,6 +47,10 @@ class Task
      */
     public private(set) bool $system = false;
     /**
+     * @var bool Whether task (and its task instances) is enabled
+     */
+    public private(set) bool $enabled = true;
+    /**
      * @var string|null Description of the task
      */
     public private(set) ?string $description = null;
@@ -130,6 +134,9 @@ class Task
                     break;
                 case 'retry':
                     $this->setRetry($value);
+                    break;
+                case 'enabled':
+                    $this->enabled = (bool)$value;
                     break;
                 case 'system':
                     $this->system = (bool)$value;
@@ -266,7 +273,7 @@ class Task
             $result = false;
             try {
                 $taskDetailsString = json_encode($this, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION);
-                $result = Agent::$dbController->query('INSERT INTO `'.Agent::dbPrefix.'tasks` (`task`, `function`, `object`, `parameters`, `allowedreturns`, `maxTime`, `minFrequency`, `retry`, `system`, `description`) VALUES (:task, :function, :object, :parameters, :returns, :maxTime, :minFrequency, :retry, :system, :desc) ON DUPLICATE KEY UPDATE `function`=:function, `object`=:object, `parameters`=:parameters, `allowedreturns`=:returns, `maxTime`=:maxTime, `minFrequency`=:minFrequency, `retry`=:retry, `system`=:system, `description`=:desc;', [
+                $result = Agent::$dbController->query('INSERT INTO `'.Agent::dbPrefix.'tasks` (`task`, `function`, `object`, `parameters`, `allowedreturns`, `maxTime`, `minFrequency`, `retry`, `enabled`, `system`, `description`) VALUES (:task, :function, :object, :parameters, :returns, :maxTime, :minFrequency, :retry, :enabled, :system, :desc) ON DUPLICATE KEY UPDATE `function`=:function, `object`=:object, `parameters`=:parameters, `allowedreturns`=:returns, `maxTime`=:maxTime, `minFrequency`=:minFrequency, `retry`=:retry, `description`=:desc;', [
                     ':task' => [$this->taskName, 'string'],
                     ':function' => [$this->function, 'string'],
                     ':object' => [$this->object, (empty($this->object) ? 'null' : 'string')],
@@ -275,12 +282,14 @@ class Task
                     ':maxTime' => [$this->maxTime, 'int'],
                     ':minFrequency' => [$this->minFrequency, 'int'],
                     ':retry' => [$this->retry, 'int'],
+                    ':enabled' => [$this->enabled, 'bool'],
                     ':system' => [$this->system, 'bool'],
                     ':desc' => [$this->description, (empty($this->description) ? 'null' : 'string')],
                 ]);
                 $this->foundInDB = true;
             } catch (\Throwable $e) {
                 Agent::log('Failed to add or update task with following details: '.$taskDetailsString.'.', 'TaskAddFail', error: $e);
+                return false;
             }
             #Log only if something was actually changed
             if (Agent::$dbController->getResult() > 0) {
@@ -310,6 +319,7 @@ class Task
                 $this->foundInDB = false;
             } catch (\Throwable $e) {
                 Agent::log('Failed delete task `'.$this->taskName.'`.', 'TaskDeleteFail', error: $e);
+                return false;
             }
             #Log only if something was actually deleted
             if (Agent::$dbController->getResult() > 0) {
@@ -337,10 +347,42 @@ class Task
                 ]);
             } catch (\Throwable $e) {
                 Agent::log('Failed to mark task `'.$this->taskName.'` as system one.', 'TaskToSystemFail', error: $e);
+                return false;
             }
             #Log only if something was actually changed
             if (Agent::$dbController->getResult() > 0) {
                 Agent::log('Marked task `'.$this->taskName.'` as system one.', 'TaskToSystem');
+            }
+            return $result;
+        }
+        return false;
+    }
+    
+    /**
+     * Function to enable or disable task and its instances
+     * @param bool $enabled Flag indicating whether we want to enable or disable the task
+     *
+     * @return bool
+     */
+    public function setEnabled(bool $enabled = true): bool
+    {
+        if (empty($this->taskName)) {
+            throw new \UnexpectedValueException('Task name is not set');
+        }
+        if (Agent::$dbReady && $this->foundInDB) {
+            $result = false;
+            try {
+                $result = Agent::$dbController->query('UPDATE `'.Agent::dbPrefix.'task` SET `enabled`=:enabled WHERE `task`=:task;', [
+                    ':task' => [$this->taskName, 'string'],
+                    ':enabled' => [$enabled, 'bool'],
+                ]);
+            } catch (\Throwable $e) {
+                Agent::log('Failed to '.($enabled ? 'enable' : 'disable').' task.', 'Task'.($enabled ? 'Enable' : 'Disable').'Fail', error: $e);
+                return false;
+            }
+            #Log only if something was actually changed
+            if (Agent::$dbController->getResult() > 0) {
+                Agent::log(($enabled ? 'Enabled' : 'Disabled').' task.', 'Task'.($enabled ? 'Enable' : 'Disable'));
             }
             return $result;
         }

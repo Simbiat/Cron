@@ -28,6 +28,10 @@ class TaskInstance
      */
     public private(set) bool $system = false;
     /**
+     * @var bool Whether task instances is enabled
+     */
+    public private(set) bool $enabled = true;
+    /**
      * @var int Task instance frequency
      */
     public private(set) int $frequency = 0;
@@ -142,6 +146,9 @@ class TaskInstance
                     break;
                 case 'instance':
                     $this->setInstance($value);
+                    break;
+                case 'enabled':
+                    $this->enabled = (bool)$value;
                     break;
                 case 'frequency':
                     $this->setFrequency($value);
@@ -315,10 +322,11 @@ class TaskInstance
         if (Agent::$dbReady) {
             $result = false;
             try {
-                $result = Agent::$dbController->query('INSERT INTO `'.Agent::dbPrefix.'schedule` (`task`, `arguments`, `instance`, `system`, `frequency`, `dayofmonth`, `dayofweek`, `priority`, `message`, `nextrun`) VALUES (:task, :arguments, :instance, :system, :frequency, :dayofmonth, :dayofweek, :priority, :message, :nextrun) ON DUPLICATE KEY UPDATE `frequency`=:frequency, `dayofmonth`=:dayofmonth, `dayofweek`=:dayofweek, `nextrun`=IF(:frequency=0, `nextrun`, :nextrun), `priority`=IF(:frequency=0, IF(`priority`>:priority, `priority`, :priority), :priority), `message`=:message, `updated`=CURRENT_TIMESTAMP();', [
+                $result = Agent::$dbController->query('INSERT INTO `'.Agent::dbPrefix.'schedule` (`task`, `arguments`, `instance`, `enabled`, `system`, `frequency`, `dayofmonth`, `dayofweek`, `priority`, `message`, `nextrun`) VALUES (:task, :arguments, :instance, :enabled, :system, :frequency, :dayofmonth, :dayofweek, :priority, :message, :nextrun) ON DUPLICATE KEY UPDATE `frequency`=:frequency, `dayofmonth`=:dayofmonth, `dayofweek`=:dayofweek, `nextrun`=IF(:frequency=0, `nextrun`, :nextrun), `priority`=IF(:frequency=0, IF(`priority`>:priority, `priority`, :priority), :priority), `message`=:message, `updated`=CURRENT_TIMESTAMP();', [
                     ':task' => [$this->taskName, 'string'],
                     ':arguments' => [$this->arguments, 'string'],
                     ':instance' => [$this->instance, 'int'],
+                    ':enabled' => [$this->enabled, 'enabled'],
                     ':system' => [$this->system, 'bool'],
                     ':frequency' => [(empty($this->frequency) ? 0 : $this->frequency), 'int'],
                     ':dayofmonth' => [$this->dayofmonth, (empty($this->dayofmonth) ? 'null' : 'string')],
@@ -330,6 +338,7 @@ class TaskInstance
                 $this->foundInDB = true;
             } catch (\Throwable $e) {
                 Agent::log('Failed to add or update task instance.', 'InstanceAddFail', error: $e, task: $this);
+                return false;
             }
             #Log only if something was actually changed
             if (Agent::$dbController->getResult() > 0) {
@@ -361,6 +370,7 @@ class TaskInstance
                 $this->foundInDB = false;
             } catch (\Throwable $e) {
                 Agent::log('Failed to delete task instance.', 'InstanceDeleteFail', error: $e, task: $this);
+                return false;
             }
             #Log only if something was actually deleted, and if it's not a one-time job
             if ($this->frequency > 0 && Agent::$dbController->getResult() > 0) {
@@ -393,10 +403,44 @@ class TaskInstance
                 ]);
             } catch (\Throwable $e) {
                 Agent::log('Failed to mark task instance as system one.', 'InstanceToSystemFail', error: $e, task: $this);
+                return false;
             }
             #Log only if something was actually changed
             if (Agent::$dbController->getResult() > 0) {
                 Agent::log('Marked task instance as system one.', 'InstanceToSystem', task: $this);
+            }
+            return $result;
+        }
+        return false;
+    }
+    
+    /**
+     * Function to enable or disable task instance
+     * @param bool $enabled Flag indicating whether we want to enable or disable the instance
+     *
+     * @return bool
+     */
+    public function setEnabled(bool $enabled = true): bool
+    {
+        if ($this->foundInDB === false) {
+            throw new \UnexpectedValueException('Not found in database.');
+        }
+        if (Agent::$dbReady) {
+            $result = false;
+            try {
+                $result = Agent::$dbController->query('UPDATE `'.Agent::dbPrefix.'schedule` SET `enabled`=:enabled WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance;', [
+                    ':task' => [$this->taskName, 'string'],
+                    ':arguments' => [$this->arguments, 'string'],
+                    ':instance' => [$this->instance, 'int'],
+                    ':enabled' => [$enabled, 'bool'],
+                ]);
+            } catch (\Throwable $e) {
+                Agent::log('Failed to '.($enabled ? 'enable' : 'disable').' task instance.', 'Instance'.($enabled ? 'Enable' : 'Disable').'Fail', error: $e, task: $this);
+                return false;
+            }
+            #Log only if something was actually changed
+            if (Agent::$dbController->getResult() > 0) {
+                Agent::log(($enabled ? 'Enabled' : 'Disabled').' task instance.', 'Instance'.($enabled ? 'Enable' : 'Disable'), task: $this);
             }
             return $result;
         }
@@ -440,6 +484,7 @@ class TaskInstance
                 ]);
             } catch (\Throwable $e) {
                 Agent::log('Failed to reschedule task instance for '.SandClock::format($time, 'c').'.', 'RescheduleFail', error: $e, task: $this);
+                return false;
             }
             #Log only if something was actually changed
             if (Agent::$dbController->getResult() > 0) {

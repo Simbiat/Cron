@@ -25,4 +25,16 @@ INSERT INTO `cron__event_types` (`type`, `description`) VALUES ('CustomWarning',
 INSERT INTO `cron__event_types` (`type`, `description`) VALUES ('CustomNotice', 'Custom event indicating a notice (SysLog standard level 5).');
 INSERT INTO `cron__event_types` (`type`, `description`) VALUES ('CustomInformation', 'Custom event indicating an informative message (SysLog standard level 6).');
 INSERT INTO `cron__event_types` (`type`, `description`) VALUES ('CustomDebug', 'Custom event indicating a debugging message (SysLog standard level 7).');
+ALTER TABLE `cron__tasks` ADD `enabled` TINYINT(1) UNSIGNED NOT NULL DEFAULT '1' COMMENT 'Whether a task (and thus all its instances) is enabled and should be run as per schedule' AFTER `retry`;
+ALTER TABLE `cron__schedule` ADD `enabled` TINYINT(1) UNSIGNED NOT NULL DEFAULT '1' COMMENT 'Whether a task instance is enabled and should be run as per schedule' AFTER `instance`;
+INSERT INTO `cron__event_types` (`type`, `description`) VALUES ('TaskEnable', 'Task was enabled.');
+INSERT INTO `cron__event_types` (`type`, `description`) VALUES ('TaskDisable', 'Task was disabled.');
+INSERT INTO `cron__event_types` (`type`, `description`) VALUES ('TaskEnableFail', 'Failed to enable task.');
+INSERT INTO `cron__event_types` (`type`, `description`) VALUES ('TaskDisableFail', 'Failed to disable task.');
+INSERT INTO `cron__event_types` (`type`, `description`) VALUES ('InstanceEnable', 'Task instance was enabled.');
+INSERT INTO `cron__event_types` (`type`, `description`) VALUES ('InstanceDisable', 'Task instance was disabled.');
+INSERT INTO `cron__event_types` (`type`, `description`) VALUES ('InstanceEnableFail', 'Failed to enable task instance.');
+INSERT INTO `cron__event_types` (`type`, `description`) VALUES ('InstanceDisableFail', 'Failed to disable task instance.');
+ALTER TABLE `cron__tasks` ADD INDEX(`enabled`);
+ALTER TABLE `cron__schedule` ADD INDEX(`enabled`);
 UPDATE `cron__settings` SET `value` = '2.2.0' WHERE `cron__settings`.`setting` = 'version';

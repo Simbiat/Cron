@@ -95,10 +95,11 @@ In order to use this library you will need to add at least 1 task using below co
 4. `parameters` are optional parameters that will be used when creating the optional `$object`. Needs to be either pure array or JSON encoded array of values, that can be expanded (`...` operator). Stored in database as JSON string and limited to `VARCHAR(5000)`.
 5. `allowedreturns` are optional return values, that will be considered as "success". By default, the library relies on `boolean` values to determine if the task was completed successfully, but this option allows to expand the possible values. Needs to be either pure array or JSON encoded array of values, that can be expanded (`...` operator). Stored in database as JSON string and limited to `VARCHAR(5000)`.
 6. `desccription` is an optional description of the task. Limited to `VARCHAR(1000)`.
-7. `system` whether a task can be removed by this class or not.
-8. `maxTime` maximum time in seconds to allow the function to run (will update execution time limit before running the task). `3600` by default.
-9. `minFrequency` minimal allowed frequency (in seconds) at which a task instance can run. Does not apply to one-time jobs.
-10. `retry` custom number of seconds to reschedule a failed task instance for instead of determining next run based on `frequency`. `0` (default) disables the functionality, since this can (and most likely will) introduce drift, so best be used on tasks that, do not require precise time to be run on. Applies to one-time jobs as well.
+7. `enabled` whether a task (and its instances) is enabled (and run as per schedule) or not. Used only when creating new tasks.
+8. `system` whether a task can be removed by this class or not. Used only when creating new tasks.
+9. `maxTime` maximum time in seconds to allow the function to run (will update execution time limit before running the task). `3600` by default.
+10. `minFrequency` minimal allowed frequency (in seconds) at which a task instance can run. Does not apply to one-time jobs.
+11. `retry` custom number of seconds to reschedule a failed task instance for instead of determining next run based on `frequency`. `0` (default) disables the functionality, since this can (and most likely will) introduce drift, so best be used on tasks that, do not require precise time to be run on. Applies to one-time jobs as well.
 
 Calling this function with `$task`, that is already registered, will update respective values, except for `system`.
 
@@ -138,6 +139,14 @@ To delete a task pass appropriate `taskName` to constructor and call `delete`.
 
 Note, that tasks with `system` flag set to `1` will not be deleted.
 
+### Enabling or disabling task
+
+If you are creating a task from scratch, then just pass `enabled` setting set to `1` (default) or `0` in the settings array. If it's an existing task, do this:
+
+```php
+(new \Simbiat\Cron\Task('taskName'))->setEnabled(bool $enabled = true);
+```
+
 ### Setting task as system
 
 If you are creating a task from scratch, then just pass `system` setting set to `1` in the settings array. If it's an existing task, do this:
@@ -160,23 +169,16 @@ To schedule a task use this function:
 (new Cron\TaskInstance())->settingsFromArray($settings)->add();
 ```
 
-`$task` is mandatory name of the task.
-
-`$arguments` are optional arguments, that will be passed to the function. Needs to be either pure array or JSON encoded array of values, that can be expanded (`...` operator). Stored in database as JSON or empty string and limited to `VARCHAR(255)` (due to MySQL limitations). Also supports special string `"$cronInstance"` (when JSON encoded, that is) that will be replaced by task instance value, when run (useful, when you need multiple instances, and need to offset their processing logic).
-
-`$instance` is optional instance number (or ID if you like). By default, it is `1`. This is useful, if you want to create multiple instances for the same task with same arguments, which you want to run in parallel, when possible.
-
-`$frequency` governs how frequent (in seconds) a task is supposed to be run. If set to `0`, it will mean that the task instance is one-time, thus it will be removed from schedule (not from list of tasks) after successful run.
-
-`$message` is an optional custom message to be shown, when running in SSE mode.
-
-`$dayofmonth` is an optional array of integers, that limits days of a month on which a task can be run. It is recommended to use it only with `$frequency` set to `86400` (1 day), because otherwise it can cause unexpected shifts and delays. Needs to be either pure array or JSON encoded array of values, that can be expanded (`...` operator). Stored in database as JSON string and limited to `VARCHAR(255)`.
-
-`$dayofweek` is an optional array of integers, that limits days of a week on which a task can be run. It is recommended to use it only with `$frequency` set to `86400` (1 day), because otherwise it can cause unexpected shifts and delays. Needs to be either pure array or JSON encoded array of values, that can be expanded (`...` operator). Stored in database as JSON string and limited to `VARCHAR(60)`.
-
-`system` whether a task can be removed by this class or not.
-
-`nextrun` time to schedule next run of the task instance. If not passed during creation of the task instance, will schedule it for current time, which will allow you run it right away.
+1. `$task` is mandatory name of the task.
+2. `$arguments` are optional arguments, that will be passed to the function. Needs to be either pure array or JSON encoded array of values, that can be expanded (`...` operator). Stored in database as JSON or empty string and limited to `VARCHAR(255)` (due to MySQL limitations). Also supports special string `"$cronInstance"` (when JSON encoded, that is) that will be replaced by task instance value, when run (useful, when you need multiple instances, and need to offset their processing logic).
+3. `$instance` is optional instance number (or ID if you like). By default, it is `1`. This is useful, if you want to create multiple instances for the same task with same arguments, which you want to run in parallel, when possible.
+4. `$frequency` governs how frequent (in seconds) a task is supposed to be run. If set to `0`, it will mean that the task instance is one-time, thus it will be removed from schedule (not from list of tasks) after successful run.
+5. `$message` is an optional custom message to be shown, when running in SSE mode.
+6. `$dayofmonth` is an optional array of integers, that limits days of a month on which a task can be run. It is recommended to use it only with `$frequency` set to `86400` (1 day), because otherwise it can cause unexpected shifts and delays. Needs to be either pure array or JSON encoded array of values, that can be expanded (`...` operator). Stored in database as JSON string and limited to `VARCHAR(255)`.
+7. `$dayofweek` is an optional array of integers, that limits days of a week on which a task can be run. It is recommended to use it only with `$frequency` set to `86400` (1 day), because otherwise it can cause unexpected shifts and delays. Needs to be either pure array or JSON encoded array of values, that can be expanded (`...` operator). Stored in database as JSON string and limited to `VARCHAR(60)`.
+8. `enabled` whether a task instance is enabled (and run as per schedule) or not. Used only when creating new instances.
+9. `system` whether a task instance can be removed by this class or not. Used only when creating new instances.
+10. `nextrun` time to schedule next run of the task instance. If not passed during creation of the task instance, will schedule it for current time, which will allow you run it right away.
 
 Same as with `Task` class it is also possible to load settings from DB while creating the object:
 
@@ -192,6 +194,14 @@ To remove a task from schedule pass appropriate `$task` and `$arguments` to
 
 ```php
 (new \Simbiat\Cron\TaskInstance('taskName', 'arguments', 1))->delete();
+```
+
+### Enabling or disabling task instance as system
+
+If you are creating a task instance from scratch, then just pass `enabled` setting set to `1` (default) or `0` in the settings array. If it's an existing instance, do this:
+
+```php
+(new \Simbiat\Cron\TaskInstance('taskName', 'arguments', 1))->setEnabled(bool $enabled = true);
 ```
 
 ### Setting task instance as system
@@ -270,27 +280,35 @@ Below is the list of event types, that are used when logging and when outputting
 8. `TaskDeleteFail` - a task failed to be deleted.
 9. `TaskToSystem` - a task was marked as system one.
 10. `TaskToSystemFail` - a task failed to be marked as system one.
-11. `InstanceStart` - a task instance was started.
-12. `InstanceEnd` - a task instance completed successfully.
-13. `InstanceFail` - a task instance failed.
-14. `InstanceAdd` - a task instance was added or updated.
-15. `InstanceAddFail` - a task instance failed to be added or updated.
-16. `InstanceDelete` - a task instance was deleted.
-17. `InstanceDeleteFail` - a task instance failed to be deleted.
-18. `InstanceToSystem` - a task instance was marked as system one.
-19. `InstanceToSystemFail` - a task instance failed to be marked as system one.
-20. `Reschedule` - a task instance was rescheduled.
-21. `RescheduleFail` - a task instance failed to be rescheduled.
-22. `SSEStart` - start of cron processing in SSE mode.
-23. `SSEEnd` - end of processing in SSE mode.
-24. `CustomEmergency` - custom event indicating an emergency (SysLog standard level 0).
-25. `CustomAlert` - custom event indicating an alert (SysLog standard level 1).
-26. `CustomCritical` - custom event indicating a critical condition (SysLog standard level 2).
-27. `CustomError` - custom event indicating an error (SysLog standard level 3).
-28. `CustomWarning` - custom event indicating a warning (SysLog standard level 4).
-29. `CustomNotice` - custom event indicating a notice (SysLog standard level 5).
-30. `CustomInformation` - custom event indicating an informative message (SysLog standard level 6).
-31. `CustomDebug` - custom event indicating a debugging message (SysLog standard level 7).
+11. `TaskEnable` - a task was enabled.
+12. `TaskDisable` - a task was disabled.
+13. `TaskEnableFail` - failed to enable task.
+14. `TaskDisableFail` - failed to disable task.
+15. `InstanceStart` - a task instance was started.
+16. `InstanceEnd` - a task instance completed successfully.
+17. `InstanceFail` - a task instance failed.
+18. `InstanceAdd` - a task instance was added or updated.
+19. `InstanceAddFail` - a task instance failed to be added or updated.
+20. `InstanceDelete` - a task instance was deleted.
+21. `InstanceDeleteFail` - a task instance failed to be deleted.
+22. `InstanceToSystem` - a task instance was marked as system one.
+23. `InstanceToSystemFail` - a task instance failed to be marked as system one.
+24. `InstanceEnable` - a task instance was enabled.
+25. `InstanceDisable` - a task instance was disabled.
+26. `InstanceEnableFail` - failed to enable task instance.
+27. `InstanceDisableFail` - failed to disable task instance.
+28. `Reschedule` - a task instance was rescheduled.
+29. `RescheduleFail` - a task instance failed to be rescheduled.
+30. `SSEStart` - start of cron processing in SSE mode.
+31. `SSEEnd` - end of processing in SSE mode.
+32. `CustomEmergency` - custom event indicating an emergency (SysLog standard level 0).
+33. `CustomAlert` - custom event indicating an alert (SysLog standard level 1).
+34. `CustomCritical` - custom event indicating a critical condition (SysLog standard level 2).
+35. `CustomError` - custom event indicating an error (SysLog standard level 3).
+36. `CustomWarning` - custom event indicating a warning (SysLog standard level 4).
+37. `CustomNotice` - custom event indicating a notice (SysLog standard level 5).
+38. `CustomInformation` - custom event indicating an informative message (SysLog standard level 6).
+39. `CustomDebug` - custom event indicating a debugging message (SysLog standard level 7).
 
 ## Custom events
 
