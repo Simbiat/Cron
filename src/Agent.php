@@ -258,10 +258,12 @@ class Agent
             self::$dbController->query('UPDATE `'.self::dbPrefix.'schedule` AS `toUpdate`
                         INNER JOIN
                         (
-                            SELECT `'.self::dbPrefix.'schedule`.`task`, `arguments`, `instance` FROM `'.self::dbPrefix.'schedule`
-                            LEFT JOIN `'.self::dbPrefix.'tasks` ON `'.self::dbPrefix.'schedule`.`task`=`'.self::dbPrefix.'tasks`.`task`
-                            WHERE `'.self::dbPrefix.'schedule`.`enabled`=1 AND `'.self::dbPrefix.'tasks`.`enabled`=1 AND `runby` IS NULL AND `nextrun`<=CURRENT_TIMESTAMP() GROUP BY `'.self::dbPrefix.'schedule`.`task`, `arguments` '.self::$sqlOrderBy.'
-                            LIMIT :limit
+                            SELECT * FROM (
+                                SELECT `task`, `arguments`, `instance` FROM `'.self::dbPrefix.'schedule` AS `instances`
+                                WHERE `enabled`=1 AND `runby` IS NULL AND `nextrun`<=CURRENT_TIMESTAMP() AND (SELECT `enabled` FROM `cron__tasks` `tasks` WHERE `tasks`.`task`=`instances`.`task`)=1
+                                '.self::$sqlOrderBy.'
+                                LIMIT :innerlimit
+                            ) `instances` GROUP BY `task`, `arguments` LIMIT :limit FOR UPDATE SKIP LOCKED
                         ) `toSelect`
                         ON `toUpdate`.`task`=`toSelect`.`task`
                             AND `toUpdate`.`arguments`=`toSelect`.`arguments`
@@ -270,7 +272,11 @@ class Agent
                 [
                     ':runby' => self::$runby,
                     ':sse' => [SSE::$SSE, 'bool'],
-                    ':limit' => [$items, 'int']
+                    ':limit' => [$items, 'int'],
+                    #Using this approach seems to be the best solution so far, so that no temporary tables are used (or smaller ones, at least), and it is still relatively performant.
+                    #In worst case scenario tested with 8mil+ records in schedule the query took 1.5 minute, which was happening while there are other queries running on same table at the same time.
+                    #On smaller (and more realistic) data sets performance hit is negligible. 
+                    ':innerlimit' => [$items * 2, 'int']
                 ]);
         } catch (\Throwable $exception) {
             #Notify of end of stream
@@ -535,7 +541,8 @@ class Agent
                 $runBy = null;
                 #Get last event time and type
                 $lastEvent = self::$dbController->selectRow('SELECT `time`, `type` FROM `'.self::dbPrefix.'log` ORDER BY `time` DESC LIMIT 1');
-                if ($lastEvent['type'] === $event) {
+                #Checking for empty, in case there are no logs in the table
+                if (!empty($lastEvent['type']) && $lastEvent['type'] === $event) {
                     #Update the message of last event with current time
                     self::$dbController->query(
                         'UPDATE `'.self::dbPrefix.'log` SET `message`=:message WHERE `time`=:time AND `type`=:type;',
