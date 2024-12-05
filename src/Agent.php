@@ -275,7 +275,7 @@ class Agent
                     ':limit' => [$items, 'int'],
                     #Using this approach seems to be the best solution so far, so that no temporary tables are used (or smaller ones, at least), and it is still relatively performant.
                     #In worst case scenario tested with 8mil+ records in schedule the query took 1.5 minute, which was happening while there are other queries running on same table at the same time.
-                    #On smaller (and more realistic) data sets performance hit is negligible. 
+                    #On smaller (and more realistic) data sets performance hit is negligible.
                     ':innerlimit' => [$items * 2, 'int']
                 ]);
         } catch (\Throwable $exception) {
