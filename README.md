@@ -65,7 +65,7 @@ To trigger processing you need to simply run this:
 ```
 
 where `10` is maximum number of tasks you want to run. It is expected, that you will have it in some .php file, that will be triggered by some system task scheduler (like actual Cron in case of *NIX systems).  
-**_IMPORTANT_**: Due to the logic of the library related to support of multiple instances of same tasks, the number of actual rows selected from the table will be **double** of the number of passed to `process` function. It should not matter much in case of small number of task instances, but if you have a lot of those, and each `process` needs to select a lot of rows as well, it **will** affect performance. For example, in case of 8 million instances, `process(25)` results in query completing with 25 seconds, while `process(50)` - in 5 minutes, when everything else is under same conditions.
+**_IMPORTANT_**: Due to the logic of the library related to support of multiple instances of same tasks, the number of actual rows selected from the table will be **double** of the number of passed to `process` function. It should not matter much in case of small number of task instances, but if you have a lot of those, and each `process` needs to select a lot of rows as well, it **will** affect performance. For example, in case of 8 million instances, `process(25)` results in query completing with 25 seconds, while `process(50)` - up to 5 minutes, when everything else is under same conditions (and you have low memory, at least).
 
 This command will do the following:
 
