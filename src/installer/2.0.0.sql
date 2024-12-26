@@ -7,7 +7,7 @@ ALTER TABLE `cron__schedule`
 ALTER TABLE `cron__schedule`
     ADD `instance` INT(10) UNSIGNED NOT NULL DEFAULT '1' COMMENT 'Instance number of the task' AFTER `arguments`;
 
-ALTER TABLE `simbiatr_simbiat`.`cron__schedule`
+ALTER TABLE `cron__schedule`
     DROP PRIMARY KEY,
     ADD PRIMARY KEY (`task`, `arguments`, `instance`) USING BTREE;
 
@@ -38,7 +38,7 @@ ALTER TABLE `cron__log`
 ALTER TABLE `cron__log`
     CHANGE `arguments` `arguments` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT 'Optional task arguments';
 
-ALTER TABLE `simbiatr_simbiat`.`cron__log`
+ALTER TABLE `cron__log`
     DROP FOREIGN KEY errors_to_arguments;
 
 ALTER TABLE `cron__log`
@@ -101,14 +101,14 @@ SET `setting`     = 'logLife',
     `description` = 'Days to keep messages in log. Older records will be removed on next CRON process.'
 WHERE `cron__settings`.`setting` = 'errorLife';
 
-ALTER TABLE `simbiatr_simbiat`.`cron__log`
+ALTER TABLE `cron__log`
     ADD INDEX `time_desc` (`time` DESC) USING BTREE;
 
-ALTER TABLE `simbiatr_simbiat`.`cron__log`
+ALTER TABLE `cron__log`
     ADD INDEX `type` (`type`) USING BTREE;
 
-ALTER TABLE `simbiatr_simbiat`.`cron__log`
+ALTER TABLE `cron__log`
     ADD INDEX `runby` (`runby`) USING BTREE;
 
-ALTER TABLE `simbiatr_simbiat`.`cron__log`
+ALTER TABLE `cron__log`
     ADD INDEX `task` (`task`) USING BTREE;

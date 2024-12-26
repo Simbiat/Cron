@@ -1,4 +1,4 @@
-ALTER TABLE `simbiatr_simbiat`.`cron__schedule`
+ALTER TABLE `cron__schedule`
     ADD INDEX `arguments` (`arguments`) USING BTREE;
 
 ALTER TABLE `cron__errors`
