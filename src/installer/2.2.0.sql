@@ -1,7 +1,7 @@
 ALTER TABLE `cron__log` CHANGE `message` `message` TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_nopad_ci NOT NULL COMMENT 'Message provided by the event';
 ALTER TABLE `cron__tasks` ADD `minFrequency` INT(10) UNSIGNED NOT NULL DEFAULT '60' COMMENT 'Minimal allowed frequency (in seconds) at which a task instance can run. Does not apply to one-time jobs.' AFTER `maxTime`;
 ALTER TABLE `cron__tasks` ADD `retry` INT UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Custom number of seconds to reschedule a failed task instance for. 0 disables the functionality.' AFTER `minFrequency`;
-CREATE TABLE `cron__event_types` (`type` VARCHAR(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_nopad_ci NOT NULL COMMENT 'Type of the event' , `description` VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_nopad_ci NOT NULL COMMENT 'Description of the event' ) ENGINE = InnoDB CHARSET=utf8mb4 COLLATE utf8mb4_unicode_nopad_ci COMMENT = 'Different event types for logging and SSE output';
+CREATE TABLE IF NOT EXISTS `cron__event_types` (`type` VARCHAR(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_nopad_ci NOT NULL COMMENT 'Type of the event' , `description` VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_nopad_ci NOT NULL COMMENT 'Description of the event' ) ENGINE = InnoDB CHARSET=utf8mb4 COLLATE utf8mb4_unicode_nopad_ci ROW_FORMAT = DYNAMIC COMMENT = 'Different event types for logging and SSE output';
 ALTER TABLE `cron__event_types` ADD PRIMARY KEY(`type`);
 ALTER TABLE `cron__log` DROP FOREIGN KEY `errors_to_tasks`;
 ALTER TABLE `cron__log` ADD CONSTRAINT `log_to_tasks` FOREIGN KEY (`task`) REFERENCES `cron__tasks`(`task`) ON DELETE CASCADE ON UPDATE CASCADE;

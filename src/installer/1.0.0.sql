@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS `cron__settings`
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci
-  ROW_FORMAT = COMPRESSED;
+  ROW_FORMAT = DYNAMIC;
 
 INSERT IGNORE INTO `cron__settings` (`setting`, `value`, `description`)
 VALUES ('enabled', 1, 'Whether cron is enabled. Will only affect processing, task management will still be possible.'),
@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS `cron__errors`
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci
-  ROW_FORMAT = COMPRESSED;
+  ROW_FORMAT = DYNAMIC;
 
 CREATE TABLE IF NOT EXISTS `cron__schedule`
 (
@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS `cron__schedule`
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci
-  ROW_FORMAT = COMPRESSED;
+  ROW_FORMAT = DYNAMIC;
 
 CREATE TABLE IF NOT EXISTS `cron__tasks`
 (
@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS `cron__tasks`
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci
-  ROW_FORMAT = COMPRESSED;
+  ROW_FORMAT = DYNAMIC;
 
 ALTER TABLE `cron__errors`
     ADD CONSTRAINT `errors_to_tasks` FOREIGN KEY (`task`) REFERENCES `cron__tasks` (`task`) ON DELETE CASCADE ON UPDATE CASCADE;
