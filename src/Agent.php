@@ -6,7 +6,7 @@ namespace Simbiat\Cron;
 use JetBrains\PhpStorm\ExpectedValues;
 use Simbiat\Database\Controller;
 use Simbiat\Database\Pool;
-use Simbiat\http\SSE;
+use Simbiat\HTTP\SSE;
 use Simbiat\SandClock;
 
 use function in_array;
