@@ -8,7 +8,6 @@ use Simbiat\Database\Controller;
 use Simbiat\Database\Pool;
 use Simbiat\HTTP\SSE;
 use Simbiat\SandClock;
-
 use function in_array;
 
 /**
@@ -89,20 +88,33 @@ class Agent
     
     /**
      * Class constructor
+     * @param \PDO|null $dbh PDO object to use for database connection. If not provided, class expects existence of `\Simbiat\Database\Pool` to utilize that instead.
      * @throws \Exception
      */
-    public function __construct()
+    public function __construct(\PDO|null $dbh = null)
     {
         #Check that database connection is established
         if (self::$dbReady === false) {
             #Establish, if possible
-            $pool = (new Pool());
-            if ($pool::$activeConnection !== NULL) {
+            if ($dbh === null) {
+                if (method_exists(Pool::class, 'openConnection')) {
+                    $pool = (new Pool());
+                    if ($pool::$activeConnection !== NULL) {
+                        self::$dbReady = true;
+                        #Cache controller
+                        self::$dbController = (new Controller());
+                        $this->getSettings();
+                    }
+                } else {
+                    throw new \RuntimeException('Pool class not loaded and no PDO object provided.');
+                }
+            } else {
                 self::$dbReady = true;
                 #Cache controller
-                self::$dbController = (new Controller());
+                self::$dbController = (new Controller($dbh));
                 $this->getSettings();
             }
+            
         }
     }
     

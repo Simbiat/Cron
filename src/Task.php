@@ -62,14 +62,16 @@ class Task
     /**
      * Create a Cron task object
      *
-     * @param string $taskName If name is not empty, settings will be attempts to be loaded from database
+     * @param string    $taskName If name is not empty, settings will be attempts to be loaded from database
+     * @param \PDO|null $dbh      PDO object to use for database connection. If not provided, class expects that connection has already been established through `\Simbiat\Cron\Agent`.
      *
      * @throws \JsonException
+     * @throws \Exception
      */
-    public function __construct(string $taskName = '')
+    public function __construct(string $taskName = '', \PDO|null $dbh = null)
     {
         #Ensure that Cron management is created to establish DB connection and settings
-        new Agent();
+        new Agent($dbh);
         if (!empty($taskName) && Agent::$dbReady) {
             $this->taskName = $taskName;
             #Attempt to get settings from DB

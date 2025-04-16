@@ -23,6 +23,9 @@
         "simbiat/sand-clock": "^2.4",
         "simbiat/sse": "^1.1"
     },
+    "suggest": {
+        "simbiat/db-pool": "Allows use of database connections pool"
+    },
     "autoload": {
         "psr-4": {
             "Simbiat\\Cron\\": "src/"

@@ -47,11 +47,11 @@ Originally my [fftracker](https://github.com/Simbiat/FFTracker) was hosted on se
 ## Installation
 
 1. Download (manually or through composer).
-2. Establish DB connection using my [Database](https://github.com/Simbiat/Database) class.
+2. Establish DB connection using my [DB-Pool](https://github.com/Simbiat/db-pool) library or by passing a `PDO` object to `Agent`'s constructor.
 3. Install:
 
 ```php
-(new \Simbiat\Cron\Agent())->install();
+(new \Simbiat\Cron\Agent($dbh))->install();
 ```
 
 Due to current design, after the tables are created this way, you will need to recreate the object for future use, in case you will be using the same script.
@@ -61,7 +61,7 @@ Due to current design, after the tables are created this way, you will need to r
 To trigger processing you need to simply run this:
 
 ```php
-(new \Simbiat\Cron\Agent())->process(10);
+(new \Simbiat\Cron\Agent($dbh))->process(10);
 ```
 
 where `10` is maximum number of tasks you want to run. It is expected, that you will have it in some .php file, that will be triggered by some system task scheduler (like actual Cron in case of *NIX systems).  
@@ -250,7 +250,7 @@ to get suggested a `DateTimeImmutable` for next run of a task. It will calculate
 To change any settings, use
 
 ```php
-(new \Simbiat\Cron\Agent())->setSetting($setting, $value);
+(new \Simbiat\Cron\Agent($dbh))->setSetting($setting, $value);
 ```
 
 `$setting` is name of the setting to change (`string`).
