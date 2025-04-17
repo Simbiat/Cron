@@ -593,7 +593,7 @@ class Agent
             if ($error !== null) {
                 throw new \RuntimeException($message, previous: $error);
             }
-            exit;
+            exit(0);
         }
     }
 }
