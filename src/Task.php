@@ -3,6 +3,7 @@ declare(strict_types = 1);
 
 namespace Simbiat\Cron;
 
+use Simbiat\Database\Select;
 use function is_string, is_array;
 
 /**
@@ -13,57 +14,57 @@ class Task
     /**
      * @var string Unique name of the task
      */
-    public private(set) string $taskName = '';
+    private(set) string $taskName = '';
     /**
      * @var string Name of the task
      */
-    public private(set) string $function = '';
+    private(set) string $function = '';
     /**
      * @var string|null Optional object reference
      */
-    public private(set) ?string $object = null;
+    private(set) ?string $object = null;
     /**
      * @var string|null Parameters to set for the object (passed to construct)
      */
-    public private(set) ?string $parameters = '';
+    private(set) ?string $parameters = '';
     /**
      * @var string|null Expected (and allowed) return values
      */
-    public private(set) ?string $returns = '';
+    private(set) ?string $returns = '';
     /**
      * @var int Maximum execution time
      */
-    public private(set) int $maxTime = 3600;
+    private(set) int $maxTime = 3600;
     /**
      * @var int Minimal allowed frequency (in seconds) at which a task instance can run. Does not apply to one-time jobs.
      */
-    public private(set) int $minFrequency = 3600;
+    private(set) int $minFrequency = 3600;
     /**
      * @var int Custom number of seconds to reschedule a failed task instance for. 0 disables the functionality.
      */
-    public private(set) int $retry = 3600;
+    private(set) int $retry = 3600;
     /**
-     * @var bool Whether task is system one or not
+     * @var bool Whether a task is system one or not
      */
-    public private(set) bool $system = false;
+    private(set) bool $system = false;
     /**
-     * @var bool Whether task (and its task instances) is enabled
+     * @var bool Whether a task (and its task instances) is enabled
      */
-    public private(set) bool $enabled = true;
+    private(set) bool $enabled = true;
     /**
      * @var string|null Description of the task
      */
-    public private(set) ?string $description = null;
+    private(set) ?string $description = null;
     /**
-     * @var bool Whether task was found in database
+     * @var bool Whether a task was found in a database
      */
-    public private(set) bool $foundInDB = false;
+    private(set) bool $foundInDB = false;
     
     /**
      * Create a Cron task object
      *
-     * @param string    $taskName If name is not empty, settings will be attempts to be loaded from database
-     * @param \PDO|null $dbh      PDO object to use for database connection. If not provided, class expects that connection has already been established through `\Simbiat\Cron\Agent`.
+     * @param string    $taskName If the name is not empty, settings will be attempts to be loaded from the database
+     * @param \PDO|null $dbh      PDO object to use for database connection. If not provided, the class expects that the connection has already been established through `\Simbiat\Cron\Agent`.
      *
      * @throws \JsonException
      * @throws \Exception
@@ -88,7 +89,7 @@ class Task
     private function getFromDB(): void
     {
         if (Agent::$dbReady) {
-            $settings = Agent::$dbController->selectRow('SELECT * FROM `'.Agent::dbPrefix.'tasks` WHERE `task`=:name;', [':name' => $this->taskName]);
+            $settings = Select::selectRow('SELECT * FROM `cron__tasks` WHERE `task`=:name;', [':name' => $this->taskName]);
             if (!empty($settings)) {
                 $this->settingsFromArray($settings);
                 if (empty($this->function)) {
@@ -199,7 +200,7 @@ class Task
     }
     
     /**
-     * Set maximum time the task is allowed to run
+     * Set the maximum time the task is allowed to run
      * @param mixed $value
      *
      * @return void
@@ -219,7 +220,7 @@ class Task
     }
     
     /**
-     * Set minimum frequency allowed for task instances
+     * Set the minimum frequency allowed for task instances
      * @param mixed $value
      *
      * @return void
@@ -239,7 +240,7 @@ class Task
     }
     
     /**
-     * Set custom number of seconds to reschedule a failed task instance for. 0 disables the functionality.
+     * Set the custom number of seconds to reschedule a failed task instance for. 0 disables the functionality.
      * @param mixed $value
      *
      * @return void
@@ -259,7 +260,7 @@ class Task
     }
     
     /**
-     * Add (or update) task
+     * Add (or update) the task
      *
      * @return bool
      */
@@ -272,10 +273,9 @@ class Task
             throw new \UnexpectedValueException('Function name is not set');
         }
         if (Agent::$dbReady) {
-            $result = false;
             try {
                 $taskDetailsString = json_encode($this, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION);
-                $result = Agent::$dbController->query('INSERT INTO `'.Agent::dbPrefix.'tasks` (`task`, `function`, `object`, `parameters`, `allowedreturns`, `maxTime`, `minFrequency`, `retry`, `enabled`, `system`, `description`) VALUES (:task, :function, :object, :parameters, :returns, :maxTime, :minFrequency, :retry, :enabled, :system, :desc) ON DUPLICATE KEY UPDATE `function`=:function, `object`=:object, `parameters`=:parameters, `allowedreturns`=:returns, `maxTime`=:maxTime, `minFrequency`=:minFrequency, `retry`=:retry, `description`=:desc;', [
+                $result = Select::query('INSERT INTO `cron__tasks` (`task`, `function`, `object`, `parameters`, `allowedreturns`, `maxTime`, `minFrequency`, `retry`, `enabled`, `system`, `description`) VALUES (:task, :function, :object, :parameters, :returns, :maxTime, :minFrequency, :retry, :enabled, :system, :desc) ON DUPLICATE KEY UPDATE `function`=:function, `object`=:object, `parameters`=:parameters, `allowedreturns`=:returns, `maxTime`=:maxTime, `minFrequency`=:minFrequency, `retry`=:retry, `description`=:desc;', [
                     ':task' => [$this->taskName, 'string'],
                     ':function' => [$this->function, 'string'],
                     ':object' => [$this->object, (empty($this->object) ? 'null' : 'string')],
@@ -294,7 +294,7 @@ class Task
                 return false;
             }
             #Log only if something was actually changed
-            if (Agent::$dbController->getResult() > 0) {
+            if (Select::$lastAffected > 0) {
                 Agent::log('Added or updated task with following details: '.$taskDetailsString.'.', 'TaskAdd');
             }
             return $result;
@@ -303,7 +303,7 @@ class Task
     }
     
     /**
-     * Delete task, if it's not a system one
+     * Delete the task if it's not a system one
      *
      * @return bool
      */
@@ -313,9 +313,8 @@ class Task
             throw new \UnexpectedValueException('Task name is not set');
         }
         if (Agent::$dbReady) {
-            $result = false;
             try {
-                $result = Agent::$dbController->query('DELETE FROM `'.Agent::dbPrefix.'tasks` WHERE `task`=:task AND `system`=0;', [
+                $result = Select::query('DELETE FROM `cron__tasks` WHERE `task`=:task AND `system`=0;', [
                     ':task' => [$this->taskName, 'string'],
                 ]);
                 $this->foundInDB = false;
@@ -324,7 +323,7 @@ class Task
                 return false;
             }
             #Log only if something was actually deleted
-            if (Agent::$dbController->getResult() > 0) {
+            if (Select::$lastAffected > 0) {
                 Agent::log('Deleted task  `'.$this->taskName.'`.', 'TaskDelete');
             }
             return $result;
@@ -333,7 +332,7 @@ class Task
     }
     
     /**
-     * Set the task as system
+     * Set the task as a system one
      * @return bool
      */
     public function setSystem(): bool
@@ -342,9 +341,8 @@ class Task
             throw new \UnexpectedValueException('Task name is not set');
         }
         if (Agent::$dbReady && $this->foundInDB) {
-            $result = false;
             try {
-                $result = Agent::$dbController->query('UPDATE `'.Agent::dbPrefix.'tasks` SET `system`=1 WHERE `task`=:task AND `system`=0;', [
+                $result = Select::query('UPDATE `cron__tasks` SET `system`=1 WHERE `task`=:task AND `system`=0;', [
                     ':task' => [$this->taskName, 'string'],
                 ]);
             } catch (\Throwable $e) {
@@ -352,7 +350,8 @@ class Task
                 return false;
             }
             #Log only if something was actually changed
-            if (Agent::$dbController->getResult() > 0) {
+            if (Select::$lastAffected > 0) {
+                $this->system = true;
                 Agent::log('Marked task `'.$this->taskName.'` as system one.', 'TaskToSystem');
             }
             return $result;
@@ -361,7 +360,7 @@ class Task
     }
     
     /**
-     * Function to enable or disable task and its instances
+     * Function to enable or disable the task and its instances
      * @param bool $enabled Flag indicating whether we want to enable or disable the task
      *
      * @return bool
@@ -372,9 +371,8 @@ class Task
             throw new \UnexpectedValueException('Task name is not set');
         }
         if (Agent::$dbReady && $this->foundInDB) {
-            $result = false;
             try {
-                $result = Agent::$dbController->query('UPDATE `'.Agent::dbPrefix.'task` SET `enabled`=:enabled WHERE `task`=:task;', [
+                $result = Select::query('UPDATE `cron__tasks` SET `enabled`=:enabled WHERE `task`=:task;', [
                     ':task' => [$this->taskName, 'string'],
                     ':enabled' => [$enabled, 'bool'],
                 ]);
@@ -383,7 +381,8 @@ class Task
                 return false;
             }
             #Log only if something was actually changed
-            if (Agent::$dbController->getResult() > 0) {
+            if (Select::$lastAffected > 0) {
+                $this->enabled = $enabled;
                 Agent::log(($enabled ? 'Enabled' : 'Disabled').' task.', 'Task'.($enabled ? 'Enable' : 'Disable'));
             }
             return $result;
