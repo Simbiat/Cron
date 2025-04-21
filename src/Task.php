@@ -3,6 +3,7 @@ declare(strict_types = 1);
 
 namespace Simbiat\Cron;
 
+use Simbiat\Database\Query;
 use Simbiat\Database\Select;
 use function is_string, is_array;
 
@@ -275,7 +276,7 @@ class Task
         if (Agent::$dbReady) {
             try {
                 $taskDetailsString = json_encode($this, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION);
-                $result = Select::query('INSERT INTO `cron__tasks` (`task`, `function`, `object`, `parameters`, `allowedreturns`, `maxTime`, `minFrequency`, `retry`, `enabled`, `system`, `description`) VALUES (:task, :function, :object, :parameters, :returns, :maxTime, :minFrequency, :retry, :enabled, :system, :desc) ON DUPLICATE KEY UPDATE `function`=:function, `object`=:object, `parameters`=:parameters, `allowedreturns`=:returns, `maxTime`=:maxTime, `minFrequency`=:minFrequency, `retry`=:retry, `description`=:desc;', [
+                $result = Query::query('INSERT INTO `cron__tasks` (`task`, `function`, `object`, `parameters`, `allowedreturns`, `maxTime`, `minFrequency`, `retry`, `enabled`, `system`, `description`) VALUES (:task, :function, :object, :parameters, :returns, :maxTime, :minFrequency, :retry, :enabled, :system, :desc) ON DUPLICATE KEY UPDATE `function`=:function, `object`=:object, `parameters`=:parameters, `allowedreturns`=:returns, `maxTime`=:maxTime, `minFrequency`=:minFrequency, `retry`=:retry, `description`=:desc;', [
                     ':task' => [$this->taskName, 'string'],
                     ':function' => [$this->function, 'string'],
                     ':object' => [$this->object, (empty($this->object) ? 'null' : 'string')],
@@ -294,7 +295,7 @@ class Task
                 return false;
             }
             #Log only if something was actually changed
-            if (Select::$lastAffected > 0) {
+            if (Query::$lastAffected > 0) {
                 Agent::log('Added or updated task with following details: '.$taskDetailsString.'.', 'TaskAdd');
             }
             return $result;
@@ -314,7 +315,7 @@ class Task
         }
         if (Agent::$dbReady) {
             try {
-                $result = Select::query('DELETE FROM `cron__tasks` WHERE `task`=:task AND `system`=0;', [
+                $result = Query::query('DELETE FROM `cron__tasks` WHERE `task`=:task AND `system`=0;', [
                     ':task' => [$this->taskName, 'string'],
                 ]);
                 $this->foundInDB = false;
@@ -323,7 +324,7 @@ class Task
                 return false;
             }
             #Log only if something was actually deleted
-            if (Select::$lastAffected > 0) {
+            if (Query::$lastAffected > 0) {
                 Agent::log('Deleted task  `'.$this->taskName.'`.', 'TaskDelete');
             }
             return $result;
@@ -342,7 +343,7 @@ class Task
         }
         if (Agent::$dbReady && $this->foundInDB) {
             try {
-                $result = Select::query('UPDATE `cron__tasks` SET `system`=1 WHERE `task`=:task AND `system`=0;', [
+                $result = Query::query('UPDATE `cron__tasks` SET `system`=1 WHERE `task`=:task AND `system`=0;', [
                     ':task' => [$this->taskName, 'string'],
                 ]);
             } catch (\Throwable $e) {
@@ -350,7 +351,7 @@ class Task
                 return false;
             }
             #Log only if something was actually changed
-            if (Select::$lastAffected > 0) {
+            if (Query::$lastAffected > 0) {
                 $this->system = true;
                 Agent::log('Marked task `'.$this->taskName.'` as system one.', 'TaskToSystem');
             }
@@ -372,7 +373,7 @@ class Task
         }
         if (Agent::$dbReady && $this->foundInDB) {
             try {
-                $result = Select::query('UPDATE `cron__tasks` SET `enabled`=:enabled WHERE `task`=:task;', [
+                $result = Query::query('UPDATE `cron__tasks` SET `enabled`=:enabled WHERE `task`=:task;', [
                     ':task' => [$this->taskName, 'string'],
                     ':enabled' => [$enabled, 'bool'],
                 ]);
@@ -381,7 +382,7 @@ class Task
                 return false;
             }
             #Log only if something was actually changed
-            if (Select::$lastAffected > 0) {
+            if (Query::$lastAffected > 0) {
                 $this->enabled = $enabled;
                 Agent::log(($enabled ? 'Enabled' : 'Disabled').' task.', 'Task'.($enabled ? 'Enable' : 'Disable'));
             }

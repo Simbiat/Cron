@@ -4,8 +4,9 @@ declare(strict_types = 1);
 namespace Simbiat\Cron;
 
 use JetBrains\PhpStorm\ExpectedValues;
+use Simbiat\Database\Common;
 use Simbiat\Database\Manage;
-use Simbiat\Database\Pool;
+use Simbiat\Database\Query;
 use Simbiat\Database\Select;
 use Simbiat\HTTP\SSE;
 use Simbiat\SandClock;
@@ -21,12 +22,6 @@ class Agent
      * @var bool
      */
     public static bool $dbReady = false;
-    /**
-     * Cached database controller for performance
-     *
-     * @var Select|null
-     */
-    public static ?Select $dbController = NULL;
     /**
      * Flag to indicate whether Cron is enabled
      * @var bool
@@ -93,25 +88,9 @@ class Agent
         #Check that a database connection is established
         if (!self::$dbReady) {
             #Establish it, if possible
-            if ($dbh === null) {
-                if (method_exists(Pool::class, 'openConnection')) {
-                    $pool = (new Pool());
-                    if ($pool::$activeConnection !== NULL) {
-                        self::$dbReady = true;
-                        #Cache controller
-                        self::$dbController = (new Select());
-                        $this->getSettings();
-                    }
-                } else {
-                    throw new \RuntimeException('Pool class not loaded and no PDO object provided.');
-                }
-            } else {
-                self::$dbReady = true;
-                #Cache controller
-                self::$dbController = (new Select($dbh));
-                $this->getSettings();
-            }
-            
+            Common::setDbh($dbh);
+            self::$dbReady = true;
+            $this->getSettings();
         }
     }
     
@@ -264,7 +243,7 @@ class Agent
     private function getTasks(int $items): bool|array
     {
         try {
-            self::$dbController::query('UPDATE `cron__schedule` AS `toUpdate`
+            Query::query('UPDATE `cron__schedule` AS `toUpdate`
                         INNER JOIN
                         (
                             SELECT * FROM (
@@ -329,7 +308,7 @@ class Agent
                 'maxThreads' => 4,
             };
         }
-        if (Select::query('UPDATE `cron__settings` SET `value`=:value WHERE `setting`=:setting;', [
+        if (Query::query('UPDATE `cron__settings` SET `value`=:value WHERE `setting`=:setting;', [
             ':setting' => [$setting, 'string'],
             ':value' => [$value, in_array($setting, ['enabled', 'sseLoop']) ? 'bool' : 'int'],
         ])) {
@@ -439,7 +418,7 @@ class Agent
     {
         if (self::$dbReady) {
             try {
-                return self::$dbController::query('DELETE FROM `cron__log` WHERE `time` <= DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL :logLife DAY);', [
+                return Query::query('DELETE FROM `cron__log` WHERE `time` <= DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL :logLife DAY);', [
                     ':logLife' => [self::$logLife, 'int'],
                 ]);
             } catch (\Throwable) {
@@ -459,14 +438,14 @@ class Agent
         #Check if the settings table exists
         if (Manage::checkTable('cron__settings') === 1) {
             #Assume that we have installed the database, try to get the version
-            $version = self::$dbController::selectValue('SELECT `value` FROM `cron__settings` WHERE `setting`=\'version\'');
+            $version = Select::selectValue('SELECT `value` FROM `cron__settings` WHERE `setting`=\'version\'');
             #If an empty installer script was run before 2.1.2, we need to determine what version we have based on other things
             if (empty($version)) {
                 #If errors' table does not exist, and the log table does - we are on version 2.0.0
-                if (Manage::checkTable('cron__errors', '') === 0 && Manage::checkTable('cron__log', '') === 1) {
+                if (Manage::checkTable('cron__errors') === 0 && Manage::checkTable('cron__log') === 1) {
                     $version = '2.0.0';
                     #If one of the schedule columns is datetime, it's 1.5.0
-                } elseif (Manage::getColumnType('cron__schedule', 'registered', '') === 'datetime') {
+                } elseif (Manage::getColumnType('cron__schedule', 'registered') === 'datetime') {
                     $version = '1.5.0';
                     #If `maxTime` column is present in `tasks` table - 1.3.0
                 } elseif (Manage::checkColumn('cron__tasks', 'maxTime')) {
@@ -475,19 +454,19 @@ class Agent
                 } elseif (Manage::checkColumn('cron__schedule', 'sse')) {
                     $version = '1.2.0';
                     #If one of the settings has the name `errorLife` (and not `errorlife`) - 1.1.14
-                } elseif (self::$dbController::selectValue('SELECT `setting` FROM `cron__settings` WHERE `setting`=\'errorLife\'') === 'errorLife') {
+                } elseif (Select::selectValue('SELECT `setting` FROM `cron__settings` WHERE `setting`=\'errorLife\'') === 'errorLife') {
                     $version = '1.1.14';
                     #If the `arguments` column is not nullable - 1.1.12
-                } elseif (!Manage::isNullable('cron__schedule', 'arguments', '')) {
+                } elseif (!Manage::isNullable('cron__schedule', 'arguments')) {
                     $version = '1.1.12';
                     #If `errors_to_arguments` Foreign Key exists in `errors` table - 1.1.8
-                } elseif (Manage::checkFK('cron__errors', 'errors_to_arguments', '')) {
+                } elseif (Manage::checkFK('cron__errors', 'errors_to_arguments')) {
                     $version = '1.1.8';
                     #It's 1.1.7 if the old column description is used
-                } elseif (Manage::getColumnDescription('cron__schedule', 'arguments', '') === 'Optional task arguments') {
+                } elseif (Manage::getColumnDescription('cron__schedule', 'arguments') === 'Optional task arguments') {
                     $version = '1.1.7';
                     #If the `maxthreads` setting exists - it's 1.1.0
-                } elseif (self::$dbController::selectValue('SELECT `setting` FROM `cron__settings` WHERE `setting`=\'maxthreads\'') === 'maxthreads') {
+                } elseif (Select::selectValue('SELECT `setting` FROM `cron__settings` WHERE `setting`=\'maxthreads\'') === 'maxthreads') {
                     $version = '1.1.0';
                     #Otherwise - version 1.0.0
                 } else {
@@ -512,9 +491,9 @@ class Agent
             return true;
         }
         #Split file content into queries
-        $sql = self::$dbController::stringToQueries($sql);
+        $sql = Query::stringToQueries($sql);
         try {
-            return self::$dbController::query($sql);
+            return Query::query($sql);
         } catch (\Exception $e) {
             return $e->getMessage()."\r\n".$e->getTraceAsString();
         }
@@ -553,7 +532,7 @@ class Agent
                 #Checking for empty, in case there are no logs in the table
                 if (!empty($lastEvent['type']) && $lastEvent['type'] === $event) {
                     #Update the message of last event with current time
-                    self::$dbController::query(
+                    Query::query(
                         'UPDATE `cron__log` SET `message`=:message WHERE `time`=:time AND `type`=:type;',
                         [
                             ':type' => $event,
@@ -566,7 +545,7 @@ class Agent
             }
             #Insert log entry only if we did not update last log on previous check
             if (!$skipInsert) {
-                Select::query(
+                Query::query(
                     'INSERT INTO `cron__log` (`type`, `runby`, `sse`, `task`, `arguments`, `instance`, `message`) VALUES (:type,:runby,:sse,:task, :arguments, :instance, :message);',
                     [
                         ':type' => $event,

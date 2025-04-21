@@ -3,6 +3,7 @@ declare(strict_types = 1);
 
 namespace Simbiat\Cron;
 
+use Simbiat\Database\Query;
 use Simbiat\Database\Select;
 use Simbiat\SandClock;
 use function is_string, is_array, in_array;
@@ -325,7 +326,7 @@ class TaskInstance
         }
         if (Agent::$dbReady) {
             try {
-                $result = Select::query('INSERT INTO `cron__schedule` (`task`, `arguments`, `instance`, `enabled`, `system`, `frequency`, `dayofmonth`, `dayofweek`, `priority`, `message`, `nextrun`) VALUES (:task, :arguments, :instance, :enabled, :system, :frequency, :dayofmonth, :dayofweek, :priority, :message, :nextrun) ON DUPLICATE KEY UPDATE `frequency`=:frequency, `dayofmonth`=:dayofmonth, `dayofweek`=:dayofweek, `nextrun`=IF(:frequency=0, `nextrun`, :nextrun), `priority`=IF(:frequency=0, IF(`priority`>:priority, `priority`, :priority), :priority), `message`=:message, `updated`=CURRENT_TIMESTAMP();', [
+                $result = Query::query('INSERT INTO `cron__schedule` (`task`, `arguments`, `instance`, `enabled`, `system`, `frequency`, `dayofmonth`, `dayofweek`, `priority`, `message`, `nextrun`) VALUES (:task, :arguments, :instance, :enabled, :system, :frequency, :dayofmonth, :dayofweek, :priority, :message, :nextrun) ON DUPLICATE KEY UPDATE `frequency`=:frequency, `dayofmonth`=:dayofmonth, `dayofweek`=:dayofweek, `nextrun`=IF(:frequency=0, `nextrun`, :nextrun), `priority`=IF(:frequency=0, IF(`priority`>:priority, `priority`, :priority), :priority), `message`=:message, `updated`=CURRENT_TIMESTAMP();', [
                     ':task' => [$this->taskName, 'string'],
                     ':arguments' => [$this->arguments, 'string'],
                     ':instance' => [$this->instance, 'int'],
@@ -344,7 +345,7 @@ class TaskInstance
                 return false;
             }
             #Log only if something was actually changed
-            if (Select::$lastAffected > 0) {
+            if (Query::$lastAffected > 0) {
                 Agent::log('Added or updated task instance.', 'InstanceAdd', task: $this);
             }
             return $result;
@@ -364,7 +365,7 @@ class TaskInstance
         }
         if (Agent::$dbReady) {
             try {
-                $result = Select::query('DELETE FROM `cron__schedule` WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance AND `system`=0;', [
+                $result = Query::query('DELETE FROM `cron__schedule` WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance AND `system`=0;', [
                     ':task' => [$this->taskName, 'string'],
                     ':arguments' => [$this->arguments, 'string'],
                     ':instance' => [$this->instance, 'int'],
@@ -375,7 +376,7 @@ class TaskInstance
                 return false;
             }
             #Log only if something was actually deleted, and if it's not a one-time job
-            if ($this->frequency > 0 && Select::$lastAffected > 0) {
+            if ($this->frequency > 0 && Query::$lastAffected > 0) {
                 Agent::log('Deleted task instance.', 'InstanceDelete', task: $this);
             }
             return $result;
@@ -397,7 +398,7 @@ class TaskInstance
         }
         if (Agent::$dbReady) {
             try {
-                $result = Select::query('UPDATE `cron__schedule` SET `system`=1 WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance `system`=0;', [
+                $result = Query::query('UPDATE `cron__schedule` SET `system`=1 WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance `system`=0;', [
                     ':task' => [$this->taskName, 'string'],
                     ':arguments' => [$this->arguments, 'string'],
                     ':instance' => [$this->instance, 'int'],
@@ -407,7 +408,7 @@ class TaskInstance
                 return false;
             }
             #Log only if something was actually changed
-            if (Select::$lastAffected > 0) {
+            if (Query::$lastAffected > 0) {
                 $this->system = true;
                 Agent::log('Marked task instance as system one.', 'InstanceToSystem', task: $this);
             }
@@ -429,7 +430,7 @@ class TaskInstance
         }
         if (Agent::$dbReady) {
             try {
-                $result = Select::query('UPDATE `cron__schedule` SET `enabled`=:enabled WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance;', [
+                $result = Query::query('UPDATE `cron__schedule` SET `enabled`=:enabled WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance;', [
                     ':task' => [$this->taskName, 'string'],
                     ':arguments' => [$this->arguments, 'string'],
                     ':instance' => [$this->instance, 'int'],
@@ -440,7 +441,7 @@ class TaskInstance
                 return false;
             }
             #Log only if something was actually changed
-            if (Select::$lastAffected > 0) {
+            if (Query::$lastAffected > 0) {
                 $this->enabled = $enabled;
                 Agent::log(($enabled ? 'Enabled' : 'Disabled').' task instance.', 'Instance'.($enabled ? 'Enable' : 'Disable'), task: $this);
             }
@@ -478,7 +479,7 @@ class TaskInstance
             }
             #Actually reschedule. One task time task will be rescheduled for the retry time from settings
             try {
-                Select::query('UPDATE `cron__schedule` SET `status`=0, `runby`=NULL, `sse`=0, `nextrun`=:time, `'.($result ? 'lastsuccess' : 'lasterror').'`=CURRENT_TIMESTAMP() WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance;', [
+                Query::query('UPDATE `cron__schedule` SET `status`=0, `runby`=NULL, `sse`=0, `nextrun`=:time, `'.($result ? 'lastsuccess' : 'lasterror').'`=CURRENT_TIMESTAMP() WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance;', [
                     ':time' => [$time, 'datetime'],
                     ':task' => [$this->taskName, 'string'],
                     ':arguments' => [$this->arguments, 'string'],
@@ -489,7 +490,7 @@ class TaskInstance
                 return false;
             }
             #Log only if something was actually changed
-            if (Select::$lastAffected > 0) {
+            if (Query::$lastAffected > 0) {
                 Agent::log('Task instance rescheduled for '.SandClock::format($time, 'c').'.', 'Reschedule', task: $this);
             }
             return $result;
@@ -528,13 +529,13 @@ class TaskInstance
         #Set the time limit for the task
         set_time_limit($this->taskObject->maxTime);
         #Update last run
-        Select::query('UPDATE `cron__schedule` SET `status`=2, `runby`=:runby, `lastrun` = CURRENT_TIMESTAMP() WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance AND `status`!=2;', [
+        Query::query('UPDATE `cron__schedule` SET `status`=2, `runby`=:runby, `lastrun` = CURRENT_TIMESTAMP() WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance AND `status`!=2;', [
             ':task' => [$this->taskName, 'string'],
             ':arguments' => [$this->arguments, 'string'],
             ':instance' => [$this->instance, 'int'],
             ':runby' => [$this->runby, 'string'],
         ]);
-        if (Select::$lastAffected <= 0) {
+        if (Query::$lastAffected <= 0) {
             #The task was either picked up by some manual process or has been removed
             Agent::setCurrentTask(null);
             return true;
