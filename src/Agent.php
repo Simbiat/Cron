@@ -58,10 +58,10 @@ class Agent
      */
     private const array settings = ['enabled', 'logLife', 'retry', 'sseLoop', 'sseRetry', 'maxThreads'];
     /**
-     * ORDER BY clause for tasks
+     * Logic to calculate task priority
      * @var string
      */
-    private static string $sqlOrderBy = 'ORDER BY IF(`frequency`=0, IF(TIMESTAMPDIFF(day, `nextrun`, CURRENT_TIMESTAMP(6))>0, TIMESTAMPDIFF(day, `nextrun`, CURRENT_TIMESTAMP(6)), 0), CEIL(IF(TIMESTAMPDIFF(second, `nextrun`, CURRENT_TIMESTAMP(6))/`frequency`>1, TIMESTAMPDIFF(second, `nextrun`, CURRENT_TIMESTAMP(6))/`frequency`, 0)))+`priority` DESC, `nextrun`';
+    private static string $calculatedPriority = 'IF(`frequency`=0, IF(TIMESTAMPDIFF(day, `nextrun`, CURRENT_TIMESTAMP(6))>0, TIMESTAMPDIFF(day, `nextrun`, CURRENT_TIMESTAMP(6)), 0), CEIL(IF(TIMESTAMPDIFF(second, `nextrun`, CURRENT_TIMESTAMP(6))/`frequency`>1, TIMESTAMPDIFF(second, `nextrun`, CURRENT_TIMESTAMP(6))/`frequency`, 0)))+`priority`';
     /**
      * Random ID
      * @var null|string
@@ -246,12 +246,12 @@ class Agent
             Query::query('UPDATE `cron__schedule` AS `toUpdate`
                         INNER JOIN
                         (
-                            SELECT * FROM (
-                                SELECT `task`, `arguments`, `instance` FROM `cron__schedule` AS `instances`
+                            SELECT `task`, `arguments`, `instance` FROM (
+                                SELECT `task`, `arguments`, `instance`, `nextrun`, '.self::$calculatedPriority.' AS `calculated` FROM `cron__schedule` AS `instances`
                                 WHERE `enabled`=1 AND `runby` IS NULL AND `nextrun`<=CURRENT_TIMESTAMP() AND (SELECT `enabled` FROM `cron__tasks` `tasks` WHERE `tasks`.`task`=`instances`.`task`)=1
-                                '.self::$sqlOrderBy.'
+                                ORDER BY `calculated` DESC, `nextrun`
                                 LIMIT :innerlimit
-                            ) `instances` GROUP BY `task`, `arguments` LIMIT :limit FOR UPDATE SKIP LOCKED
+                            ) `instances` GROUP BY `task`, `arguments` ORDER BY `calculated` DESC, `nextrun` LIMIT :limit FOR UPDATE SKIP LOCKED
                         ) `toSelect`
                         ON `toUpdate`.`task`=`toSelect`.`task`
                             AND `toUpdate`.`arguments`=`toSelect`.`arguments`
@@ -273,7 +273,7 @@ class Agent
         #Get tasks
         try {
             return Select::selectAll(
-                'SELECT `task`, `arguments`, `instance` FROM `cron__schedule` WHERE `runby`=:runby '.self::$sqlOrderBy.';',
+                'SELECT `task`, `arguments`, `instance` FROM `cron__schedule` WHERE `runby`=:runby ORDER BY '.self::$calculatedPriority.' DESC, `nextrun`;',
                 [
                     ':runby' => self::$runby,
                 ]
