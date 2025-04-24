@@ -399,15 +399,15 @@ class Agent
     public function unHang(): bool
     {
         if (self::$dbReady) {
+            #Delete tasks that were marked as `For removal` (`status` was set to `3`), which means they failed to be removed initially, but succeeded to be updated.
+            $tasks = Select::selectAll('SELECT `task`, `arguments`, `instance` FROM `cron__schedule` as `a` WHERE `status` = 3;');
+            foreach ($tasks as $task) {
+                new TaskInstance($task['task'], $task['arguments'], $task['instance'])->delete();
+            }
             $tasks = Select::selectAll('SELECT `task`, `arguments`, `instance`, `frequency` FROM `cron__schedule` as `a` WHERE `runby` IS NOT NULL AND CURRENT_TIMESTAMP()>DATE_ADD(IF(`lastrun` IS NOT NULL, `lastrun`, `nextrun`), INTERVAL (SELECT `maxTime` FROM `cron__tasks` WHERE `cron__tasks`.`task`=`a`.`task`) SECOND);');
             foreach ($tasks as $task) {
                 #If this was a one-time task, schedule it for right now, to avoid delaying it for double the time.
                 new TaskInstance($task['task'], $task['arguments'], $task['instance'])->reSchedule(false, ($task['frequency'] === 0 ? time() : null));
-            }
-            #Also, delete tasks that were marked as `For removal` (`status` was set to `3`), which means they failed to be removed initially, but succeeded to be updated.
-            $tasks = Select::selectAll('SELECT `task`, `arguments`, `instance` FROM `cron__schedule` as `a` WHERE `status` = 3;');
-            foreach ($tasks as $task) {
-                new TaskInstance($task['task'], $task['arguments'], $task['instance'])->delete();
             }
         } else {
             return false;
