@@ -58,10 +58,10 @@ class Agent
      */
     private const array settings = ['enabled', 'logLife', 'retry', 'sseLoop', 'sseRetry', 'maxThreads'];
     /**
-     * Logic to calculate task priority
+     * Logic to calculate task priority. Not sure, I fully understand how this provides the results I expect, but it does. Essentially, `priority` is valued higher, while "overdue" time has a smoother scaling. Rare jobs (with higher value of `frequency`) also have higher weight, but one-time jobs have even higher weight, since they are likely to be quick ones.
      * @var string
      */
-    private static string $calculatedPriority = 'IF(`frequency`=0, IF(TIMESTAMPDIFF(day, `nextrun`, CURRENT_TIMESTAMP(6))>0, TIMESTAMPDIFF(day, `nextrun`, CURRENT_TIMESTAMP(6)), 0), CEIL(IF(TIMESTAMPDIFF(second, `nextrun`, CURRENT_TIMESTAMP(6))/`frequency`>1, TIMESTAMPDIFF(second, `nextrun`, CURRENT_TIMESTAMP(6))/`frequency`, 0)))+`priority`';
+    private static string $calculatedPriority = '(LOG(TIMESTAMPDIFF(SECOND, `nextrun`, CURRENT_TIMESTAMP(6)) + 2) * LOG((CASE WHEN `frequency` = 0 THEN 1 ELSE (`frequency`/4294967295) END) + 2) * POWER((`priority` + 1), 2))';
     /**
      * Random ID
      * @var null|string
@@ -256,7 +256,7 @@ class Agent
                         ON `toUpdate`.`task`=`toSelect`.`task`
                             AND `toUpdate`.`arguments`=`toSelect`.`arguments`
                             AND `toUpdate`.`instance`=`toSelect`.`instance`
-                        SET `status`=1, `runby`=:runby, `sse`=:sse, `lastrun`=CURRENT_TIMESTAMP();',
+                        SET `status`=1, `runby`=:runby, `sse`=:sse;',
                 [
                     ':runby' => self::$runby,
                     ':sse' => [SSE::$SSE, 'bool'],
