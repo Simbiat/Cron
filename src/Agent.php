@@ -61,7 +61,7 @@ class Agent
      * Logic to calculate task priority. Not sure, I fully understand how this provides the results I expect, but it does. Essentially, `priority` is valued higher, while "overdue" time has a smoother scaling. Rare jobs (with higher value of `frequency`) also have higher weight, but one-time jobs have even higher weight, since they are likely to be quick ones.
      * @var string
      */
-    private static string $calculatedPriority = '(LOG(TIMESTAMPDIFF(SECOND, `nextrun`, CURRENT_TIMESTAMP(6)) + 2) * LOG((CASE WHEN `frequency` = 0 THEN 1 ELSE (`frequency`/4294967295) END) + 2) * POWER((`priority` + 1), 2))';
+    private static string $calculatedPriority = '((CASE WHEN frequency = 0 THEN 1 ELSE (4294967295 - frequency) / 4294967295 END) + LOG(TIMESTAMPDIFF(SECOND, `nextrun`, CURRENT_TIMESTAMP(6)) + 2) * 100 + (priority / 99) * 1000)';
     /**
      * Random ID
      * @var null|string

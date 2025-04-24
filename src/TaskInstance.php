@@ -84,7 +84,9 @@ class TaskInstance
     public function __construct(string $taskName = '', string|array|null $arguments = null, int $instance = 1, \PDO|null $dbh = null)
     {
         #Ensure that Cron management is created to establish DB connection and settings
-        new Agent($dbh);
+        if (!Agent::$dbReady) {
+            new Agent($dbh);
+        }
         if (!empty($taskName) && Agent::$dbReady) {
             $this->taskName = $taskName;
             $this->setArguments($arguments);

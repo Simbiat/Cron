@@ -73,7 +73,9 @@ class Task
     public function __construct(string $taskName = '', \PDO|null $dbh = null)
     {
         #Ensure that Cron management is created to establish DB connection and settings
-        new Agent($dbh);
+        if (!Agent::$dbReady) {
+            new Agent($dbh);
+        }
         if (!empty($taskName) && Agent::$dbReady) {
             $this->taskName = $taskName;
             #Attempt to get settings from DB
