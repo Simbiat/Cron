@@ -22,9 +22,13 @@ class TaskInstance
      */
     private(set) string $arguments = '';
     /**
-     * @var int Task instance
+     * @var int Task instance number
      */
     private(set) int $instance = 1;
+    /**
+     * @var int Task instance status. `0` means a task is not running; `1` - queued; `2` - running; `3` - to be removed (used only in case of failed removal)
+     */
+    private(set) int $status = 0;
     /**
      * @var bool Whether the task instance is system one or not
      */
@@ -117,6 +121,9 @@ class TaskInstance
                 if (!empty($settings['runby'])) {
                     $this->runby = $settings['runby'];
                 }
+                #Status is not allowed to be changed from outside, so `settingsFromArray` does not handle it, but we do update it in the class itself
+                $this->status = $settings['status'];
+                unset($settings['status']);
                 #Get task object
                 $this->taskObject = (new Task($this->taskName));
                 #Process settings
@@ -373,8 +380,21 @@ class TaskInstance
                     ':instance' => [$this->instance, 'int'],
                 ]);
                 $this->foundInDB = false;
-            } catch (\Throwable $e) {
-                Agent::log('Failed to delete task instance.', 'InstanceDeleteFail', error: $e, task: $this);
+            } catch (\Throwable $first) {
+                Agent::log('Failed to delete task instance.', 'InstanceDeleteFail', error: $first, task: $this);
+                try {
+                    Query::query('UPDATE `cron__schedule` SET `status` = 3 WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance AND `system`=0;', [
+                        ':task' => [$this->taskName, 'string'],
+                        ':arguments' => [$this->arguments, 'string'],
+                        ':instance' => [$this->instance, 'int'],
+                    ]);
+                    #Log only if something was actually deleted, and if it's not a one-time job
+                    if (Query::$lastAffected > 0) {
+                        Agent::log('Task instance marked for removal.', 'InstanceDelete', task: $this);
+                    }
+                } catch (\Throwable $second) {
+                    Agent::log('Failed to mark task instance for removal.', 'InstanceDeleteFail', error: $second, task: $this);
+                }
                 return false;
             }
             #Log only if something was actually deleted, and if it's not a one-time job
@@ -400,7 +420,7 @@ class TaskInstance
         }
         if (Agent::$dbReady) {
             try {
-                $result = Query::query('UPDATE `cron__schedule` SET `system`=1 WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance `system`=0;', [
+                $result = Query::query('UPDATE `cron__schedule` SET `system`=1 WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance AND `system`=0;', [
                     ':task' => [$this->taskName, 'string'],
                     ':arguments' => [$this->arguments, 'string'],
                     ':instance' => [$this->instance, 'int'],
@@ -531,7 +551,7 @@ class TaskInstance
         #Set the time limit for the task
         set_time_limit($this->taskObject->maxTime);
         #Update last run
-        Query::query('UPDATE `cron__schedule` SET `status`=2, `runby`=:runby, `lastrun` = CURRENT_TIMESTAMP() WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance AND `status`!=2;', [
+        Query::query('UPDATE `cron__schedule` SET `status`=2, `runby`=:runby, `lastrun` = CURRENT_TIMESTAMP() WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance AND `status` IN (0, 1);', [
             ':task' => [$this->taskName, 'string'],
             ':arguments' => [$this->arguments, 'string'],
             ':instance' => [$this->instance, 'int'],

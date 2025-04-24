@@ -61,7 +61,7 @@ class Agent
      * Logic to calculate task priority. Not sure, I fully understand how this provides the results I expect, but it does. Essentially, `priority` is valued higher, while "overdue" time has a smoother scaling. Rare jobs (with higher value of `frequency`) also have higher weight, but one-time jobs have even higher weight, since they are likely to be quick ones.
      * @var string
      */
-    private static string $calculatedPriority = '((CASE WHEN frequency = 0 THEN 1 ELSE (4294967295 - frequency) / 4294967295 END) + LOG(TIMESTAMPDIFF(SECOND, `nextrun`, CURRENT_TIMESTAMP(6)) + 2) * 100 + (priority / 99) * 1000)';
+    private static string $calculatedPriority = '((CASE WHEN `frequency` = 0 THEN 1 ELSE (4294967295 - `frequency`) / 4294967295 END) + LOG(TIMESTAMPDIFF(SECOND, `nextrun`, CURRENT_TIMESTAMP(6)) + 2) * 100 + `priority` * 1000)';
     /**
      * Random ID
      * @var null|string
@@ -401,8 +401,13 @@ class Agent
         if (self::$dbReady) {
             $tasks = Select::selectAll('SELECT `task`, `arguments`, `instance`, `frequency` FROM `cron__schedule` as `a` WHERE `runby` IS NOT NULL AND CURRENT_TIMESTAMP()>DATE_ADD(IF(`lastrun` IS NOT NULL, `lastrun`, `nextrun`), INTERVAL (SELECT `maxTime` FROM `cron__tasks` WHERE `cron__tasks`.`task`=`a`.`task`) SECOND);');
             foreach ($tasks as $task) {
-                #If this was a one-time task, schedule it for right now, to avoid delaying it for double the time
+                #If this was a one-time task, schedule it for right now, to avoid delaying it for double the time.
                 new TaskInstance($task['task'], $task['arguments'], $task['instance'])->reSchedule(false, ($task['frequency'] === 0 ? time() : null));
+            }
+            #Also, delete tasks that were marked as `For removal` (`status` was set to `3`), which means they failed to be removed initially, but succeeded to be updated.
+            $tasks = Select::selectAll('SELECT `task`, `arguments`, `instance` FROM `cron__schedule` as `a` WHERE `status` = 3;');
+            foreach ($tasks as $task) {
+                new TaskInstance($task['task'], $task['arguments'], $task['instance'])->delete();
             }
         } else {
             return false;
