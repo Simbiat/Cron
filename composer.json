@@ -19,12 +19,13 @@
     ],
     "require": {
         "php": "^8.4",
-        "simbiat/database": "^2.12",
+        "simbiat/db-query": "^1",
         "simbiat/sand-clock": "^2.4",
         "simbiat/sse": "^1.1"
     },
     "suggest": {
-        "simbiat/db-pool": "Allows use of database connections pool"
+        "simbiat/db-pool": "Allows use of database connections pool",
+        "simbiat/db-manager": "Requried for automatic installation and updates"
     },
     "autoload": {
         "psr-4": {

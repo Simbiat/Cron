@@ -407,7 +407,7 @@ class Agent
             $tasks = Select::selectAll('SELECT `task`, `arguments`, `instance`, `frequency` FROM `cron__schedule` as `a` WHERE `runby` IS NOT NULL AND CURRENT_TIMESTAMP()>DATE_ADD(IF(`lastrun` IS NOT NULL, `lastrun`, `nextrun`), INTERVAL (SELECT `maxTime` FROM `cron__tasks` WHERE `cron__tasks`.`task`=`a`.`task`) SECOND);');
             foreach ($tasks as $task) {
                 #If this was a one-time task, schedule it for right now, to avoid delaying it for double the time.
-                new TaskInstance($task['task'], $task['arguments'], $task['instance'])->reSchedule(false, ($task['frequency'] === 0 ? time() : null));
+                new TaskInstance($task['task'], $task['arguments'], $task['instance'])->reSchedule(false);
             }
         } else {
             return false;
@@ -440,6 +440,9 @@ class Agent
      */
     public function install(): bool|string
     {
+        if (!class_exists(Manage::class)) {
+            throw new \RuntimeException('Cron requires `\Simbiat\Database\Manage` class to be automatically installed or updated.');
+        }
         #Check if the settings table exists
         if (Manage::checkTable('cron__settings') === 1) {
             #Assume that we have installed the database, try to get the version
