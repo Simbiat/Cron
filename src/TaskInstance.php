@@ -4,7 +4,6 @@ declare(strict_types = 1);
 namespace Simbiat\Cron;
 
 use Simbiat\Database\Query;
-use Simbiat\Database\Select;
 use Simbiat\SandClock;
 use function is_string, is_array, in_array;
 
