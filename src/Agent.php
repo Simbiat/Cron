@@ -500,7 +500,7 @@ class Agent
         $sql = Query::stringToQueries($sql);
         try {
             return Query::query($sql);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return $e->getMessage()."\r\n".$e->getTraceAsString();
         }
     }
