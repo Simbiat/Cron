@@ -109,12 +109,12 @@ class TaskInstance
     private function getFromDB(): void
     {
         if (Agent::$dbReady) {
-            $settings = Select::selectRow('SELECT * FROM `cron__schedule` WHERE `task`=:name AND `arguments`=:arguments AND `instance`=:instance;',
+            $settings = Query::query('SELECT * FROM `cron__schedule` WHERE `task`=:name AND `arguments`=:arguments AND `instance`=:instance;',
                 [
                     ':name' => $this->taskName,
                     ':arguments' => $this->arguments,
                     ':instance' => [$this->instance, 'int'],
-                ]
+                ], return: 'row'
             );
             if (!empty($settings)) {
                 #Set `runby` value, if present
@@ -347,17 +347,17 @@ class TaskInstance
                     ':priority' => [(empty($this->priority) ? 0 : $this->priority), 'int'],
                     ':message' => [$this->message, (empty($this->message) ? 'null' : 'string')],
                     ':nextrun' => [$this->nextTime, 'datetime'],
-                ]);
+                ], return: 'affected');
                 $this->foundInDB = true;
             } catch (\Throwable $e) {
                 Agent::log('Failed to add or update task instance.', 'InstanceAddFail', error: $e, task: $this);
                 return false;
             }
             #Log only if something was actually changed
-            if (Query::$lastAffected > 0) {
+            if ($result > 0) {
                 Agent::log('Added or updated task instance.', 'InstanceAdd', task: $this);
             }
-            return $result;
+            return true;
         }
         return false;
     }
@@ -378,18 +378,18 @@ class TaskInstance
                     ':task' => [$this->taskName, 'string'],
                     ':arguments' => [$this->arguments, 'string'],
                     ':instance' => [$this->instance, 'int'],
-                ]);
+                ], return: 'affected');
                 $this->foundInDB = false;
             } catch (\Throwable $first) {
                 Agent::log('Failed to delete task instance.', 'InstanceDeleteFail', error: $first, task: $this);
                 try {
-                    Query::query('UPDATE `cron__schedule` SET `status` = 3 WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance AND `system`=0;', [
+                    $result = Query::query('UPDATE `cron__schedule` SET `status` = 3 WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance AND `system`=0;', [
                         ':task' => [$this->taskName, 'string'],
                         ':arguments' => [$this->arguments, 'string'],
                         ':instance' => [$this->instance, 'int'],
-                    ]);
+                    ], return: 'affected');
                     #Log only if something was actually deleted, and if it's not a one-time job
-                    if (Query::$lastAffected > 0) {
+                    if ($result > 0) {
                         Agent::log('Task instance marked for removal.', 'InstanceDelete', task: $this);
                     }
                 } catch (\Throwable $second) {
@@ -398,10 +398,10 @@ class TaskInstance
                 return false;
             }
             #Log only if something was actually deleted, and if it's not a one-time job
-            if ($this->frequency > 0 && Query::$lastAffected > 0) {
+            if ($this->frequency > 0 && $result > 0) {
                 Agent::log('Deleted task instance.', 'InstanceDelete', task: $this);
             }
-            return $result;
+            return true;
         }
         return false;
     }
@@ -424,17 +424,17 @@ class TaskInstance
                     ':task' => [$this->taskName, 'string'],
                     ':arguments' => [$this->arguments, 'string'],
                     ':instance' => [$this->instance, 'int'],
-                ]);
+                ], return: 'affected');
             } catch (\Throwable $e) {
                 Agent::log('Failed to mark task instance as system one.', 'InstanceToSystemFail', error: $e, task: $this);
                 return false;
             }
             #Log only if something was actually changed
-            if (Query::$lastAffected > 0) {
+            if ($result > 0) {
                 $this->system = true;
                 Agent::log('Marked task instance as system one.', 'InstanceToSystem', task: $this);
             }
-            return $result;
+            return true;
         }
         return false;
     }
@@ -457,17 +457,17 @@ class TaskInstance
                     ':arguments' => [$this->arguments, 'string'],
                     ':instance' => [$this->instance, 'int'],
                     ':enabled' => [$enabled, 'bool'],
-                ]);
+                ], return: 'affected');
             } catch (\Throwable $e) {
                 Agent::log('Failed to '.($enabled ? 'enable' : 'disable').' task instance.', 'Instance'.($enabled ? 'Enable' : 'Disable').'Fail', error: $e, task: $this);
                 return false;
             }
             #Log only if something was actually changed
-            if (Query::$lastAffected > 0) {
+            if ($result > 0) {
                 $this->enabled = $enabled;
                 Agent::log(($enabled ? 'Enabled' : 'Disabled').' task instance.', 'Instance'.($enabled ? 'Enable' : 'Disable'), task: $this);
             }
-            return $result;
+            return true;
         }
         return false;
     }
@@ -501,18 +501,18 @@ class TaskInstance
             }
             #Actually reschedule. One task time task will be rescheduled for the retry time from settings
             try {
-                Query::query('UPDATE `cron__schedule` SET `status`=0, `runby`=NULL, `sse`=0, `nextrun`=:time, `'.($result ? 'lastsuccess' : 'lasterror').'`=CURRENT_TIMESTAMP() WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance;', [
+                $affected = Query::query('UPDATE `cron__schedule` SET `status`=0, `runby`=NULL, `sse`=0, `nextrun`=:time, `'.($result ? 'lastsuccess' : 'lasterror').'`=CURRENT_TIMESTAMP() WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance;', [
                     ':time' => [$time, 'datetime'],
                     ':task' => [$this->taskName, 'string'],
                     ':arguments' => [$this->arguments, 'string'],
                     ':instance' => [$this->instance, 'int'],
-                ]);
+                ], return: 'affected');
             } catch (\Throwable $e) {
                 Agent::log('Failed to reschedule task instance for '.SandClock::format($time, 'c').'.', 'RescheduleFail', error: $e, task: $this);
                 return false;
             }
             #Log only if something was actually changed
-            if (Query::$lastAffected > 0) {
+            if ($affected > 0) {
                 Agent::log('Task instance rescheduled for '.SandClock::format($time, 'c').'.', 'Reschedule', task: $this);
             }
             return $result;
@@ -551,13 +551,13 @@ class TaskInstance
         #Set the time limit for the task
         set_time_limit($this->taskObject->maxTime);
         #Update last run
-        Query::query('UPDATE `cron__schedule` SET `status`=2, `runby`=:runby, `lastrun` = CURRENT_TIMESTAMP() WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance AND `status` IN (0, 1);', [
+        $affected = Query::query('UPDATE `cron__schedule` SET `status`=2, `runby`=:runby, `lastrun` = CURRENT_TIMESTAMP() WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance AND `status` IN (0, 1);', [
             ':task' => [$this->taskName, 'string'],
             ':arguments' => [$this->arguments, 'string'],
             ':instance' => [$this->instance, 'int'],
             ':runby' => [$this->runby, 'string'],
-        ]);
-        if (Query::$lastAffected <= 0) {
+        ], return: 'affected');
+        if ($affected <= 0) {
             #The task was either picked up by some manual process or has been removed
             Agent::setCurrentTask(null);
             return true;

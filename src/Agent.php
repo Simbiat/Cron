@@ -4,10 +4,8 @@ declare(strict_types = 1);
 namespace Simbiat\Cron;
 
 use JetBrains\PhpStorm\ExpectedValues;
-use Simbiat\Database\Common;
 use Simbiat\Database\Manage;
 use Simbiat\Database\Query;
-use Simbiat\Database\Select;
 use Simbiat\HTTP\SSE;
 use Simbiat\SandClock;
 use function in_array;
@@ -88,7 +86,7 @@ class Agent
         #Check that a database connection is established
         if (!self::$dbReady) {
             #Establish it, if possible
-            Common::setDbh($dbh);
+            new Query($dbh);
             self::$dbReady = true;
             $this->getSettings();
         }
@@ -165,7 +163,7 @@ class Agent
             }
             #Check if enough threads are available
             try {
-                if (Select::count('SELECT COUNT(DISTINCT(`runby`)) as `count` FROM `cron__schedule` WHERE `runby` IS NOT NULL;') >= self::$maxThreads) {
+                if (Query::query('SELECT COUNT(DISTINCT(`runby`)) as `count` FROM `cron__schedule` WHERE `runby` IS NOT NULL;', return: 'count') >= self::$maxThreads) {
                     self::log('Cron threads are exhausted', 'CronNoThreads');
                     if (!SSE::$SSE) {
                         return false;
@@ -272,11 +270,11 @@ class Agent
         }
         #Get tasks
         try {
-            return Select::selectAll(
+            return Query::query(
                 'SELECT `task`, `arguments`, `instance` FROM `cron__schedule` WHERE `runby`=:runby ORDER BY '.self::$calculatedPriority.' DESC, `nextrun`;',
                 [
                     ':runby' => self::$runby,
-                ]
+                ], return: 'all'
             );
         } catch (\Throwable $exception) {
             #Notify about the end the stream
@@ -344,7 +342,7 @@ class Agent
     {
         #Get settings
         try {
-            $settings = Select::selectPair('SELECT `setting`, `value` FROM `cron__settings`');
+            $settings = Query::query('SELECT `setting`, `value` FROM `cron__settings`', return: 'pair');
         } catch (\Throwable) {
             #Implies that DB went away, for example
             self::$dbReady = false;
@@ -400,11 +398,11 @@ class Agent
     {
         if (self::$dbReady) {
             #Delete tasks that were marked as `For removal` (`status` was set to `3`), which means they failed to be removed initially, but succeeded to be updated.
-            $tasks = Select::selectAll('SELECT `task`, `arguments`, `instance` FROM `cron__schedule` as `a` WHERE `status` = 3;');
+            $tasks = Query::query('SELECT `task`, `arguments`, `instance` FROM `cron__schedule` as `a` WHERE `status` = 3;', return: 'all');
             foreach ($tasks as $task) {
                 new TaskInstance($task['task'], $task['arguments'], $task['instance'])->delete();
             }
-            $tasks = Select::selectAll('SELECT `task`, `arguments`, `instance`, `frequency` FROM `cron__schedule` as `a` WHERE `runby` IS NOT NULL AND CURRENT_TIMESTAMP()>DATE_ADD(IF(`lastrun` IS NOT NULL, `lastrun`, `nextrun`), INTERVAL (SELECT `maxTime` FROM `cron__tasks` WHERE `cron__tasks`.`task`=`a`.`task`) SECOND);');
+            $tasks = Query::query('SELECT `task`, `arguments`, `instance`, `frequency` FROM `cron__schedule` as `a` WHERE `runby` IS NOT NULL AND CURRENT_TIMESTAMP()>DATE_ADD(IF(`lastrun` IS NOT NULL, `lastrun`, `nextrun`), INTERVAL (SELECT `maxTime` FROM `cron__tasks` WHERE `cron__tasks`.`task`=`a`.`task`) SECOND);', return: 'all');
             foreach ($tasks as $task) {
                 #If this was a one-time task, schedule it for right now, to avoid delaying it for double the time.
                 new TaskInstance($task['task'], $task['arguments'], $task['instance'])->reSchedule(false);
@@ -446,7 +444,7 @@ class Agent
         #Check if the settings table exists
         if (Manage::checkTable('cron__settings') === 1) {
             #Assume that we have installed the database, try to get the version
-            $version = Select::selectValue('SELECT `value` FROM `cron__settings` WHERE `setting`=\'version\'');
+            $version = Query::query('SELECT `value` FROM `cron__settings` WHERE `setting`=\'version\'', return: 'value');
             #If an empty installer script was run before 2.1.2, we need to determine what version we have based on other things
             if (empty($version)) {
                 #If errors' table does not exist, and the log table does - we are on version 2.0.0
@@ -462,7 +460,7 @@ class Agent
                 } elseif (Manage::checkColumn('cron__schedule', 'sse')) {
                     $version = '1.2.0';
                     #If one of the settings has the name `errorLife` (and not `errorlife`) - 1.1.14
-                } elseif (Select::selectValue('SELECT `setting` FROM `cron__settings` WHERE `setting`=\'errorLife\'') === 'errorLife') {
+                } elseif (Query::query('SELECT `setting` FROM `cron__settings` WHERE `setting`=\'errorLife\'', return: 'value') === 'errorLife') {
                     $version = '1.1.14';
                     #If the `arguments` column is not nullable - 1.1.12
                 } elseif (!Manage::isNullable('cron__schedule', 'arguments')) {
@@ -474,7 +472,7 @@ class Agent
                 } elseif (Manage::getColumnDescription('cron__schedule', 'arguments') === 'Optional task arguments') {
                     $version = '1.1.7';
                     #If the `maxthreads` setting exists - it's 1.1.0
-                } elseif (Select::selectValue('SELECT `setting` FROM `cron__settings` WHERE `setting`=\'maxthreads\'') === 'maxthreads') {
+                } elseif (Query::query('SELECT `setting` FROM `cron__settings` WHERE `setting`=\'maxthreads\'', return: 'value') === 'maxthreads') {
                     $version = '1.1.0';
                     #Otherwise - version 1.0.0
                 } else {
@@ -536,7 +534,7 @@ class Agent
                 #Reset runby value to null, since these entries can belong to multiple threads, and we don't really care about which one was the last one
                 $runBy = null;
                 #Get last event time and type
-                $lastEvent = Select::selectRow('SELECT `time`, `type` FROM `cron__log` ORDER BY `time` DESC LIMIT 1');
+                $lastEvent = Query::query('SELECT `time`, `type` FROM `cron__log` ORDER BY `time` DESC LIMIT 1', return: 'row');
                 #Checking for empty, in case there are no logs in the table
                 if (!empty($lastEvent['type']) && $lastEvent['type'] === $event) {
                     #Update the message of last event with current time

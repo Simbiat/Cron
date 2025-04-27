@@ -92,7 +92,7 @@ class Task
     private function getFromDB(): void
     {
         if (Agent::$dbReady) {
-            $settings = Select::selectRow('SELECT * FROM `cron__tasks` WHERE `task`=:name;', [':name' => $this->taskName]);
+            $settings = Query::query('SELECT * FROM `cron__tasks` WHERE `task`=:name;', [':name' => $this->taskName], return: 'row');
             if (!empty($settings)) {
                 $this->settingsFromArray($settings);
                 if (empty($this->function)) {
@@ -290,17 +290,17 @@ class Task
                     ':enabled' => [$this->enabled, 'bool'],
                     ':system' => [$this->system, 'bool'],
                     ':desc' => [$this->description, (empty($this->description) ? 'null' : 'string')],
-                ]);
+                ], return: 'affected');
                 $this->foundInDB = true;
             } catch (\Throwable $e) {
                 Agent::log('Failed to add or update task with following details: '.$taskDetailsString.'.', 'TaskAddFail', error: $e);
                 return false;
             }
             #Log only if something was actually changed
-            if (Query::$lastAffected > 0) {
+            if ($result > 0) {
                 Agent::log('Added or updated task with following details: '.$taskDetailsString.'.', 'TaskAdd');
             }
-            return $result;
+            return true;
         }
         return false;
     }
@@ -319,17 +319,17 @@ class Task
             try {
                 $result = Query::query('DELETE FROM `cron__tasks` WHERE `task`=:task AND `system`=0;', [
                     ':task' => [$this->taskName, 'string'],
-                ]);
+                ], return: 'affected');
                 $this->foundInDB = false;
             } catch (\Throwable $e) {
                 Agent::log('Failed delete task `'.$this->taskName.'`.', 'TaskDeleteFail', error: $e);
                 return false;
             }
             #Log only if something was actually deleted
-            if (Query::$lastAffected > 0) {
+            if ($result > 0) {
                 Agent::log('Deleted task  `'.$this->taskName.'`.', 'TaskDelete');
             }
-            return $result;
+            return true;
         }
         return false;
     }
@@ -347,17 +347,17 @@ class Task
             try {
                 $result = Query::query('UPDATE `cron__tasks` SET `system`=1 WHERE `task`=:task AND `system`=0;', [
                     ':task' => [$this->taskName, 'string'],
-                ]);
+                ], return: 'affected');
             } catch (\Throwable $e) {
                 Agent::log('Failed to mark task `'.$this->taskName.'` as system one.', 'TaskToSystemFail', error: $e);
                 return false;
             }
             #Log only if something was actually changed
-            if (Query::$lastAffected > 0) {
+            if ($result > 0) {
                 $this->system = true;
                 Agent::log('Marked task `'.$this->taskName.'` as system one.', 'TaskToSystem');
             }
-            return $result;
+            return true;
         }
         return false;
     }
@@ -378,17 +378,17 @@ class Task
                 $result = Query::query('UPDATE `cron__tasks` SET `enabled`=:enabled WHERE `task`=:task;', [
                     ':task' => [$this->taskName, 'string'],
                     ':enabled' => [$enabled, 'bool'],
-                ]);
+                ], return: 'affected');
             } catch (\Throwable $e) {
                 Agent::log('Failed to '.($enabled ? 'enable' : 'disable').' task.', 'Task'.($enabled ? 'Enable' : 'Disable').'Fail', error: $e);
                 return false;
             }
             #Log only if something was actually changed
-            if (Query::$lastAffected > 0) {
+            if ($result > 0) {
                 $this->enabled = $enabled;
                 Agent::log(($enabled ? 'Enabled' : 'Disabled').' task.', 'Task'.($enabled ? 'Enable' : 'Disable'));
             }
-            return $result;
+            return true;
         }
         return false;
     }
