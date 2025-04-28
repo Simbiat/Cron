@@ -17,13 +17,38 @@ class TaskInstance
      */
     private(set) string $taskName = '';
     /**
-     * @var string Optional object reference
+     * @var string Optional arguments
      */
-    private(set) string $arguments = '';
+    private(set) string $arguments = '' {
+        set (mixed $value) {
+            if (empty($value)) {
+                $this->arguments = '';
+            } elseif (is_array($value)) {
+                $this->arguments = json_encode($value, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION);
+            } elseif (is_string($value) && json_validate($value)) {
+                $this->arguments = $value;
+            } else {
+                throw new \UnexpectedValueException('`arguments` is not an array or a valid JSON string');
+            }
+        }
+    }
     /**
      * @var int Task instance number
      */
-    private(set) int $instance = 1;
+    private(set) int $instance = 1 {
+        set (mixed $value) {
+            if (empty($value)) {
+                $this->instance = 1;
+            } elseif (is_numeric($value)) {
+                $this->instance = (int)$value;
+                if ($this->instance < 1) {
+                    $this->instance = 1;
+                }
+            } else {
+                throw new \UnexpectedValueException('`instance` is not a valid numeric value');
+            }
+        }
+    }
     /**
      * @var int Task instance status. `0` means a task is not running; `1` - queued; `2` - running; `3` - to be removed (used only in case of failed removal)
      */
@@ -39,19 +64,78 @@ class TaskInstance
     /**
      * @var int Task instance frequency
      */
-    private(set) int $frequency = 0;
+    private(set) int $frequency = 0 {
+        set (mixed $value) {
+            if (empty($value)) {
+                $this->frequency = 0;
+            } elseif (is_numeric($value)) {
+                $frequency = (int)$value;
+                if ($frequency < 0) {
+                    $frequency = 0;
+                }
+                if ($frequency > 0 && $frequency < $this->taskObject->minFrequency) {
+                    throw new \UnexpectedValueException('`frequency` for `'.$this->taskName.'` should be either 0 (one-time job) or equal or more than '.$this->taskObject->minFrequency.' seconds');
+                }
+                if ($frequency === 0 && $this->system) {
+                    throw new \UnexpectedValueException('`frequency` cannot be set to 0 (one-time job), if task instance is system one');
+                }
+                $this->frequency = $frequency;
+            } else {
+                throw new \UnexpectedValueException('`frequency` is not a valid numeric value');
+            }
+        }
+    }
     /**
      * @var string|null Day of month limitation
      */
-    private(set) ?string $dayofmonth = null;
+    private(set) ?string $dayofmonth = null {
+        set (mixed $value) {
+            if (empty($value)) {
+                $this->dayofmonth = null;
+            } elseif (is_array($value)) {
+                $this->dayofmonth = json_encode($value, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION);
+            } elseif (is_string($value) && json_validate($value)) {
+                $this->dayofmonth = $value;
+            } else {
+                throw new \UnexpectedValueException('`dayofmonth` is not an array or a valid JSON string');
+            }
+        }
+    }
     /**
      * @var string|null Day of week limitation
      */
-    private(set) ?string $dayofweek = null;
+    private(set) ?string $dayofweek = null {
+        set (mixed $value) {
+            if (empty($value)) {
+                $this->dayofweek = null;
+            } elseif (is_array($value)) {
+                $this->dayofweek = json_encode($value, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION);
+            } elseif (is_string($value) && json_validate($value)) {
+                $this->dayofweek = $value;
+            } else {
+                throw new \UnexpectedValueException('`dayofweek` is not an array or a valid JSON string');
+            }
+        }
+    }
     /**
      * @var int Task instance priority
      */
-    private(set) int $priority = 0;
+    private(set) int $priority = 0 {
+        set (mixed $value) {
+            if (empty($value)) {
+                $this->priority = 0;
+            } elseif (is_numeric($value)) {
+                $this->priority = (int)$value;
+                if ($this->priority < 0) {
+                    $this->priority = 0;
+                } elseif ($this->priority > 255) {
+                    $this->priority = 255;
+                }
+            } else {
+                throw new \UnexpectedValueException('`priority` is not a valid numeric value');
+            }
+        }
+    }
     /**
      * @var string|null Message to show in SSE mode
      */
@@ -92,8 +176,8 @@ class TaskInstance
         }
         if (!empty($taskName) && Agent::$dbReady) {
             $this->taskName = $taskName;
-            $this->setArguments($arguments);
-            $this->setInstance($instance);
+            $this->arguments = $arguments;
+            $this->instance = $instance;
             #Attempt to get settings from DB
             $this->getFromDB();
         }
@@ -152,28 +236,16 @@ class TaskInstance
         foreach ($settings as $setting => $value) {
             switch ($setting) {
                 case 'task':
-                    $this->taskName = $value;
-                    break;
                 case 'arguments':
-                    $this->setArguments($value);
-                    break;
                 case 'instance':
-                    $this->setInstance($value);
+                case 'frequency':
+                case 'priority':
+                case 'dayofmonth':
+                case 'dayofweek':
+                    $this->${$setting} = $value;
                     break;
                 case 'enabled':
                     $this->enabled = (bool)$value;
-                    break;
-                case 'frequency':
-                    $this->setFrequency($value);
-                    break;
-                case 'priority':
-                    $this->setPriority($value);
-                    break;
-                case 'dayofmonth':
-                    $this->setDayOfMonth($value);
-                    break;
-                case 'dayofweek':
-                    $this->setDayOfWeek($value);
                     break;
                 case 'nextrun':
                     $this->nextTime = SandClock::valueToDateTime($value);
@@ -191,135 +263,6 @@ class TaskInstance
             }
         }
         return $this;
-    }
-    
-    /**
-     * Set task instance arguments
-     * @param mixed $value
-     *
-     * @return void
-     * @throws \JsonException
-     */
-    private function setArguments(mixed $value): void
-    {
-        if (empty($value)) {
-            $this->arguments = '';
-        } elseif (is_array($value)) {
-            $this->arguments = json_encode($value, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION);
-        } elseif (is_string($value) && json_validate($value)) {
-            $this->arguments = $value;
-        } else {
-            throw new \UnexpectedValueException('`arguments` is not an array or a valid JSON string');
-        }
-    }
-    
-    /**
-     * Set task instance day of month limitation
-     * @param mixed $value
-     *
-     * @return void
-     * @throws \JsonException
-     */
-    private function setDayOfMonth(mixed $value): void
-    {
-        if (empty($value)) {
-            $this->dayofmonth = null;
-        } elseif (is_array($value)) {
-            $this->dayofmonth = json_encode($value, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION);
-        } elseif (is_string($value) && json_validate($value)) {
-            $this->dayofmonth = $value;
-        } else {
-            throw new \UnexpectedValueException('`dayofmonth` is not an array or a valid JSON string');
-        }
-    }
-    
-    /**
-     * Set task instance day of week limitation
-     * @param mixed $value
-     *
-     * @return void
-     * @throws \JsonException
-     */
-    private function setDayOfWeek(mixed $value): void
-    {
-        if (empty($value)) {
-            $this->dayofweek = null;
-        } elseif (is_array($value)) {
-            $this->dayofweek = json_encode($value, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION);
-        } elseif (is_string($value) && json_validate($value)) {
-            $this->dayofweek = $value;
-        } else {
-            throw new \UnexpectedValueException('`dayofweek` is not an array or a valid JSON string');
-        }
-    }
-    
-    /**
-     * Set the task instance number
-     * @param mixed $value
-     *
-     * @return void
-     */
-    private function setInstance(mixed $value): void
-    {
-        if (empty($value)) {
-            $this->instance = 1;
-        } elseif (is_numeric($value)) {
-            $this->instance = (int)$value;
-            if ($this->instance < 1) {
-                $this->instance = 1;
-            }
-        } else {
-            throw new \UnexpectedValueException('`instance` is not a valid numeric value');
-        }
-    }
-    
-    /**
-     * Set task instance frequency
-     * @param mixed $value
-     *
-     * @return void
-     */
-    private function setFrequency(mixed $value): void
-    {
-        if (empty($value)) {
-            $this->frequency = 0;
-        } elseif (is_numeric($value)) {
-            $frequency = (int)$value;
-            if ($frequency < 0) {
-                $frequency = 0;
-            }
-            if ($frequency > 0 && $frequency < $this->taskObject->minFrequency) {
-                throw new \UnexpectedValueException('`frequency` for `'.$this->taskName.'` should be either 0 (one-time job) or equal or more than '.$this->taskObject->minFrequency.' seconds');
-            }
-            if ($frequency === 0 && $this->system) {
-                throw new \UnexpectedValueException('`frequency` cannot be set to 0 (one-time job), if task instance is system one');
-            }
-            $this->frequency = $frequency;
-        } else {
-            throw new \UnexpectedValueException('`frequency` is not a valid numeric value');
-        }
-    }
-    
-    /**
-     * Set task instance priority
-     * @param mixed $value
-     *
-     * @return void
-     */
-    private function setPriority(mixed $value): void
-    {
-        if (empty($value)) {
-            $this->priority = 0;
-        } elseif (is_numeric($value)) {
-            $this->priority = (int)$value;
-            if ($this->priority < 0) {
-                $this->priority = 0;
-            } elseif ($this->priority > 255) {
-                $this->priority = 255;
-            }
-        } else {
-            throw new \UnexpectedValueException('`priority` is not a valid numeric value');
-        }
     }
     
     /**

@@ -482,7 +482,8 @@ class Agent
         } else {
             $version = '0.0.0';
         }
-        #Get SQL from all files
+        #Get SQL from all files. Sorting is required since we need a specific order of execution.
+        /** @noinspection LowPerformingFilesystemOperationsInspection */
         $sqlFiles = glob(__DIR__.'/installer/*.sql');
         $sql = '';
         foreach ($sqlFiles as $file) {
