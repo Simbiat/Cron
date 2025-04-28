@@ -186,16 +186,18 @@ class Task
                     $this->returns = $value;
                     break;
                 case 'task':
+                    $this->taskName = $value;
+                    break;
                 case 'function':
                 case 'parameters':
                 case 'maxTime':
                 case 'minFrequency':
                 case 'retry':
-                    $this->${$setting} = $value;
+                    $this->{$setting} = $value;
                     break;
                 case 'enabled':
                 case 'system':
-                    $this->${$setting} = (bool)$value;
+                    $this->{$setting} = (bool)$value;
                     break;
                 case 'description':
                     if (empty($value)) {

@@ -236,13 +236,15 @@ class TaskInstance
         foreach ($settings as $setting => $value) {
             switch ($setting) {
                 case 'task':
+                    $this->taskName = $value;
+                    break;
                 case 'arguments':
                 case 'instance':
                 case 'frequency':
                 case 'priority':
                 case 'dayofmonth':
                 case 'dayofweek':
-                    $this->${$setting} = $value;
+                    $this->{$setting} = $value;
                     break;
                 case 'enabled':
                     $this->enabled = (bool)$value;
