@@ -51,10 +51,24 @@ Originally my [fftracker](https://github.com/Simbiat/FFTracker) was hosted on a 
 3. Install:
 
 ```php
-(new \Simbiat\Cron\Agent($dbh))->install();
+(new \Simbiat\Cron\Installer($dbh))->install();
 ```
 
 Due to the current design, after the tables are created this way, you will need to recreate the object for future use, in case you will be using the same script.
+
+If you do not want to run installation, but rather just check the current version (from database perspective), use
+
+```php
+(new \Simbiat\Cron\Installer($dbh))->getVersion();
+```
+
+### Changing prefix
+
+By default, tables use `cron__` prefix, but you can change that by passing your own prefix. All classes (`Installer`, `Agent`, `Task` and `TaskInstance`) support a `prefix` argument, so if you do change it during installation, you can use it even when managing stuff outside of `Agent`.
+
+### Changing database connection
+
+Similar logic applies for the database connection object (`dbh`), in case you are not using [DB-Pool](https://github.com/Simbiat/db-pool).
 
 ## Trigger processing
 
