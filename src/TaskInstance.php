@@ -12,6 +12,8 @@ use function is_string, is_array, in_array;
  */
 class TaskInstance
 {
+    use TraitForCron;
+    
     /**
      * @var string Unique name of the task
      */
@@ -88,14 +90,14 @@ class TaskInstance
     /**
      * @var string|null Day of month limitation
      */
-    private(set) ?string $dayofmonth = null {
+    private(set) ?string $dayOfMonth = null {
         set (mixed $value) {
             if (empty($value)) {
-                $this->dayofmonth = null;
+                $this->dayOfMonth = null;
             } elseif (is_array($value)) {
-                $this->dayofmonth = json_encode($value, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION);
+                $this->dayOfMonth = json_encode($value, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION);
             } elseif (is_string($value) && json_validate($value)) {
-                $this->dayofmonth = $value;
+                $this->dayOfMonth = $value;
             } else {
                 throw new \UnexpectedValueException('`dayofmonth` is not an array or a valid JSON string');
             }
@@ -104,14 +106,14 @@ class TaskInstance
     /**
      * @var string|null Day of week limitation
      */
-    private(set) ?string $dayofweek = null {
+    private(set) ?string $dayOfWeek = null {
         set (mixed $value) {
             if (empty($value)) {
-                $this->dayofweek = null;
+                $this->dayOfWeek = null;
             } elseif (is_array($value)) {
-                $this->dayofweek = json_encode($value, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION);
+                $this->dayOfWeek = json_encode($value, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION);
             } elseif (is_string($value) && json_validate($value)) {
-                $this->dayofweek = $value;
+                $this->dayOfWeek = $value;
             } else {
                 throw new \UnexpectedValueException('`dayofweek` is not an array or a valid JSON string');
             }
@@ -152,11 +154,6 @@ class TaskInstance
      * @var Task|null Task object
      */
     private(set) ?Task $taskObject = null;
-    /**
-     * Random ID
-     * @var null|string
-     */
-    private(set) ?string $runby = null;
     
     
     /**
@@ -164,17 +161,13 @@ class TaskInstance
      * @param string|array|null $arguments Arguments for the task
      * @param int               $instance  Task instance number
      * @param \PDO|null         $dbh       PDO object to use for database connection. If not provided class expects that connection has already been established through `\Simbiat\Cron\Agent`.
+     * @param string            $prefix    Cron database prefix.
      *
-     * @throws \JsonException
-     * @throws \Exception
      */
-    public function __construct(string $taskName = '', string|array|null $arguments = null, int $instance = 1, \PDO|null $dbh = null)
+    public function __construct(string $taskName = '', string|array|null $arguments = null, int $instance = 1, \PDO|null $dbh = null, string $prefix = 'cron__')
     {
-        #Ensure that Cron management is created to establish DB connection and settings
-        if (!Agent::$dbReady) {
-            new Agent($dbh);
-        }
-        if (!empty($taskName) && Agent::$dbReady) {
+        $this->init($dbh, $prefix);
+        if (!empty($taskName)) {
             $this->taskName = $taskName;
             $this->arguments = $arguments;
             $this->instance = $instance;
@@ -187,33 +180,30 @@ class TaskInstance
      * Get task settings from database
      *
      * @return void
-     * @throws \JsonException
      */
     private function getFromDB(): void
     {
-        if (Agent::$dbReady) {
-            $settings = Query::query('SELECT * FROM `cron__schedule` WHERE `task`=:name AND `arguments`=:arguments AND `instance`=:instance;',
-                [
-                    ':name' => $this->taskName,
-                    ':arguments' => $this->arguments,
-                    ':instance' => [$this->instance, 'int'],
-                ], return: 'row'
-            );
-            if (!empty($settings)) {
-                #Set `runby` value, if present
-                if (!empty($settings['runby'])) {
-                    $this->runby = $settings['runby'];
-                }
-                #Status is not allowed to be changed from outside, so `settingsFromArray` does not handle it, but we do update it in the class itself
-                $this->status = $settings['status'];
-                unset($settings['status']);
-                #Get task object
-                $this->taskObject = (new Task($this->taskName));
-                #Process settings
-                $this->settingsFromArray($settings);
-                #If nothing failed at this point, set the flag to `true`
-                $this->foundInDB = $this->taskObject->foundInDB;
+        $settings = Query::query('SELECT * FROM `'.$this->prefix.'schedule` WHERE `task`=:name AND `arguments`=:arguments AND `instance`=:instance;',
+            [
+                ':name' => $this->taskName,
+                ':arguments' => $this->arguments,
+                ':instance' => [$this->instance, 'int'],
+            ], return: 'row'
+        );
+        if (!empty($settings)) {
+            #Set `runby` value, if present
+            if (!empty($settings['runby'])) {
+                $this->runBy = $settings['runby'];
             }
+            #Status is not allowed to be changed from outside, so `settingsFromArray` does not handle it, but we do update it in the class itself
+            $this->status = $settings['status'];
+            unset($settings['status']);
+            #Get task object
+            $this->taskObject = (new Task($this->taskName));
+            #Process settings
+            $this->settingsFromArray($settings);
+            #If nothing failed at this point, set the flag to `true`
+            $this->foundInDB = $this->taskObject->foundInDB;
         }
     }
     
@@ -221,7 +211,6 @@ class TaskInstance
      * Set task settings from associative array
      *
      * @return $this
-     * @throws \JsonException
      */
     public function settingsFromArray(array $settings): self
     {
@@ -277,33 +266,30 @@ class TaskInstance
         if (empty($this->taskName)) {
             throw new \UnexpectedValueException('Task name is not set');
         }
-        if (Agent::$dbReady) {
-            try {
-                $result = Query::query('INSERT INTO `cron__schedule` (`task`, `arguments`, `instance`, `enabled`, `system`, `frequency`, `dayofmonth`, `dayofweek`, `priority`, `message`, `nextrun`) VALUES (:task, :arguments, :instance, :enabled, :system, :frequency, :dayofmonth, :dayofweek, :priority, :message, :nextrun) ON DUPLICATE KEY UPDATE `frequency`=:frequency, `dayofmonth`=:dayofmonth, `dayofweek`=:dayofweek, `nextrun`=IF(:frequency=0, `nextrun`, :nextrun), `priority`=IF(:frequency=0, IF(`priority`>:priority, `priority`, :priority), :priority), `message`=:message, `updated`=CURRENT_TIMESTAMP();', [
-                    ':task' => [$this->taskName, 'string'],
-                    ':arguments' => [$this->arguments, 'string'],
-                    ':instance' => [$this->instance, 'int'],
-                    ':enabled' => [$this->enabled, 'enabled'],
-                    ':system' => [$this->system, 'bool'],
-                    ':frequency' => [(empty($this->frequency) ? 0 : $this->frequency), 'int'],
-                    ':dayofmonth' => [$this->dayofmonth, (empty($this->dayofmonth) ? 'null' : 'string')],
-                    ':dayofweek' => [$this->dayofweek, (empty($this->dayofweek) ? 'null' : 'string')],
-                    ':priority' => [(empty($this->priority) ? 0 : $this->priority), 'int'],
-                    ':message' => [$this->message, (empty($this->message) ? 'null' : 'string')],
-                    ':nextrun' => [$this->nextTime, 'datetime'],
-                ], return: 'affected');
-                $this->foundInDB = true;
-            } catch (\Throwable $e) {
-                Agent::log('Failed to add or update task instance.', 'InstanceAddFail', error: $e, task: $this);
-                return false;
-            }
-            #Log only if something was actually changed
-            if ($result > 0) {
-                Agent::log('Added or updated task instance.', 'InstanceAdd', task: $this);
-            }
-            return true;
+        try {
+            $result = Query::query('INSERT INTO `'.$this->prefix.'schedule` (`task`, `arguments`, `instance`, `enabled`, `system`, `frequency`, `dayofmonth`, `dayofweek`, `priority`, `message`, `nextrun`) VALUES (:task, :arguments, :instance, :enabled, :system, :frequency, :dayofmonth, :dayofweek, :priority, :message, :nextrun) ON DUPLICATE KEY UPDATE `frequency`=:frequency, `dayofmonth`=:dayofmonth, `dayofweek`=:dayofweek, `nextrun`=IF(:frequency=0, `nextrun`, :nextrun), `priority`=IF(:frequency=0, IF(`priority`>:priority, `priority`, :priority), :priority), `message`=:message, `updated`=CURRENT_TIMESTAMP();', [
+                ':task' => [$this->taskName, 'string'],
+                ':arguments' => [$this->arguments, 'string'],
+                ':instance' => [$this->instance, 'int'],
+                ':enabled' => [$this->enabled, 'enabled'],
+                ':system' => [$this->system, 'bool'],
+                ':frequency' => [(empty($this->frequency) ? 0 : $this->frequency), 'int'],
+                ':dayofmonth' => [$this->dayOfMonth, (empty($this->dayOfMonth) ? 'null' : 'string')],
+                ':dayofweek' => [$this->dayOfWeek, (empty($this->dayOfWeek) ? 'null' : 'string')],
+                ':priority' => [(empty($this->priority) ? 0 : $this->priority), 'int'],
+                ':message' => [$this->message, (empty($this->message) ? 'null' : 'string')],
+                ':nextrun' => [$this->nextTime, 'datetime'],
+            ], return: 'affected');
+            $this->foundInDB = true;
+        } catch (\Throwable $e) {
+            $this->log('Failed to add or update task instance.', 'InstanceAddFail', error: $e, task: $this);
+            return false;
         }
-        return false;
+        #Log only if something was actually changed
+        if ($result > 0) {
+            $this->log('Added or updated task instance.', 'InstanceAdd', task: $this);
+        }
+        return true;
     }
     
     /**
@@ -316,38 +302,35 @@ class TaskInstance
         if (empty($this->taskName)) {
             throw new \UnexpectedValueException('Task name is not set');
         }
-        if (Agent::$dbReady) {
+        try {
+            $result = Query::query('DELETE FROM `'.$this->prefix.'schedule` WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance AND `system`=0;', [
+                ':task' => [$this->taskName, 'string'],
+                ':arguments' => [$this->arguments, 'string'],
+                ':instance' => [$this->instance, 'int'],
+            ], return: 'affected');
+            $this->foundInDB = false;
+        } catch (\Throwable $first) {
+            $this->log('Failed to delete task instance.', 'InstanceDeleteFail', error: $first, task: $this);
             try {
-                $result = Query::query('DELETE FROM `cron__schedule` WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance AND `system`=0;', [
+                $result = Query::query('UPDATE `'.$this->prefix.'schedule` SET `status` = 3 WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance AND `system`=0;', [
                     ':task' => [$this->taskName, 'string'],
                     ':arguments' => [$this->arguments, 'string'],
                     ':instance' => [$this->instance, 'int'],
                 ], return: 'affected');
-                $this->foundInDB = false;
-            } catch (\Throwable $first) {
-                Agent::log('Failed to delete task instance.', 'InstanceDeleteFail', error: $first, task: $this);
-                try {
-                    $result = Query::query('UPDATE `cron__schedule` SET `status` = 3 WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance AND `system`=0;', [
-                        ':task' => [$this->taskName, 'string'],
-                        ':arguments' => [$this->arguments, 'string'],
-                        ':instance' => [$this->instance, 'int'],
-                    ], return: 'affected');
-                    #Log only if something was actually deleted, and if it's not a one-time job
-                    if ($result > 0) {
-                        Agent::log('Task instance marked for removal.', 'InstanceDelete', task: $this);
-                    }
-                } catch (\Throwable $second) {
-                    Agent::log('Failed to mark task instance for removal.', 'InstanceDeleteFail', error: $second, task: $this);
+                #Log only if something was actually deleted, and if it's not a one-time job
+                if ($result > 0) {
+                    $this->log('Task instance marked for removal.', 'InstanceDelete', task: $this);
                 }
-                return false;
+            } catch (\Throwable $second) {
+                $this->log('Failed to mark task instance for removal.', 'InstanceDeleteFail', error: $second, task: $this);
             }
-            #Log only if something was actually deleted, and if it's not a one-time job
-            if ($this->frequency > 0 && $result > 0) {
-                Agent::log('Deleted task instance.', 'InstanceDelete', task: $this);
-            }
-            return true;
+            return false;
         }
-        return false;
+        #Log only if something was actually deleted, and if it's not a one-time job
+        if ($this->frequency > 0 && $result > 0) {
+            $this->log('Deleted task instance.', 'InstanceDelete', task: $this);
+        }
+        return true;
     }
     
     /**
@@ -362,25 +345,22 @@ class TaskInstance
         if ($this->frequency === 0) {
             throw new \UnexpectedValueException('One-time job cannot be made system one');
         }
-        if (Agent::$dbReady) {
-            try {
-                $result = Query::query('UPDATE `cron__schedule` SET `system`=1 WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance AND `system`=0;', [
-                    ':task' => [$this->taskName, 'string'],
-                    ':arguments' => [$this->arguments, 'string'],
-                    ':instance' => [$this->instance, 'int'],
-                ], return: 'affected');
-            } catch (\Throwable $e) {
-                Agent::log('Failed to mark task instance as system one.', 'InstanceToSystemFail', error: $e, task: $this);
-                return false;
-            }
-            #Log only if something was actually changed
-            if ($result > 0) {
-                $this->system = true;
-                Agent::log('Marked task instance as system one.', 'InstanceToSystem', task: $this);
-            }
-            return true;
+        try {
+            $result = Query::query('UPDATE `'.$this->prefix.'schedule` SET `system`=1 WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance AND `system`=0;', [
+                ':task' => [$this->taskName, 'string'],
+                ':arguments' => [$this->arguments, 'string'],
+                ':instance' => [$this->instance, 'int'],
+            ], return: 'affected');
+        } catch (\Throwable $e) {
+            $this->log('Failed to mark task instance as system one.', 'InstanceToSystemFail', error: $e, task: $this);
+            return false;
         }
-        return false;
+        #Log only if something was actually changed
+        if ($result > 0) {
+            $this->system = true;
+            $this->log('Marked task instance as system one.', 'InstanceToSystem', task: $this);
+        }
+        return true;
     }
     
     /**
@@ -394,26 +374,23 @@ class TaskInstance
         if (!$this->foundInDB) {
             throw new \UnexpectedValueException('Not found in database.');
         }
-        if (Agent::$dbReady) {
-            try {
-                $result = Query::query('UPDATE `cron__schedule` SET `enabled`=:enabled WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance;', [
-                    ':task' => [$this->taskName, 'string'],
-                    ':arguments' => [$this->arguments, 'string'],
-                    ':instance' => [$this->instance, 'int'],
-                    ':enabled' => [$enabled, 'bool'],
-                ], return: 'affected');
-            } catch (\Throwable $e) {
-                Agent::log('Failed to '.($enabled ? 'enable' : 'disable').' task instance.', 'Instance'.($enabled ? 'Enable' : 'Disable').'Fail', error: $e, task: $this);
-                return false;
-            }
-            #Log only if something was actually changed
-            if ($result > 0) {
-                $this->enabled = $enabled;
-                Agent::log(($enabled ? 'Enabled' : 'Disabled').' task instance.', 'Instance'.($enabled ? 'Enable' : 'Disable'), task: $this);
-            }
-            return true;
+        try {
+            $result = Query::query('UPDATE `'.$this->prefix.'schedule` SET `enabled`=:enabled WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance;', [
+                ':task' => [$this->taskName, 'string'],
+                ':arguments' => [$this->arguments, 'string'],
+                ':instance' => [$this->instance, 'int'],
+                ':enabled' => [$enabled, 'bool'],
+            ], return: 'affected');
+        } catch (\Throwable $e) {
+            $this->log('Failed to '.($enabled ? 'enable' : 'disable').' task instance.', 'Instance'.($enabled ? 'Enable' : 'Disable').'Fail', error: $e, task: $this);
+            return false;
         }
-        return false;
+        #Log only if something was actually changed
+        if ($result > 0) {
+            $this->enabled = $enabled;
+            $this->log(($enabled ? 'Enabled' : 'Disabled').' task instance.', 'Instance'.($enabled ? 'Enable' : 'Disable'), task: $this);
+        }
+        return true;
     }
     
     /**
@@ -423,45 +400,40 @@ class TaskInstance
      * @param string|float|int|\DateTime|\DateTimeImmutable|null $timestamp Optional timestamp to use
      *
      * @return bool
-     * @throws \DateMalformedStringException
-     * @throws \JsonException
      */
     public function reSchedule(bool $result = true, string|float|int|\DateTime|\DateTimeImmutable|null $timestamp = null): bool
     {
         if (!$this->foundInDB) {
             throw new \UnexpectedValueException('Not found in database.');
         }
-        if (Agent::$dbReady) {
-            #Check whether this is a successful one-time job
-            if ($this->frequency === 0 && $result) {
-                #Since this is a one-time task, we can just remove it
-                return $this->delete();
-            }
-            #Determine a new time
-            if (empty($timestamp)) {
-                $time = $this->updateNextRun($result);
-            } else {
-                $time = SandClock::valueToDateTime($timestamp);
-            }
-            #Actually reschedule. One task time task will be rescheduled for the retry time from settings
-            try {
-                $affected = Query::query('UPDATE `cron__schedule` SET `status`=0, `runby`=NULL, `sse`=0, `nextrun`=:time, `'.($result ? 'lastsuccess' : 'lasterror').'`=CURRENT_TIMESTAMP() WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance;', [
-                    ':time' => [$time, 'datetime'],
-                    ':task' => [$this->taskName, 'string'],
-                    ':arguments' => [$this->arguments, 'string'],
-                    ':instance' => [$this->instance, 'int'],
-                ], return: 'affected');
-            } catch (\Throwable $e) {
-                Agent::log('Failed to reschedule task instance for '.SandClock::format($time, 'c').'.', 'RescheduleFail', error: $e, task: $this);
-                return false;
-            }
-            #Log only if something was actually changed
-            if ($affected > 0) {
-                Agent::log('Task instance rescheduled for '.SandClock::format($time, 'c').'.', 'Reschedule', task: $this);
-            }
-            return $result;
+        #Check whether this is a successful one-time job
+        if ($this->frequency === 0 && $result) {
+            #Since this is a one-time task, we can just remove it
+            return $this->delete();
         }
-        return false;
+        #Determine a new time
+        if (empty($timestamp)) {
+            $time = $this->updateNextRun($result);
+        } else {
+            $time = SandClock::valueToDateTime($timestamp);
+        }
+        #Actually reschedule. One task time task will be rescheduled for the retry time from settings
+        try {
+            $affected = Query::query('UPDATE `'.$this->prefix.'schedule` SET `status`=0, `runby`=NULL, `sse`=0, `nextrun`=:time, `'.($result ? 'lastsuccess' : 'lasterror').'`=CURRENT_TIMESTAMP() WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance;', [
+                ':time' => [$time, 'datetime'],
+                ':task' => [$this->taskName, 'string'],
+                ':arguments' => [$this->arguments, 'string'],
+                ':instance' => [$this->instance, 'int'],
+            ], return: 'affected');
+        } catch (\Throwable $e) {
+            $this->log('Failed to reschedule task instance for '.SandClock::format($time, 'c').'.', 'RescheduleFail', error: $e, task: $this);
+            return false;
+        }
+        #Log only if something was actually changed
+        if ($affected > 0) {
+            $this->log('Task instance rescheduled for '.SandClock::format($time, 'c').'.', 'Reschedule', task: $this);
+        }
+        return $result;
     }
     
     /**
@@ -473,42 +445,38 @@ class TaskInstance
     public function run(): bool
     {
         #If runBy value is empty (a job is being run manually) - generate it
-        if (empty($this->runby)) {
-            $this->runby = Agent::generateRunBy();
+        if (empty($this->runBy)) {
+            $this->runBy = $this->generateRunBy();
         }
-        Agent::setCurrentTask($this);
         if (!$this->foundInDB) {
             #Assume that it was a [one-time job], that has already been run and removed by another (possibly manual) process
-            Agent::setCurrentTask(null);
             return true;
         }
         if ($this->nextTime !== SandClock::suggestNextDay($this->nextTime,
-                (!empty($this->dayofweek) ? json_decode($this->dayofweek, flags: JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_BIGINT_AS_STRING | JSON_OBJECT_AS_ARRAY) : []),
-                (!empty($this->dayofmonth) ? json_decode($this->dayofmonth, flags: JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_BIGINT_AS_STRING | JSON_OBJECT_AS_ARRAY) : []))
+                (!empty($this->dayOfWeek) ? json_decode($this->dayOfWeek, flags: JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_BIGINT_AS_STRING | JSON_OBJECT_AS_ARRAY) : []),
+                (!empty($this->dayOfMonth) ? json_decode($this->dayOfMonth, flags: JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_BIGINT_AS_STRING | JSON_OBJECT_AS_ARRAY) : []))
         ) {
             #Register error.
-            Agent::log('Attempted to run function during forbidden day of week or day of month.', 'InstanceFail', task: $this);
+            $this->log('Attempted to run function during forbidden day of week or day of month.', 'InstanceFail', task: $this);
             $this->reSchedule(false);
-            Agent::setCurrentTask(null);
             return false;
         }
         #Set the time limit for the task
         set_time_limit($this->taskObject->maxTime);
         #Update last run
-        $affected = Query::query('UPDATE `cron__schedule` SET `status`=2, `runby`=:runby, `lastrun` = CURRENT_TIMESTAMP() WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance AND `status` IN (0, 1);', [
+        $affected = Query::query('UPDATE `'.$this->prefix.'schedule` SET `status`=2, `runby`=:runby, `lastrun` = CURRENT_TIMESTAMP() WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance AND `status` IN (0, 1);', [
             ':task' => [$this->taskName, 'string'],
             ':arguments' => [$this->arguments, 'string'],
             ':instance' => [$this->instance, 'int'],
-            ':runby' => [$this->runby, 'string'],
+            ':runby' => [$this->runBy, 'string'],
         ], return: 'affected');
         if ($affected <= 0) {
             #The task was either picked up by some manual process or has been removed
-            Agent::setCurrentTask(null);
             return true;
         }
         #Decode allowed returns if any
         if (!empty($this->taskObject->returns)) {
-            $allowedreturns = json_decode($this->taskObject->returns, flags: JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_BIGINT_AS_STRING | JSON_OBJECT_AS_ARRAY);
+            $allowedReturns = json_decode($this->taskObject->returns, flags: JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_BIGINT_AS_STRING | JSON_OBJECT_AS_ARRAY);
         }
         try {
             $function = $this->functionCreation();
@@ -526,22 +494,21 @@ class TaskInstance
         #Validate result
         if ($result !== true) {
             #Check if it's an allowed return value
-            if (!empty($allowedreturns)) {
-                if (in_array($result, $allowedreturns, true)) {
+            if (!empty($allowedReturns)) {
+                if (in_array($result, $allowedReturns, true)) {
                     #Override the value
                     $result = true;
                 } else {
-                    Agent::log('Unexpected return `'.json_encode($result, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION).'`.', 'InstanceFail', task: $this);
+                    $this->log('Unexpected return `'.json_encode($result, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION).'`.', 'InstanceFail', task: $this);
                     $result = false;
                 }
             } elseif ($result !== false) {
-                Agent::log('Unexpected return `'.json_encode($result, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION).'`.', 'InstanceFail', task: $this);
+                $this->log('Unexpected return `'.json_encode($result, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION).'`.', 'InstanceFail', task: $this);
                 $result = false;
             }
         }
         #Reschedule
         $this->reSchedule($result);
-        Agent::setCurrentTask(null);
         #Return
         return $result;
     }
@@ -612,8 +579,6 @@ class TaskInstance
      * @param bool $result Flag to determine if we are determining a new time for a successful job (`true`, default) or failed one
      *
      * @return \DateTimeImmutable
-     * @throws \JsonException
-     * @throws \DateMalformedStringException
      */
     public function updateNextRun(bool $result = true): \DateTimeImmutable
     {
@@ -625,27 +590,42 @@ class TaskInstance
             $this->nextTime = $currentTime;
         }
         if (!$result && $this->taskObject->retry && $this->taskObject->retry > 0) {
-            $newTime = $this->nextTime->modify('+'.$this->taskObject->retry.' seconds');
+            try {
+                $newTime = $this->nextTime->modify('+'.$this->taskObject->retry.' seconds');
+            } catch (\DateMalformedStringException) {
+                #We should not get here, since the value is not from the user, and there are validations on earlier steps, this is just a failback
+                $newTime = $currentTime;
+            }
         } else {
             #Determine minimum seconds to move the time by
             if ($this->frequency > 0) {
                 $seconds = $this->frequency;
             } else {
-                $seconds = Agent::$retry;
+                $seconds = $this->oneTimeRetry;
             }
             #Determine the time difference between current time and run time that was initially set
             $timeDiff = $currentTime->getTimestamp() - $this->nextTime->getTimestamp();
             #Determine how many runs (based on frequency) could have happened within the time difference, essentially to "skip" over the missed runs
             $possibleRuns = (int)ceil($timeDiff / $seconds);
             #Increase time value by
-            $newTime = $this->nextTime->modify('+'.(max($possibleRuns, 1) * $seconds).' seconds');
+            try {
+                $newTime = $this->nextTime->modify('+'.(max($possibleRuns, 1) * $seconds).' seconds');
+            } catch (\DateMalformedStringException) {
+                #We should not get here, since the value is not from the user, and there are validations on earlier steps, this is just a failback
+                $newTime = $currentTime;
+            }
         }
-        if (empty($this->dayofmonth) && empty($this->dayofweek)) {
+        if (empty($this->dayOfMonth) && empty($this->dayOfWeek)) {
             return $newTime;
         }
         #Check if the new time will satisfy day of week/month requirements
-        return SandClock::suggestNextDay($newTime,
-            (!empty($this->dayofweek) ? json_decode($this->dayofweek, flags: JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_BIGINT_AS_STRING | JSON_OBJECT_AS_ARRAY) : []),
-            (!empty($this->dayofmonth) ? json_decode($this->dayofmonth, flags: JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_BIGINT_AS_STRING | JSON_OBJECT_AS_ARRAY) : []));
+        try {
+            return SandClock::suggestNextDay($newTime,
+                (!empty($this->dayOfWeek) ? json_decode($this->dayOfWeek, flags: JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_BIGINT_AS_STRING | JSON_OBJECT_AS_ARRAY) : []),
+                (!empty($this->dayOfMonth) ? json_decode($this->dayOfMonth, flags: JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_BIGINT_AS_STRING | JSON_OBJECT_AS_ARRAY) : []));
+        } catch (\Throwable) {
+            #We should not get here, since the value is not from the user, and there are validations on earlier steps, this is just a failback
+            return $currentTime;
+        }
     }
 }

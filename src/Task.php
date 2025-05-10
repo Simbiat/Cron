@@ -11,6 +11,8 @@ use function is_string, is_array;
  */
 class Task
 {
+    use TraitForCron;
+    
     /**
      * @var string Unique name of the task
      */
@@ -128,17 +130,12 @@ class Task
      *
      * @param string    $taskName If the name is not empty, settings will be attempts to be loaded from the database
      * @param \PDO|null $dbh      PDO object to use for database connection. If not provided, the class expects that the connection has already been established through `\Simbiat\Cron\Agent`.
-     *
-     * @throws \JsonException
-     * @throws \Exception
+     * @param string    $prefix   Cron database prefix.
      */
-    public function __construct(string $taskName = '', \PDO|null $dbh = null)
+    public function __construct(string $taskName = '', \PDO|null $dbh = null, string $prefix = 'cron__')
     {
-        #Ensure that Cron management is created to establish DB connection and settings
-        if (!Agent::$dbReady) {
-            new Agent($dbh);
-        }
-        if (!empty($taskName) && Agent::$dbReady) {
+        $this->init($dbh, $prefix);
+        if (!empty($taskName)) {
             $this->taskName = $taskName;
             #Attempt to get settings from DB
             $this->getFromDB();
@@ -149,19 +146,16 @@ class Task
      * Get task settings from database
      *
      * @return void
-     * @throws \JsonException
      */
     private function getFromDB(): void
     {
-        if (Agent::$dbReady) {
-            $settings = Query::query('SELECT * FROM `cron__tasks` WHERE `task`=:name;', [':name' => $this->taskName], return: 'row');
-            if (!empty($settings)) {
-                $this->settingsFromArray($settings);
-                if (empty($this->function)) {
-                    throw new \UnexpectedValueException('Task has no assigned function');
-                }
-                $this->foundInDB = true;
+        $settings = Query::query('SELECT * FROM `'.$this->prefix.'tasks` WHERE `task`=:name;', [':name' => $this->taskName], return: 'row');
+        if (!empty($settings)) {
+            $this->settingsFromArray($settings);
+            if (empty($this->function)) {
+                throw new \UnexpectedValueException('Task has no assigned function');
             }
+            $this->foundInDB = true;
         }
     }
     
@@ -169,7 +163,6 @@ class Task
      * Set task settings from associative array
      *
      * @return $this
-     * @throws \JsonException
      */
     public function settingsFromArray(array $settings): self
     {
@@ -227,34 +220,31 @@ class Task
         if (empty($this->function)) {
             throw new \UnexpectedValueException('Function name is not set');
         }
-        if (Agent::$dbReady) {
-            try {
-                $taskDetailsString = json_encode($this, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION);
-                $result = Query::query('INSERT INTO `cron__tasks` (`task`, `function`, `object`, `parameters`, `allowedreturns`, `maxTime`, `minFrequency`, `retry`, `enabled`, `system`, `description`) VALUES (:task, :function, :object, :parameters, :returns, :maxTime, :minFrequency, :retry, :enabled, :system, :desc) ON DUPLICATE KEY UPDATE `function`=:function, `object`=:object, `parameters`=:parameters, `allowedreturns`=:returns, `maxTime`=:maxTime, `minFrequency`=:minFrequency, `retry`=:retry, `description`=:desc;', [
-                    ':task' => [$this->taskName, 'string'],
-                    ':function' => [$this->function, 'string'],
-                    ':object' => [$this->object, (empty($this->object) ? 'null' : 'string')],
-                    ':parameters' => [$this->parameters, (empty($this->parameters) ? 'null' : 'string')],
-                    ':returns' => [$this->returns, (empty($this->returns) ? 'null' : 'string')],
-                    ':maxTime' => [$this->maxTime, 'int'],
-                    ':minFrequency' => [$this->minFrequency, 'int'],
-                    ':retry' => [$this->retry, 'int'],
-                    ':enabled' => [$this->enabled, 'bool'],
-                    ':system' => [$this->system, 'bool'],
-                    ':desc' => [$this->description, (empty($this->description) ? 'null' : 'string')],
-                ], return: 'affected');
-                $this->foundInDB = true;
-            } catch (\Throwable $e) {
-                Agent::log('Failed to add or update task with following details: '.$taskDetailsString.'.', 'TaskAddFail', error: $e);
-                return false;
-            }
-            #Log only if something was actually changed
-            if ($result > 0) {
-                Agent::log('Added or updated task with following details: '.$taskDetailsString.'.', 'TaskAdd');
-            }
-            return true;
+        try {
+            $taskDetailsString = json_encode($this, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION);
+            $result = Query::query('INSERT INTO `'.$this->prefix.'tasks` (`task`, `function`, `object`, `parameters`, `allowedreturns`, `maxTime`, `minFrequency`, `retry`, `enabled`, `system`, `description`) VALUES (:task, :function, :object, :parameters, :returns, :maxTime, :minFrequency, :retry, :enabled, :system, :desc) ON DUPLICATE KEY UPDATE `function`=:function, `object`=:object, `parameters`=:parameters, `allowedreturns`=:returns, `maxTime`=:maxTime, `minFrequency`=:minFrequency, `retry`=:retry, `description`=:desc;', [
+                ':task' => [$this->taskName, 'string'],
+                ':function' => [$this->function, 'string'],
+                ':object' => [$this->object, (empty($this->object) ? 'null' : 'string')],
+                ':parameters' => [$this->parameters, (empty($this->parameters) ? 'null' : 'string')],
+                ':returns' => [$this->returns, (empty($this->returns) ? 'null' : 'string')],
+                ':maxTime' => [$this->maxTime, 'int'],
+                ':minFrequency' => [$this->minFrequency, 'int'],
+                ':retry' => [$this->retry, 'int'],
+                ':enabled' => [$this->enabled, 'bool'],
+                ':system' => [$this->system, 'bool'],
+                ':desc' => [$this->description, (empty($this->description) ? 'null' : 'string')],
+            ], return: 'affected');
+            $this->foundInDB = true;
+        } catch (\Throwable $e) {
+            $this->log('Failed to add or update task with following details: '.$taskDetailsString.'.', 'TaskAddFail', error: $e);
+            return false;
         }
-        return false;
+        #Log only if something was actually changed
+        if ($result > 0) {
+            $this->log('Added or updated task with following details: '.$taskDetailsString.'.', 'TaskAdd');
+        }
+        return true;
     }
     
     /**
@@ -267,23 +257,20 @@ class Task
         if (empty($this->taskName)) {
             throw new \UnexpectedValueException('Task name is not set');
         }
-        if (Agent::$dbReady) {
-            try {
-                $result = Query::query('DELETE FROM `cron__tasks` WHERE `task`=:task AND `system`=0;', [
-                    ':task' => [$this->taskName, 'string'],
-                ], return: 'affected');
-                $this->foundInDB = false;
-            } catch (\Throwable $e) {
-                Agent::log('Failed delete task `'.$this->taskName.'`.', 'TaskDeleteFail', error: $e);
-                return false;
-            }
-            #Log only if something was actually deleted
-            if ($result > 0) {
-                Agent::log('Deleted task  `'.$this->taskName.'`.', 'TaskDelete');
-            }
-            return true;
+        try {
+            $result = Query::query('DELETE FROM `'.$this->prefix.'tasks` WHERE `task`=:task AND `system`=0;', [
+                ':task' => [$this->taskName, 'string'],
+            ], return: 'affected');
+            $this->foundInDB = false;
+        } catch (\Throwable $e) {
+            $this->log('Failed delete task `'.$this->taskName.'`.', 'TaskDeleteFail', error: $e);
+            return false;
         }
-        return false;
+        #Log only if something was actually deleted
+        if ($result > 0) {
+            $this->log('Deleted task  `'.$this->taskName.'`.', 'TaskDelete');
+        }
+        return true;
     }
     
     /**
@@ -295,19 +282,19 @@ class Task
         if (empty($this->taskName)) {
             throw new \UnexpectedValueException('Task name is not set');
         }
-        if (Agent::$dbReady && $this->foundInDB) {
+        if ($this->foundInDB) {
             try {
-                $result = Query::query('UPDATE `cron__tasks` SET `system`=1 WHERE `task`=:task AND `system`=0;', [
+                $result = Query::query('UPDATE `'.$this->prefix.'tasks` SET `system`=1 WHERE `task`=:task AND `system`=0;', [
                     ':task' => [$this->taskName, 'string'],
                 ], return: 'affected');
             } catch (\Throwable $e) {
-                Agent::log('Failed to mark task `'.$this->taskName.'` as system one.', 'TaskToSystemFail', error: $e);
+                $this->log('Failed to mark task `'.$this->taskName.'` as system one.', 'TaskToSystemFail', error: $e);
                 return false;
             }
             #Log only if something was actually changed
             if ($result > 0) {
                 $this->system = true;
-                Agent::log('Marked task `'.$this->taskName.'` as system one.', 'TaskToSystem');
+                $this->log('Marked task `'.$this->taskName.'` as system one.', 'TaskToSystem');
             }
             return true;
         }
@@ -325,20 +312,20 @@ class Task
         if (empty($this->taskName)) {
             throw new \UnexpectedValueException('Task name is not set');
         }
-        if (Agent::$dbReady && $this->foundInDB) {
+        if ($this->foundInDB) {
             try {
-                $result = Query::query('UPDATE `cron__tasks` SET `enabled`=:enabled WHERE `task`=:task;', [
+                $result = Query::query('UPDATE `'.$this->prefix.'tasks` SET `enabled`=:enabled WHERE `task`=:task;', [
                     ':task' => [$this->taskName, 'string'],
                     ':enabled' => [$enabled, 'bool'],
                 ], return: 'affected');
             } catch (\Throwable $e) {
-                Agent::log('Failed to '.($enabled ? 'enable' : 'disable').' task.', 'Task'.($enabled ? 'Enable' : 'Disable').'Fail', error: $e);
+                $this->log('Failed to '.($enabled ? 'enable' : 'disable').' task.', 'Task'.($enabled ? 'Enable' : 'Disable').'Fail', error: $e);
                 return false;
             }
             #Log only if something was actually changed
             if ($result > 0) {
                 $this->enabled = $enabled;
-                Agent::log(($enabled ? 'Enabled' : 'Disabled').' task.', 'Task'.($enabled ? 'Enable' : 'Disable'));
+                $this->log(($enabled ? 'Enabled' : 'Disabled').' task.', 'Task'.($enabled ? 'Enable' : 'Disable'));
             }
             return true;
         }

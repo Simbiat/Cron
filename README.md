@@ -7,10 +7,10 @@
     * [Tasks management](#tasks-management)
         + [Adding a task](#adding-a-task)
         + [Deleting a task](#deleting-a-task)
-        + [Setting task as system](#setting-task-as-system)
+        + [Setting task as system](#setting-a-task-as-a-system-one)
     * [Scheduling](#scheduling)
         + [Adding a task instance](#adding-a-task-instance)
-        + [Removing task from schedule](#removing-task-from-schedule)
+        + [Removing task from schedule](#removing-a-task-from-the-schedule)
         + [Setting task instance as system](#setting-task-instance-as-system)
         + [Manual task instance trigger](#manual-task-instance-trigger)
         + [Manual task instance rescheduling](#manual-task-instance-rescheduling)
@@ -148,7 +148,7 @@ If you are creating a task from scratch, then just pass `enabled` setting set to
 (new \Simbiat\Cron\Task('taskName'))->setEnabled(bool $enabled = true);
 ```
 
-### Setting a task as a system
+### Setting a task as a system one
 
 If you are creating a task from scratch, then just pass `system` setting set to `1` in the settings array. If it's an existing task, do this:
 
@@ -317,8 +317,10 @@ You might have noticed that among the event types there are a few starting with 
 To log events call
 
 ```php
-\Simbiat\Cron\Agent::log(string $message, string $event, bool $endStream = false, ?\Throwable $error = null, ?TaskInstance $task = null);
+(new \Simbiat\Cron\Agent)->log(string $message, string $event, bool $endStream = false, ?\Throwable $error = null, ?TaskInstance $task = null);
 ```
+
+Instead of `Agent` you can use `Task` or `TaskInstance`, since `log` is part of a `TrainForCron` and is available in all of them.
 
 `$message` is the text of your message you want to send.  
 `$event` is the event type.  
