@@ -7,7 +7,7 @@ use Simbiat\Database\Manage;
 use Simbiat\Database\Query;
 
 /**
- * Task scheduler that uses MySQL/MariaDB database to store tasks and their schedule.
+ * Installer class for CRON library.
  */
 class Installer
 {
