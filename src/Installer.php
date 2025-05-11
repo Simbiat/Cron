@@ -328,9 +328,6 @@ class Installer
      */
     public function getVersion(): string
     {
-        if (!class_exists(Manage::class)) {
-            throw new \RuntimeException('Cron requires `\Simbiat\Database\Manage` class to be automatically installed or updated.');
-        }
         #Check if the settings table exists
         if (Manage::checkTable($this->prefix.'settings') === 1) {
             #Assume that we have installed the database, try to get the version

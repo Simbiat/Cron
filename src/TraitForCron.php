@@ -27,7 +27,7 @@ trait TraitForCron
             if (preg_match('/^[\w\-]{0,53}$/u', $value) === 1) {
                 $this->prefix = $value;
             } else {
-                throw new \InvalidArgumentException('Invalid database prefix');
+                throw new \UnexpectedValueException('Invalid database prefix');
             }
         }
     }
