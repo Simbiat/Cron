@@ -19,10 +19,18 @@ trait TraitForCron
      */
     private(set) \PDO|null $dbh = null;
     /**
-     * PDO Cron database prefix.
+     * PDO Cron database prefix. Only Latin characters, underscores, dashes and numbers are allowed. Maximum 53 symbols.
      * @var string
      */
-    private(set) string $prefix = 'cron__';
+    private(set) string $prefix = 'cron__' {
+        set {
+            if (preg_match('/^[\w\-]{0,53}$/u', $value) === 1) {
+                $this->prefix = $value;
+            } else {
+                throw new \InvalidArgumentException('Invalid database prefix');
+            }
+        }
+    }
     /**
      * Flag to indicate whether Cron is enabled
      * @var bool
