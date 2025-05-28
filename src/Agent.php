@@ -43,6 +43,7 @@ class Agent
      * @param int $items Number of items to process
      *
      * @return bool
+     * @throws \Throwable
      */
     public function process(int $items = 1): bool
     {
@@ -259,6 +260,7 @@ class Agent
      * Function to reschedule hanged jobs
      *
      * @return bool
+     * @throws \Throwable
      */
     public function unHang(): bool
     {
@@ -270,7 +272,14 @@ class Agent
         $tasks = Query::query('SELECT `task`, `arguments`, `instance`, `frequency` FROM `'.$this->prefix.'schedule` as `a` WHERE `runby` IS NOT NULL AND CURRENT_TIMESTAMP()>DATE_ADD(IF(`lastrun` IS NOT NULL, `lastrun`, `nextrun`), INTERVAL (SELECT `maxTime` FROM `'.$this->prefix.'tasks` WHERE `'.$this->prefix.'tasks`.`task`=`a`.`task`) SECOND);', return: 'all');
         foreach ($tasks as $task) {
             #If this was a one-time task, schedule it for right now, to avoid delaying it for double the time.
-            new TaskInstance($task['task'], $task['arguments'], $task['instance'])->reSchedule(false);
+            try {
+                new TaskInstance($task['task'], $task['arguments'], $task['instance'])->reSchedule(false);
+            } catch (\Throwable $exception) {
+                #If the instance was not found in the database, it was probably deleted, so we can safely ignore the error.
+                if ($exception->getMessage() !== 'Not found in database.') {
+                    throw $exception;
+                }
+            }
         }
         return true;
     }
