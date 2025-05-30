@@ -313,8 +313,6 @@ class Installer
         if (empty($sql)) {
             return true;
         }
-        #Split file content into queries
-        $sql = Query::stringToQueries($sql);
         try {
             return Query::query($sql);
         } catch (\Throwable $e) {
