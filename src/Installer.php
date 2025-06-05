@@ -44,7 +44,7 @@ class Installer
         $version = $this->getVersion();
         #Generate SQL to run
         $sql = '';
-        if (version_compare(basename('1.0.0', '.sql'), $version, 'gt')) {
+        if (version_compare('1.0.0', $version, 'gt')) {
             $sql .= 'CREATE TABLE IF NOT EXISTS `'.$this->prefix.'settings`
                     (
                         `setting`     varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT \'Name of the setting\',
@@ -125,17 +125,17 @@ class Installer
                     ALTER TABLE `'.$this->prefix.'schedule`
                         ADD CONSTRAINT `schedule_to_task` FOREIGN KEY (`task`) REFERENCES `'.$this->prefix.'tasks` (`task`) ON DELETE CASCADE ON UPDATE CASCADE;';
         }
-        if (version_compare(basename('1.1.0', '.sql'), $version, 'gt')) {
+        if (version_compare('1.1.0', $version, 'gt')) {
             $sql .= 'INSERT IGNORE INTO `'.$this->prefix.'settings` (`setting`, `value`, `description`) VALUES (\'maxthreads\', 4, \'Maximum number of simultaneous threads to run\');';
         }
-        if (version_compare(basename('1.1.7', '.sql'), $version, 'gt')) {
+        if (version_compare('1.1.7', $version, 'gt')) {
             $sql .= 'ALTER TABLE `'.$this->prefix.'schedule` CHANGE `arguments` `arguments` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT \'Optional task arguments\';';
         }
-        if (version_compare(basename('1.1.8', '.sql'), $version, 'gt')) {
+        if (version_compare('1.1.8', $version, 'gt')) {
             $sql .= 'ALTER TABLE `'.$this->prefix.'schedule` ADD INDEX `arguments` (`arguments`) USING BTREE;
                     ALTER TABLE `'.$this->prefix.'errors` ADD CONSTRAINT `errors_to_arguments` FOREIGN KEY (`arguments`) REFERENCES `'.$this->prefix.'schedule` (`arguments`) ON DELETE CASCADE ON UPDATE CASCADE;';
         }
-        if (version_compare(basename('1.1.12', '.sql'), $version, 'gt')) {
+        if (version_compare('1.1.12', $version, 'gt')) {
             $sql .= 'ALTER TABLE `'.$this->prefix.'schedule` CHANGE `arguments` `arguments` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT \'\' COMMENT \'Optional arguments in JSON string\';
                     ALTER TABLE `'.$this->prefix.'schedule` DROP INDEX `task`, ADD PRIMARY KEY (`task`, `arguments`) USING BTREE;
                     ALTER TABLE `'.$this->prefix.'errors` CHANGE `arguments` `arguments` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT \'\' COMMENT \'Optional task arguments\';
@@ -143,19 +143,19 @@ class Installer
                     ALTER TABLE `'.$this->prefix.'errors` DROP INDEX `task`, ADD PRIMARY KEY (`task`, `arguments`) USING BTREE;
                     ALTER TABLE `'.$this->prefix.'errors` CHANGE `task` `task` VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT \'\\\'\\\'\' COMMENT \'Optional task ID\' FIRST, CHANGE `arguments` `arguments` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT \'\\\'\\\'\' COMMENT \'Optional task arguments\' AFTER `task`;';
         }
-        if (version_compare(basename('1.1.14', '.sql'), $version, 'gt')) {
+        if (version_compare('1.1.14', $version, 'gt')) {
             $sql .= 'UPDATE `'.$this->prefix.'settings` SET `setting`=\'errorLife\' WHERE `setting` = \'errorlife\';
                     UPDATE `'.$this->prefix.'settings` SET `setting`=\'maxTime\' WHERE `setting` = \'maxtime\';
                     UPDATE `'.$this->prefix.'settings` SET `setting`=\'maxThreads\' WHERE `setting` = \'maxthreads\';';
         }
-        if (version_compare(basename('1.2.0', '.sql'), $version, 'gt')) {
+        if (version_compare('1.2.0', $version, 'gt')) {
             $sql .= 'ALTER TABLE `'.$this->prefix.'schedule` ADD `sse` TINYINT(1) UNSIGNED NOT NULL DEFAULT \'0\' COMMENT \'Flag to indicate whether job is being ran by SSE call.\' AFTER `runby`;';
         }
-        if (version_compare(basename('1.3.0', '.sql'), $version, 'gt')) {
+        if (version_compare('1.3.0', $version, 'gt')) {
             $sql .= 'ALTER TABLE `'.$this->prefix.'tasks` ADD `maxTime` INT(10) UNSIGNED NOT NULL DEFAULT \'3600\' COMMENT \'Maximum time allowed for the task to run. If exceeded, it will be terminated by PHP.\' AFTER `allowedreturns`;
-                    DELETE FROM `'.$this->prefix.'settings` WHERE `'.$this->prefix.'settings`.`setting` = \'maxTime\';';
+                    DELETE FROM `'.$this->prefix.'settings` WHERE `setting` = \'maxTime\';';
         }
-        if (version_compare(basename('1.5.0', '.sql'), $version, 'gt')) {
+        if (version_compare('1.5.0', $version, 'gt')) {
             $sql .= 'ALTER TABLE `'.$this->prefix.'errors` CHANGE `time` `time` DATETIME(6) on update CURRENT_TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT \'Time the error occurred\';
                     ALTER TABLE `'.$this->prefix.'schedule`
                         CHANGE `registered` `registered` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT \'When the job was initially registered\',
@@ -165,7 +165,7 @@ class Installer
                         CHANGE `lastsuccess` `lastsuccess` DATETIME(6) NULL DEFAULT NULL COMMENT \'Time of the last successful run\',
                         CHANGE `lasterror` `lasterror` DATETIME(6) NULL DEFAULT NULL COMMENT \'Time of the last error\';';
         }
-        if (version_compare(basename('2.0.0', '.sql'), $version, 'gt')) {
+        if (version_compare('2.0.0', $version, 'gt')) {
             $sql .= 'ALTER TABLE `'.$this->prefix.'tasks` ADD `system` TINYINT(1) UNSIGNED NOT NULL DEFAULT \'0\' COMMENT \'Flag indicating that task is system and can\\\'t be deleted from Cron\\Task class\' AFTER `maxTime`;
                     ALTER TABLE `'.$this->prefix.'schedule` ADD `system` TINYINT(1) UNSIGNED NOT NULL DEFAULT \'0\' COMMENT \'Flag indicating whether a task instance is system one and can\\\'t be deleted from Cron\\Schedule class\' AFTER `arguments`;
                     ALTER TABLE `'.$this->prefix.'schedule` ADD `instance` INT(10) UNSIGNED NOT NULL DEFAULT \'1\' COMMENT \'Instance number of the task\' AFTER `arguments`;
@@ -217,17 +217,17 @@ class Installer
                     ALTER TABLE `'.$this->prefix.'log` CHANGE `text` `message` TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_nopad_ci NOT NULL COMMENT \'Error for the text\';
                     ALTER TABLE `'.$this->prefix.'log` ADD `sse` TINYINT(1) UNSIGNED NOT NULL DEFAULT \'0\' COMMENT \'Flag to indicate whether task was being ran by SSE call\' AFTER `runby`;
                     TRUNCATE `'.$this->prefix.'log`;
-                    UPDATE `'.$this->prefix.'settings` SET `setting`     = \'logLife\', `description` = \'Days to keep messages in log. Older records will be removed on next CRON process.\' WHERE `'.$this->prefix.'settings`.`setting` = \'errorLife\';
+                    UPDATE `'.$this->prefix.'settings` SET `setting`     = \'logLife\', `description` = \'Days to keep messages in log. Older records will be removed on next CRON process.\' WHERE `setting` = \'errorLife\';
                     ALTER TABLE `'.$this->prefix.'log` ADD INDEX `time_desc` (`time` DESC) USING BTREE;
                     ALTER TABLE `'.$this->prefix.'log` ADD INDEX `type` (`type`) USING BTREE;
                     ALTER TABLE `'.$this->prefix.'log` ADD INDEX `runby` (`runby`) USING BTREE;
                     ALTER TABLE `'.$this->prefix.'log` ADD INDEX `task` (`task`) USING BTREE;';
         }
-        if (version_compare(basename('2.1.2', '.sql'), $version, 'gt')) {
+        if (version_compare('2.1.2', $version, 'gt')) {
             $sql .= 'ALTER TABLE `'.$this->prefix.'settings` CHANGE `value` `value` VARCHAR(10) NULL DEFAULT NULL COMMENT \'Value of the setting\';
                     INSERT IGNORE INTO `'.$this->prefix.'settings` (`setting`, `value`, `description`) VALUES (\'version\', \'2.1.2\', \'Version of cron database, based on release version in which it was last modified\');';
         }
-        if (version_compare(basename('2.2.0', '.sql'), $version, 'gt')) {
+        if (version_compare('2.2.0', $version, 'gt')) {
             $sql .= 'ALTER TABLE `'.$this->prefix.'log` CHANGE `message` `message` TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_nopad_ci NOT NULL COMMENT \'Message provided by the event\';
                     ALTER TABLE `'.$this->prefix.'tasks` ADD `minFrequency` INT(10) UNSIGNED NOT NULL DEFAULT \'60\' COMMENT \'Minimal allowed frequency (in seconds) at which a task instance can run. Does not apply to one-time jobs.\' AFTER `maxTime`;
                     ALTER TABLE `'.$this->prefix.'tasks` ADD `retry` INT UNSIGNED NOT NULL DEFAULT \'0\' COMMENT \'Custom number of seconds to reschedule a failed task instance for. 0 disables the functionality.\' AFTER `minFrequency`;
@@ -267,13 +267,13 @@ class Installer
                     INSERT INTO `'.$this->prefix.'event_types` (`type`, `description`) VALUES (\'InstanceDisableFail\', \'Failed to disable task instance.\');
                     ALTER TABLE `'.$this->prefix.'tasks` ADD INDEX(`enabled`);
                     ALTER TABLE `'.$this->prefix.'schedule` ADD INDEX(`enabled`);
-                    UPDATE `'.$this->prefix.'settings` SET `value` = \'2.2.0\' WHERE `'.$this->prefix.'settings`.`setting` = \'version\';';
+                    UPDATE `'.$this->prefix.'settings` SET `value` = \'2.2.0\' WHERE `setting` = \'version\';';
         }
-        if (version_compare(basename('2.2.1', '.sql'), $version, 'gt')) {
+        if (version_compare('2.2.1', $version, 'gt')) {
             $sql .= 'ALTER TABLE `'.$this->prefix.'settings` CHANGE `description` `description` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_nopad_ci NULL DEFAULT NULL COMMENT \'Description of the setting\';
-                    UPDATE `'.$this->prefix.'settings` SET `value` = \'2.2.1\' WHERE `'.$this->prefix.'settings`.`setting` = \'version\';';
+                    UPDATE `'.$this->prefix.'settings` SET `value` = \'2.2.1\' WHERE `setting` = \'version\';';
         }
-        if (version_compare(basename('2.2.2', '.sql'), $version, 'gt')) {
+        if (version_compare('2.2.2', $version, 'gt')) {
             $sql .= 'ALTER TABLE `'.$this->prefix.'event_types` CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_as_cs;
                     ALTER TABLE `'.$this->prefix.'log` CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_as_cs;
                     ALTER TABLE `'.$this->prefix.'schedule` CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_as_cs;
@@ -307,7 +307,22 @@ class Installer
                     ALTER TABLE `'.$this->prefix.'log` ADD CONSTRAINT `cron_log_to_event_type` FOREIGN KEY (`type`) REFERENCES `'.$this->prefix.'event_types` (`type`) ON DELETE CASCADE ON UPDATE CASCADE;
                     ALTER TABLE `'.$this->prefix.'log` ADD CONSTRAINT `cron_log_to_tasks` FOREIGN KEY (`task`) REFERENCES `'.$this->prefix.'tasks` (`task`) ON DELETE CASCADE ON UPDATE CASCADE;
                     ALTER TABLE `'.$this->prefix.'schedule` ADD CONSTRAINT `schedule_to_task` FOREIGN KEY (`task`) REFERENCES `'.$this->prefix.'tasks` (`task`) ON DELETE CASCADE ON UPDATE CASCADE;
-                    UPDATE `'.$this->prefix.'settings` SET `value` = \'2.2.2\' WHERE `'.$this->prefix.'settings`.`setting` = \'version\';';
+                    UPDATE `'.$this->prefix.'settings` SET `value` = \'2.2.2\' WHERE `setting` = \'version\';';
+        }
+        if (version_compare('2.3.4', $version, 'gt')) {
+            $sql .= 'ALTER TABLE `'.$this->prefix.'log` DROP FOREIGN KEY `cron_log_to_event_type`;
+                    ALTER TABLE `'.$this->prefix.'log` DROP FOREIGN KEY `cron_log_to_tasks`;
+                    ALTER TABLE `'.$this->prefix.'schedule` DROP FOREIGN KEY `schedule_to_task`;
+                    ALTER TABLE `'.$this->prefix.'log` CHANGE `runby` `runBy` VARCHAR(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_as_cs NULL DEFAULT NULL COMMENT \'Indicates process that was running a task\';
+                    ALTER TABLE `'.$this->prefix.'tasks` CHANGE `allowedreturns` `allowedReturns` VARCHAR(5000) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_as_cs NULL DEFAULT NULL COMMENT \'Optional allowed return values to be treated as \\\'true\\\' by Cron processor in JSON string\';
+                    ALTER TABLE `'.$this->prefix.'schedule` CHANGE `dayofmonth` `dayOfMonth` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_as_cs NULL DEFAULT NULL COMMENT \'Optional limit to run only on specific days of the month. Expects array of integers in JSON string.\';
+                    ALTER TABLE `'.$this->prefix.'schedule` CHANGE `dayofweek` `dayOfWeek` VARCHAR(60) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_as_cs NULL DEFAULT NULL COMMENT \'Optional limit to run only on specific days of the week. Expects array of integers in JSON string.\';
+                    ALTER TABLE `'.$this->prefix.'schedule` CHANGE `runby` `runBy` VARCHAR(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_as_cs NULL DEFAULT NULL COMMENT \'If not NULL, indicates, that a task is queued for a run by a process.\';
+                    ALTER TABLE `'.$this->prefix.'schedule` CHANGE `nextrun` `nextRun` DATETIME(6) NOT NULL DEFAULT current_timestamp(6) COMMENT \'Next expected time for the task to be run.\';
+                    ALTER TABLE `'.$this->prefix.'schedule` CHANGE `lastrun` `lastRun` DATETIME(6) NULL DEFAULT NULL COMMENT \'Time of the last run attempt\';
+                    ALTER TABLE `'.$this->prefix.'schedule` CHANGE `lastsuccess` `lastSuccess` DATETIME(6) NULL DEFAULT NULL COMMENT \'Time of the last successful run\';
+                    ALTER TABLE `'.$this->prefix.'schedule` CHANGE `lasterror` `lastError` DATETIME(6) NULL DEFAULT NULL COMMENT \'Time of the last error\';
+                    UPDATE `'.$this->prefix.'settings` SET `value` = \'2.3.4\' WHERE `setting` = \'version\';';
         }
         #If empty - we are up to date
         if (empty($sql)) {

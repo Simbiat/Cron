@@ -75,7 +75,7 @@ class Task
         }
     }
     /**
-     * @var int Minimal allowed frequency (in seconds) at which a task instance can run. Does not apply to one-time jobs.
+     * @var int Minimal-allowed frequency (in seconds) at which a task instance can run. Does not apply to one-time jobs.
      */
     private(set) int $minFrequency = 3600 {
         set (mixed $value) {
@@ -175,7 +175,7 @@ class Task
                         $this->object = $value;
                     }
                     break;
-                case 'allowedreturns':
+                case 'allowedReturns':
                     $this->returns = $value;
                     break;
                 case 'task':
@@ -222,7 +222,7 @@ class Task
         }
         try {
             $taskDetailsString = json_encode($this, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION);
-            $result = Query::query('INSERT INTO `'.$this->prefix.'tasks` (`task`, `function`, `object`, `parameters`, `allowedreturns`, `maxTime`, `minFrequency`, `retry`, `enabled`, `system`, `description`) VALUES (:task, :function, :object, :parameters, :returns, :maxTime, :minFrequency, :retry, :enabled, :system, :desc) ON DUPLICATE KEY UPDATE `function`=:function, `object`=:object, `parameters`=:parameters, `allowedreturns`=:returns, `maxTime`=:maxTime, `minFrequency`=:minFrequency, `retry`=:retry, `description`=:desc;', [
+            $result = Query::query('INSERT INTO `'.$this->prefix.'tasks` (`task`, `function`, `object`, `parameters`, `allowedReturns`, `maxTime`, `minFrequency`, `retry`, `enabled`, `system`, `description`) VALUES (:task, :function, :object, :parameters, :returns, :maxTime, :minFrequency, :retry, :enabled, :system, :desc) ON DUPLICATE KEY UPDATE `function`=:function, `object`=:object, `parameters`=:parameters, `allowedReturns`=:returns, `maxTime`=:maxTime, `minFrequency`=:minFrequency, `retry`=:retry, `description`=:desc;', [
                 ':task' => [$this->taskName, 'string'],
                 ':function' => [$this->function, 'string'],
                 ':object' => [$this->object, (empty($this->object) ? 'null' : 'string')],
@@ -261,13 +261,21 @@ class Task
             $result = Query::query('DELETE FROM `'.$this->prefix.'tasks` WHERE `task`=:task AND `system`=0;', [
                 ':task' => [$this->taskName, 'string'],
             ], return: 'affected');
-            $this->foundInDB = false;
         } catch (\Throwable $e) {
             $this->log('Failed delete task `'.$this->taskName.'`.', 'TaskDeleteFail', error: $e);
             return false;
         }
         #Log only if something was actually deleted
         if ($result > 0) {
+            $this->foundInDB = false;
+            try {
+                #Try to delete the respective task instances as well
+                Query::query('DELETE FROM `'.$this->prefix.'schedule` WHERE `task`=:task AND `system`=0;', [
+                    ':task' => [$this->taskName, 'string'],
+                ]);
+            } catch (\Throwable) {
+                #Do nothing, not critical
+            }
             $this->log('Deleted task  `'.$this->taskName.'`.', 'TaskDelete');
         }
         return true;

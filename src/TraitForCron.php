@@ -165,9 +165,9 @@ trait TraitForCron
         $skipInsert = false;
         #If $task was passed, use its value for runBy
         $runBy = $task?->runBy ?? $this->runBy;
-        #To reduce amount of NoThreads, Empty and Disabled events in the DB log, we check if the latest event is the same we want to write
+        #To reduce the amount of NoThreads, Empty and Disabled events in the DB log, we check if the latest event is the same we want to write
         if (in_array($event, ['CronDisabled', 'CronEmpty', 'CronNoThreads'])) {
-            #Reset runby value to null, since these entries can belong to multiple threads, and we don't really care about which one was the last one
+            #Reset runBy value to null, since these entries can belong to multiple threads, and we don't really care about which one was the last one
             $runBy = null;
             #Get last event time and type
             $lastEvent = Query::query('SELECT `time`, `type` FROM `'.$this->prefix.'log` ORDER BY `time` DESC LIMIT 1', return: 'row');
@@ -185,13 +185,13 @@ trait TraitForCron
                 $skipInsert = true;
             }
         }
-        #Insert log entry only if we did not update last log on previous check
+        #Insert log entry only if we did not update the last log on previous check
         if (!$skipInsert) {
             Query::query(
-                'INSERT INTO `'.$this->prefix.'log` (`type`, `runby`, `sse`, `task`, `arguments`, `instance`, `message`) VALUES (:type,:runby,:sse,:task, :arguments, :instance, :message);',
+                'INSERT INTO `'.$this->prefix.'log` (`type`, `runBy`, `sse`, `task`, `arguments`, `instance`, `message`) VALUES (:type,:runBy,:sse,:task, :arguments, :instance, :message);',
                 [
                     ':type' => $event,
-                    ':runby' => [empty($runBy) ? null : $runBy, empty($runBy) ? 'null' : 'string'],
+                    ':runBy' => [empty($runBy) ? null : $runBy, empty($runBy) ? 'null' : 'string'],
                     ':sse' => [SSE::$SSE, 'bool'],
                     ':task' => [$task?->taskName, $task === null ? 'null' : 'string'],
                     ':arguments' => [$task?->arguments, $task === null ? 'null' : 'string'],

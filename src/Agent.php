@@ -24,7 +24,7 @@ class Agent
      * Logic to calculate task priority. Not sure, I fully understand how this provides the results I expect, but it does. Essentially, `priority` is valued higher, while "overdue" time has a smoother scaling. Rare jobs (with higher value of `frequency`) also have higher weight, but one-time jobs have even higher weight, since they are likely to be quick ones.
      * @var string
      */
-    private const string calculatedPriority = '((CASE WHEN `frequency` = 0 THEN 1 ELSE (4294967295 - `frequency`) / 4294967295 END) + LOG(TIMESTAMPDIFF(SECOND, `nextrun`, CURRENT_TIMESTAMP(6)) + 2) * 100 + `priority` * 1000)';
+    private const string calculatedPriority = '((CASE WHEN `frequency` = 0 THEN 1 ELSE (4294967295 - `frequency`) / 4294967295 END) + LOG(TIMESTAMPDIFF(SECOND, `nextRun`, CURRENT_TIMESTAMP(6)) + 2) * 100 + `priority` * 1000)';
     
     
     /**
@@ -84,7 +84,7 @@ class Agent
             }
             #Check if enough threads are available
             try {
-                if (Query::query('SELECT COUNT(DISTINCT(`runby`)) as `count` FROM `'.$this->prefix.'schedule` WHERE `runby` IS NOT NULL;', return: 'count') >= $this->maxThreads) {
+                if (Query::query('SELECT COUNT(DISTINCT(`runBy`)) as `count` FROM `'.$this->prefix.'schedule` WHERE `runBy` IS NOT NULL;', return: 'count') >= $this->maxThreads) {
                     $this->log('Cron threads are exhausted', 'CronNoThreads');
                     if (!SSE::$SSE) {
                         return false;
@@ -166,18 +166,18 @@ class Agent
                         INNER JOIN
                         (
                             SELECT `task`, `arguments`, `instance` FROM (
-                                SELECT `task`, `arguments`, `instance`, `nextrun`, '.self::calculatedPriority.' AS `calculated` FROM `'.$this->prefix.'schedule` AS `instances`
-                                WHERE `enabled`=1 AND `runby` IS NULL AND `nextrun`<=CURRENT_TIMESTAMP() AND (SELECT `enabled` FROM `'.$this->prefix.'tasks` `tasks` WHERE `tasks`.`task`=`instances`.`task`)=1
-                                ORDER BY `calculated` DESC, `nextrun`
+                                SELECT `task`, `arguments`, `instance`, `nextRun`, '.self::calculatedPriority.' AS `calculated` FROM `'.$this->prefix.'schedule` AS `instances`
+                                WHERE `enabled`=1 AND `runBy` IS NULL AND `nextRun`<=CURRENT_TIMESTAMP() AND (SELECT `enabled` FROM `'.$this->prefix.'tasks` `tasks` WHERE `tasks`.`task`=`instances`.`task`)=1
+                                ORDER BY `calculated` DESC, `nextRun`
                                 LIMIT :innerLimit
-                            ) `instances` GROUP BY `task`, `arguments` ORDER BY `calculated` DESC, `nextrun` LIMIT :limit FOR UPDATE SKIP LOCKED
+                            ) `instances` GROUP BY `task`, `arguments` ORDER BY `calculated` DESC, `nextRun` LIMIT :limit FOR UPDATE SKIP LOCKED
                         ) `toSelect`
                         ON `toUpdate`.`task`=`toSelect`.`task`
                             AND `toUpdate`.`arguments`=`toSelect`.`arguments`
                             AND `toUpdate`.`instance`=`toSelect`.`instance`
-                        SET `status`=1, `runby`=:runby, `sse`=:sse;',
+                        SET `status`=1, `runBy`=:runBy, `sse`=:sse;',
                 [
-                    ':runby' => $this->runBy,
+                    ':runBy' => $this->runBy,
                     ':sse' => [SSE::$SSE, 'bool'],
                     ':limit' => [$items, 'int'],
                     #Using this approach seems to be the best solution so far, so that no temporary tables are used (or smaller ones, at least), and it is still relatively performant.
@@ -192,9 +192,9 @@ class Agent
         #Get tasks
         try {
             return Query::query(
-                'SELECT `task`, `arguments`, `instance` FROM `'.$this->prefix.'schedule` WHERE `runby`=:runby ORDER BY '.self::calculatedPriority.' DESC, `nextrun`;',
+                'SELECT `task`, `arguments`, `instance` FROM `'.$this->prefix.'schedule` WHERE `runBy`=:runBy ORDER BY '.self::calculatedPriority.' DESC, `nextRun`;',
                 [
-                    ':runby' => $this->runBy,
+                    ':runBy' => $this->runBy,
                 ], return: 'all'
             );
         } catch (\Throwable $exception) {
@@ -264,12 +264,22 @@ class Agent
      */
     public function unHang(): bool
     {
-        #Delete tasks that were marked as `For removal` (`status` was set to `3`), which means they failed to be removed initially, but succeeded to be updated.
+        #Delete task instances that do not have a respective task registered.
+        #Depending on the number of task instances, this may take a while, so use a bit of randomization to not do this on very run.
+        #It is also not critical: these tasks, if picked-up, will fail to run due to `function` ending up being `null`, and thus not callable.
+        if (random_int(1, 3600 * $this->maxThreads) >= 3600 * ($this->maxThreads - 1)) {
+            try {
+                Query::query('DELETE FROM `'.$this->prefix.'schedule` WHERE `task` IS NOT IN (SELECT `task` FROM `'.$this->prefix.'tasks`);');
+            } catch (\Throwable) {
+                #Do nothing
+            }
+        }
+        #Delete task instances that were marked as `For removal` (`status` was set to `3`), which means they failed to be removed initially, but succeeded to be updated.
         $tasks = Query::query('SELECT `task`, `arguments`, `instance` FROM `'.$this->prefix.'schedule` as `a` WHERE `status` = 3;', return: 'all');
         foreach ($tasks as $task) {
             new TaskInstance($task['task'], $task['arguments'], $task['instance'])->delete();
         }
-        $tasks = Query::query('SELECT `task`, `arguments`, `instance`, `frequency` FROM `'.$this->prefix.'schedule` as `a` WHERE `runby` IS NOT NULL AND CURRENT_TIMESTAMP()>DATE_ADD(IF(`lastrun` IS NOT NULL, `lastrun`, `nextrun`), INTERVAL (SELECT `maxTime` FROM `'.$this->prefix.'tasks` WHERE `'.$this->prefix.'tasks`.`task`=`a`.`task`) SECOND);', return: 'all');
+        $tasks = Query::query('SELECT `task`, `arguments`, `instance`, `frequency` FROM `'.$this->prefix.'schedule` as `a` WHERE `runBy` IS NOT NULL AND CURRENT_TIMESTAMP()>DATE_ADD(IF(`lastRun` IS NOT NULL, `lastRun`, `nextRun`), INTERVAL (SELECT `maxTime` FROM `'.$this->prefix.'tasks` WHERE `'.$this->prefix.'tasks`.`task`=`a`.`task`) SECOND);', return: 'all');
         foreach ($tasks as $task) {
             #If this was a one-time task, schedule it for right now, to avoid delaying it for double the time.
             try {
