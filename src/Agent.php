@@ -60,8 +60,15 @@ class Agent
         if (Query::$dbh !== null) {
             #Reschedule hanged jobs
             $this->unHang();
-            #Clean old logs
-            $this->logPurge();
+            #Depending on the number of events in the log, this may take a while, so use a bit of randomization to not do this on very run.
+            try {
+                if (random_int(1, 3600 * $this->maxThreads) < 3600 * ($this->maxThreads - 1)) {
+                    #Clean old logs
+                    $this->logPurge();
+                }
+            } catch (\Throwable) {
+                #Do nothing, not critical, since these are just logs
+            }
         } else {
             #Notify about the end of the stream
             $this->log('Cron database not available', 'CronFail', true);
@@ -267,12 +274,12 @@ class Agent
         #Delete task instances that do not have a respective task registered.
         #Depending on the number of task instances, this may take a while, so use a bit of randomization to not do this on very run.
         #It is also not critical: these tasks, if picked-up, will fail to run due to `function` ending up being `null`, and thus not callable.
-        if (random_int(1, 3600 * $this->maxThreads) >= 3600 * ($this->maxThreads - 1)) {
-            try {
+        try {
+            if (random_int(1, 3600 * $this->maxThreads) >= 3600 * ($this->maxThreads - 1)) {
                 Query::query('DELETE FROM `'.$this->prefix.'schedule` WHERE `task` IS NOT IN (SELECT `task` FROM `'.$this->prefix.'tasks`);');
-            } catch (\Throwable) {
-                #Do nothing
             }
+        } catch (\Throwable) {
+            #Do nothing
         }
         #Delete task instances that were marked as `For removal` (`status` was set to `3`), which means they failed to be removed initially, but succeeded to be updated.
         $tasks = Query::query('SELECT `task`, `arguments`, `instance` FROM `'.$this->prefix.'schedule` as `a` WHERE `status` = 3;', return: 'all');
