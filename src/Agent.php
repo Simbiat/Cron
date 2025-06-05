@@ -62,7 +62,7 @@ class Agent
             $this->unHang();
             #Depending on the number of events in the log, this may take a while, so use a bit of randomization to not do this on very run.
             try {
-                if (random_int(1, 3600 * $this->maxThreads) < 3600 * ($this->maxThreads - 1)) {
+                if (random_int(1, 60 * $this->maxThreads) < 60 * ($this->maxThreads - 1)) {
                     #Clean old logs
                     $this->logPurge();
                 }
@@ -275,7 +275,7 @@ class Agent
         #Depending on the number of task instances, this may take a while, so use a bit of randomization to not do this on very run.
         #It is also not critical: these tasks, if picked-up, will fail to run due to `function` ending up being `null`, and thus not callable.
         try {
-            if (random_int(1, 3600 * $this->maxThreads) >= 3600 * ($this->maxThreads - 1)) {
+            if (random_int(1, 60 * $this->maxThreads) >= 60 * ($this->maxThreads - 1)) {
                 Query::query('DELETE FROM `'.$this->prefix.'schedule` WHERE `task` IS NOT IN (SELECT `task` FROM `'.$this->prefix.'tasks`);');
             }
         } catch (\Throwable) {
