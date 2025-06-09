@@ -17,7 +17,7 @@ class Installer
      * Supported settings
      * @var array
      */
-    private const array settings = ['enabled', 'logLife', 'retry', 'sseLoop', 'sseRetry', 'maxThreads'];
+    private const array settings = ['enabled', 'log_life', 'retry', 'sse_loop', 'sse_retry', 'max_threads'];
     /**
      * Logic to calculate task priority. Not sure, I fully understand how this provides the results I expect, but it does. Essentially, `priority` is valued higher, while "overdue" time has a smoother scaling. Rare jobs (with higher value of `frequency`) also have higher weight, but one-time jobs have even higher weight, since they are likely to be quick ones.
      * @var string
@@ -62,10 +62,10 @@ class Installer
                     #If one of the schedule columns is datetime, it's 1.5.0
                 } elseif (Manage::getColumnType($this->prefix.'schedule', 'registered') === 'datetime') {
                     $version = '1.5.0';
-                    #If `maxTime` column is present in `tasks` table - 1.3.0
-                } elseif (Manage::checkColumn($this->prefix.'tasks', 'maxTime')) {
+                    #If `max_time` column is present in `tasks` table - 1.3.0
+                } elseif (Manage::checkColumn($this->prefix.'tasks', 'max_time')) {
                     $version = '1.3.0';
-                    #If `maxTime` column is present in `tasks` table - 1.2.0
+                    #If `max_time` column is present in `tasks` table - 1.2.0
                 } elseif (Manage::checkColumn($this->prefix.'schedule', 'sse')) {
                     $version = '1.2.0';
                     #If one of the settings has the name `errorLife` (and not `errorlife`) - 1.1.14

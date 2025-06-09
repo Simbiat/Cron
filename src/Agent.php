@@ -19,12 +19,12 @@ class Agent
      * Supported settings
      * @var array
      */
-    private const array settings = ['enabled', 'logLife', 'retry', 'sseLoop', 'sseRetry', 'maxThreads'];
+    private const array settings = ['enabled', 'log_life', 'retry', 'sse_loop', 'sse_retry', 'max_threads'];
     /**
      * Logic to calculate task priority. Not sure, I fully understand how this provides the results I expect, but it does. Essentially, `priority` is valued higher, while "overdue" time has a smoother scaling. Rare jobs (with higher value of `frequency`) also have higher weight, but one-time jobs have even higher weight, since they are likely to be quick ones.
      * @var string
      */
-    private const string calculatedPriority = '((CASE WHEN `frequency` = 0 THEN 1 ELSE (4294967295 - `frequency`) / 4294967295 END) + LOG(TIMESTAMPDIFF(SECOND, `nextRun`, CURRENT_TIMESTAMP(6)) + 2) * 100 + `priority` * 1000)';
+    private const string calculatedPriority = '((CASE WHEN `frequency` = 0 THEN 1 ELSE (4294967295 - `frequency`) / 4294967295 END) + LOG(TIMESTAMPDIFF(SECOND, `next_run`, CURRENT_TIMESTAMP(6)) + 2) * 100 + `priority` * 1000)';
     
     
     /**
@@ -52,7 +52,7 @@ class Agent
             SSE::open();
         }
         #Generate random ID
-        $this->runBy = $this->generateRunBy();
+        $this->run_by = $this->generateRunBy();
         if (SSE::$SSE) {
             $this->log('Cron processing started in SSE mode', 'SSEStart');
         }
@@ -62,7 +62,7 @@ class Agent
             $this->unHang();
             #Depending on the number of events in the log, this may take a while, so use a bit of randomization to not do this on very run.
             try {
-                if (random_int(1, 60 * $this->maxThreads) < 60 * ($this->maxThreads - 1)) {
+                if (random_int(1, 60 * $this->max_threads) < 60 * ($this->max_threads - 1)) {
                     #Clean old logs
                     $this->logPurge();
                 }
@@ -91,13 +91,13 @@ class Agent
             }
             #Check if enough threads are available
             try {
-                if (Query::query('SELECT COUNT(DISTINCT(`runBy`)) as `count` FROM `'.$this->prefix.'schedule` WHERE `runBy` IS NOT NULL;', return: 'count') >= $this->maxThreads) {
+                if (Query::query('SELECT COUNT(DISTINCT(`run_by`)) as `count` FROM `'.$this->prefix.'schedule` WHERE `run_by` IS NOT NULL;', return: 'count') >= $this->max_threads) {
                     $this->log('Cron threads are exhausted', 'CronNoThreads');
                     if (!SSE::$SSE) {
                         return false;
                     }
                     #Sleep for a bit
-                    sleep($this->sseRetry / 20);
+                    sleep($this->sse_retry / 20);
                     continue;
                 }
             } catch (\Throwable $exception) {
@@ -110,7 +110,7 @@ class Agent
                 $this->log('Cron list is empty', 'CronEmpty');
                 if (SSE::$SSE) {
                     #Sleep for a bit
-                    sleep($this->sseRetry / 20);
+                    sleep($this->sse_retry / 20);
                 }
             } else {
                 $totalTasks = \count($tasks);
@@ -119,10 +119,10 @@ class Agent
                 }
             }
             #Additionally, reschedule hanged jobs if we're in SSE
-            if (SSE::$SSE && $this->sseLoop) {
+            if (SSE::$SSE && $this->sse_loop) {
                 $this->unHang();
             }
-        } while ($this->cronEnabled && SSE::$SSE && $this->sseLoop && connection_status() === 0);
+        } while ($this->cronEnabled && SSE::$SSE && $this->sse_loop && connection_status() === 0);
         #Notify about the end of the stream
         if (SSE::$SSE) {
             $this->log('Cron processing finished', 'SSEEnd', true);
@@ -173,18 +173,18 @@ class Agent
                         INNER JOIN
                         (
                             SELECT `task`, `arguments`, `instance` FROM (
-                                SELECT `task`, `arguments`, `instance`, `nextRun`, '.self::calculatedPriority.' AS `calculated` FROM `'.$this->prefix.'schedule` AS `instances`
-                                WHERE `enabled`=1 AND `runBy` IS NULL AND `nextRun`<=CURRENT_TIMESTAMP() AND (SELECT `enabled` FROM `'.$this->prefix.'tasks` `tasks` WHERE `tasks`.`task`=`instances`.`task`)=1
-                                ORDER BY `calculated` DESC, `nextRun`
+                                SELECT `task`, `arguments`, `instance`, `next_run`, '.self::calculatedPriority.' AS `calculated` FROM `'.$this->prefix.'schedule` AS `instances`
+                                WHERE `enabled`=1 AND `run_by` IS NULL AND `next_run`<=CURRENT_TIMESTAMP() AND (SELECT `enabled` FROM `'.$this->prefix.'tasks` `tasks` WHERE `tasks`.`task`=`instances`.`task`)=1
+                                ORDER BY `calculated` DESC, `next_run`
                                 LIMIT :innerLimit
-                            ) `instances` GROUP BY `task`, `arguments` ORDER BY `calculated` DESC, `nextRun` LIMIT :limit FOR UPDATE SKIP LOCKED
+                            ) `instances` GROUP BY `task`, `arguments` ORDER BY `calculated` DESC, `next_run` LIMIT :limit FOR UPDATE SKIP LOCKED
                         ) `toSelect`
                         ON `toUpdate`.`task`=`toSelect`.`task`
                             AND `toUpdate`.`arguments`=`toSelect`.`arguments`
                             AND `toUpdate`.`instance`=`toSelect`.`instance`
-                        SET `status`=1, `runBy`=:runBy, `sse`=:sse;',
+                        SET `status`=1, `run_by`=:run_by, `sse`=:sse;',
                 [
-                    ':runBy' => $this->runBy,
+                    ':run_by' => $this->run_by,
                     ':sse' => [SSE::$SSE, 'bool'],
                     ':limit' => [$items, 'int'],
                     #Using this approach seems to be the best solution so far, so that no temporary tables are used (or smaller ones, at least), and it is still relatively performant.
@@ -199,9 +199,9 @@ class Agent
         #Get tasks
         try {
             return Query::query(
-                'SELECT `task`, `arguments`, `instance` FROM `'.$this->prefix.'schedule` WHERE `runBy`=:runBy ORDER BY '.self::calculatedPriority.' DESC, `nextRun`;',
+                'SELECT `task`, `arguments`, `instance` FROM `'.$this->prefix.'schedule` WHERE `run_by`=:run_by ORDER BY '.self::calculatedPriority.' DESC, `next_run`;',
                 [
-                    ':runBy' => $this->runBy,
+                    ':run_by' => $this->run_by,
                 ], return: 'all'
             );
         } catch (\Throwable $exception) {
@@ -227,35 +227,35 @@ class Agent
         #Handle values lower than 0
         if ($value <= 0) {
             $value = match ($setting) {
-                'enabled', 'sseLoop' => 0,
-                'logLife' => 30,
+                'enabled', 'sse_loop' => 0,
+                'log_life' => 30,
                 'retry' => 3600,
-                'sseRetry' => 10000,
-                'maxThreads' => 4,
+                'sse_retry' => 10000,
+                'max_threads' => 4,
             };
         }
         if (Query::query('UPDATE `'.$this->prefix.'settings` SET `value`=:value WHERE `setting`=:setting;', [
             ':setting' => [$setting, 'string'],
-            ':value' => [$value, in_array($setting, ['enabled', 'sseLoop']) ? 'bool' : 'int'],
+            ':value' => [$value, in_array($setting, ['enabled', 'sse_loop']) ? 'bool' : 'int'],
         ])) {
             switch ($setting) {
                 case 'enabled':
                     $this->cronEnabled = (bool)$value;
                     break;
-                case 'sseLoop':
-                    $this->sseLoop = (bool)$value;
+                case 'sse_loop':
+                    $this->sse_loop = (bool)$value;
                     break;
-                case 'logLife':
-                    $this->logLife = $value;
+                case 'log_life':
+                    $this->log_life = $value;
                     break;
                 case 'retry':
                     $this->oneTimeRetry = $value;
                     break;
-                case 'sseRetry':
-                    $this->sseRetry = $value;
+                case 'sse_retry':
+                    $this->sse_retry = $value;
                     break;
-                case 'maxThreads':
-                    $this->maxThreads = $value;
+                case 'max_threads':
+                    $this->max_threads = $value;
                     break;
             }
             return $this;
@@ -275,7 +275,7 @@ class Agent
         #Depending on the number of task instances, this may take a while, so use a bit of randomization to not do this on very run.
         #It is also not critical: these tasks, if picked-up, will fail to run due to `function` ending up being `null`, and thus not callable.
         try {
-            if (random_int(1, 60 * $this->maxThreads) >= 60 * ($this->maxThreads - 1)) {
+            if (random_int(1, 60 * $this->max_threads) >= 60 * ($this->max_threads - 1)) {
                 Query::query('DELETE FROM `'.$this->prefix.'schedule` WHERE `task` IS NOT IN (SELECT `task` FROM `'.$this->prefix.'tasks`);');
             }
         } catch (\Throwable) {
@@ -286,7 +286,7 @@ class Agent
         foreach ($tasks as $task) {
             new TaskInstance($task['task'], $task['arguments'], $task['instance'])->delete();
         }
-        $tasks = Query::query('SELECT `task`, `arguments`, `instance`, `frequency` FROM `'.$this->prefix.'schedule` as `a` WHERE `runBy` IS NOT NULL AND CURRENT_TIMESTAMP()>DATE_ADD(IF(`lastRun` IS NOT NULL, `lastRun`, `nextRun`), INTERVAL (SELECT `maxTime` FROM `'.$this->prefix.'tasks` WHERE `'.$this->prefix.'tasks`.`task`=`a`.`task`) SECOND);', return: 'all');
+        $tasks = Query::query('SELECT `task`, `arguments`, `instance`, `frequency` FROM `'.$this->prefix.'schedule` as `a` WHERE `run_by` IS NOT NULL AND CURRENT_TIMESTAMP()>DATE_ADD(IF(`last_run` IS NOT NULL, `last_run`, `next_run`), INTERVAL (SELECT `max_time` FROM `'.$this->prefix.'tasks` WHERE `'.$this->prefix.'tasks`.`task`=`a`.`task`) SECOND);', return: 'all');
         foreach ($tasks as $task) {
             #If this was a one-time task, schedule it for right now, to avoid delaying it for double the time.
             try {
@@ -308,8 +308,8 @@ class Agent
     public function logPurge(): bool
     {
         try {
-            return Query::query('DELETE FROM `'.$this->prefix.'log` WHERE `time` <= DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL :logLife DAY);', [
-                ':logLife' => [$this->logLife, 'int'],
+            return Query::query('DELETE FROM `'.$this->prefix.'log` WHERE `time` <= DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL :log_life DAY);', [
+                ':log_life' => [$this->log_life, 'int'],
             ]);
         } catch (\Throwable) {
             return false;

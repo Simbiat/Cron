@@ -75,8 +75,8 @@ class TaskInstance
                 if ($frequency < 0) {
                     $frequency = 0;
                 }
-                if ($frequency > 0 && $frequency < $this->taskObject->minFrequency) {
-                    throw new \UnexpectedValueException('`frequency` for `'.$this->taskName.'` should be either 0 (one-time job) or equal or more than '.$this->taskObject->minFrequency.' seconds');
+                if ($frequency > 0 && $frequency < $this->taskObject->min_frequency) {
+                    throw new \UnexpectedValueException('`frequency` for `'.$this->taskName.'` should be either 0 (one-time job) or equal or more than '.$this->taskObject->min_frequency.' seconds');
                 }
                 if ($frequency === 0 && $this->system) {
                     throw new \UnexpectedValueException('`frequency` cannot be set to 0 (one-time job), if task instance is system one');
@@ -90,32 +90,32 @@ class TaskInstance
     /**
      * @var string|null Day of month limitation
      */
-    private(set) ?string $dayOfMonth = null {
+    private(set) ?string $day_of_month = null {
         set (mixed $value) {
             if (empty($value)) {
-                $this->dayOfMonth = null;
+                $this->day_of_month = null;
             } elseif (is_array($value)) {
-                $this->dayOfMonth = json_encode($value, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION);
+                $this->day_of_month = json_encode($value, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION);
             } elseif (is_string($value) && json_validate($value)) {
-                $this->dayOfMonth = $value;
+                $this->day_of_month = $value;
             } else {
-                throw new \UnexpectedValueException('`dayOfMonth` is not an array or a valid JSON string');
+                throw new \UnexpectedValueException('`day_of_month` is not an array or a valid JSON string');
             }
         }
     }
     /**
      * @var string|null Day of week limitation
      */
-    private(set) ?string $dayOfWeek = null {
+    private(set) ?string $day_of_week = null {
         set (mixed $value) {
             if (empty($value)) {
-                $this->dayOfWeek = null;
+                $this->day_of_week = null;
             } elseif (is_array($value)) {
-                $this->dayOfWeek = json_encode($value, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION);
+                $this->day_of_week = json_encode($value, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION);
             } elseif (is_string($value) && json_validate($value)) {
-                $this->dayOfWeek = $value;
+                $this->day_of_week = $value;
             } else {
-                throw new \UnexpectedValueException('`dayOfWeek` is not an array or a valid JSON string');
+                throw new \UnexpectedValueException('`day_of_week` is not an array or a valid JSON string');
             }
         }
     }
@@ -191,9 +191,9 @@ class TaskInstance
             ], return: 'row'
         );
         if (!empty($settings)) {
-            #Set `runBy` value, if present
-            if (!empty($settings['runBy'])) {
-                $this->runBy = $settings['runBy'];
+            #Set `run_by` value, if present
+            if (!empty($settings['run_by'])) {
+                $this->run_by = $settings['run_by'];
             }
             #Status is not allowed to be changed from outside, so `settingsFromArray` does not handle it, but we do update it in the class itself
             $this->status = $settings['status'];
@@ -231,14 +231,14 @@ class TaskInstance
                 case 'instance':
                 case 'frequency':
                 case 'priority':
-                case 'dayOfMonth':
-                case 'dayOfWeek':
+                case 'day_of_month':
+                case 'day_of_week':
                     $this->{$setting} = $value;
                     break;
                 case 'enabled':
                     $this->enabled = (bool)$value;
                     break;
-                case 'nextRun':
+                case 'next_run':
                     $this->nextTime = SandClock::valueToDateTime($value);
                     break;
                 case 'message':
@@ -267,18 +267,18 @@ class TaskInstance
             throw new \UnexpectedValueException('Task name is not set');
         }
         try {
-            $result = Query::query('INSERT INTO `'.$this->prefix.'schedule` (`task`, `arguments`, `instance`, `enabled`, `system`, `frequency`, `dayOfMonth`, `dayOfWeek`, `priority`, `message`, `nextRun`) VALUES (:task, :arguments, :instance, :enabled, :system, :frequency, :dayOfMonth, :dayOfWeek, :priority, :message, :nextRun) ON DUPLICATE KEY UPDATE `frequency`=:frequency, `dayOfMonth`=:dayOfMonth, `dayOfWeek`=:dayOfWeek, `nextRun`=IF(:frequency=0, `nextRun`, :nextRun), `priority`=IF(:frequency=0, IF(`priority`>:priority, `priority`, :priority), :priority), `message`=:message, `updated`=CURRENT_TIMESTAMP();', [
+            $result = Query::query('INSERT INTO `'.$this->prefix.'schedule` (`task`, `arguments`, `instance`, `enabled`, `system`, `frequency`, `day_of_month`, `day_of_week`, `priority`, `message`, `next_run`) VALUES (:task, :arguments, :instance, :enabled, :system, :frequency, :day_of_month, :day_of_week, :priority, :message, :next_run) ON DUPLICATE KEY UPDATE `frequency`=:frequency, `day_of_month`=:day_of_month, `day_of_week`=:day_of_week, `next_run`=IF(:frequency=0, `next_run`, :next_run), `priority`=IF(:frequency=0, IF(`priority`>:priority, `priority`, :priority), :priority), `message`=:message, `updated`=CURRENT_TIMESTAMP();', [
                 ':task' => [$this->taskName, 'string'],
                 ':arguments' => [$this->arguments, 'string'],
                 ':instance' => [$this->instance, 'int'],
                 ':enabled' => [$this->enabled, 'enabled'],
                 ':system' => [$this->system, 'bool'],
                 ':frequency' => [(empty($this->frequency) ? 0 : $this->frequency), 'int'],
-                ':dayOfMonth' => [$this->dayOfMonth, (empty($this->dayOfMonth) ? 'null' : 'string')],
-                ':dayOfWeek' => [$this->dayOfWeek, (empty($this->dayOfWeek) ? 'null' : 'string')],
+                ':day_of_month' => [$this->day_of_month, (empty($this->day_of_month) ? 'null' : 'string')],
+                ':day_of_week' => [$this->day_of_week, (empty($this->day_of_week) ? 'null' : 'string')],
                 ':priority' => [(empty($this->priority) ? 0 : $this->priority), 'int'],
                 ':message' => [$this->message, (empty($this->message) ? 'null' : 'string')],
-                ':nextRun' => [$this->nextTime, 'datetime'],
+                ':next_run' => [$this->nextTime, 'datetime'],
             ], return: 'affected');
             $this->foundInDB = true;
         } catch (\Throwable $e) {
@@ -421,7 +421,7 @@ class TaskInstance
         }
         #Actually reschedule. One task time task will be rescheduled for the retry time from settings
         try {
-            $affected = Query::query('UPDATE `'.$this->prefix.'schedule` SET `status`=0, `runBy`=NULL, `sse`=0, `nextRun`=:time, `'.($result ? 'lastSuccess' : 'lastError').'`=CURRENT_TIMESTAMP() WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance;', [
+            $affected = Query::query('UPDATE `'.$this->prefix.'schedule` SET `status`=0, `run_by`=NULL, `sse`=0, `next_run`=:time, `'.($result ? 'last_success' : 'last_error').'`=CURRENT_TIMESTAMP() WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance;', [
                 ':time' => [$time, 'datetime'],
                 ':task' => [$this->taskName, 'string'],
                 ':arguments' => [$this->arguments, 'string'],
@@ -446,17 +446,17 @@ class TaskInstance
      */
     public function run(): bool
     {
-        #If runBy value is empty (a job is being run manually) - generate it
-        if (empty($this->runBy)) {
-            $this->runBy = $this->generateRunBy();
+        #If run_by value is empty (a job is being run manually) - generate it
+        if (empty($this->run_by)) {
+            $this->run_by = $this->generateRunBy();
         }
         if (!$this->foundInDB) {
             #Assume that it was a [one-time job], that has already been run and removed by another (possibly manual) process
             return true;
         }
         if ($this->nextTime !== SandClock::suggestNextDay($this->nextTime,
-                (!empty($this->dayOfWeek) ? json_decode($this->dayOfWeek, flags: JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_BIGINT_AS_STRING | JSON_OBJECT_AS_ARRAY) : []),
-                (!empty($this->dayOfMonth) ? json_decode($this->dayOfMonth, flags: JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_BIGINT_AS_STRING | JSON_OBJECT_AS_ARRAY) : []))
+                (!empty($this->day_of_week) ? json_decode($this->day_of_week, flags: JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_BIGINT_AS_STRING | JSON_OBJECT_AS_ARRAY) : []),
+                (!empty($this->day_of_month) ? json_decode($this->day_of_month, flags: JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_BIGINT_AS_STRING | JSON_OBJECT_AS_ARRAY) : []))
         ) {
             #Register error.
             $this->log('Attempted to run function during forbidden day of week or day of month.', 'InstanceFail', task: $this);
@@ -464,13 +464,13 @@ class TaskInstance
             return false;
         }
         #Set the time limit for the task
-        set_time_limit($this->taskObject->maxTime);
+        set_time_limit($this->taskObject->max_time);
         #Update last run
-        $affected = Query::query('UPDATE `'.$this->prefix.'schedule` SET `status`=2, `runBy`=:runBy, `lastRun` = CURRENT_TIMESTAMP() WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance AND `status` IN (0, 1);', [
+        $affected = Query::query('UPDATE `'.$this->prefix.'schedule` SET `status`=2, `run_by`=:run_by, `last_run` = CURRENT_TIMESTAMP() WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance AND `status` IN (0, 1);', [
             ':task' => [$this->taskName, 'string'],
             ':arguments' => [$this->arguments, 'string'],
             ':instance' => [$this->instance, 'int'],
-            ':runBy' => [$this->runBy, 'string'],
+            ':run_by' => [$this->run_by, 'string'],
         ], return: 'affected');
         if ($affected <= 0) {
             #The task was either picked up by some manual process or has been removed
@@ -478,7 +478,7 @@ class TaskInstance
         }
         #Decode allowed returns if any
         if (!empty($this->taskObject->returns)) {
-            $allowedReturns = json_decode($this->taskObject->returns, flags: JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_BIGINT_AS_STRING | JSON_OBJECT_AS_ARRAY);
+            $allowed_returns = json_decode($this->taskObject->returns, flags: JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_BIGINT_AS_STRING | JSON_OBJECT_AS_ARRAY);
         }
         try {
             $function = $this->functionCreation();
@@ -496,8 +496,8 @@ class TaskInstance
         #Validate result
         if ($result !== true) {
             #Check if it's an allowed return value
-            if (!empty($allowedReturns)) {
-                if (in_array($result, $allowedReturns, true)) {
+            if (!empty($allowed_returns)) {
+                if (in_array($result, $allowed_returns, true)) {
                     #Override the value
                     $result = true;
                 } else {
@@ -617,14 +617,14 @@ class TaskInstance
                 $newTime = $currentTime;
             }
         }
-        if (empty($this->dayOfMonth) && empty($this->dayOfWeek)) {
+        if (empty($this->day_of_month) && empty($this->day_of_week)) {
             return $newTime;
         }
         #Check if the new time will satisfy day of week/month requirements
         try {
             return SandClock::suggestNextDay($newTime,
-                (!empty($this->dayOfWeek) ? json_decode($this->dayOfWeek, flags: JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_BIGINT_AS_STRING | JSON_OBJECT_AS_ARRAY) : []),
-                (!empty($this->dayOfMonth) ? json_decode($this->dayOfMonth, flags: JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_BIGINT_AS_STRING | JSON_OBJECT_AS_ARRAY) : []));
+                (!empty($this->day_of_week) ? json_decode($this->day_of_week, flags: JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_BIGINT_AS_STRING | JSON_OBJECT_AS_ARRAY) : []),
+                (!empty($this->day_of_month) ? json_decode($this->day_of_month, flags: JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_BIGINT_AS_STRING | JSON_OBJECT_AS_ARRAY) : []));
         } catch (\Throwable) {
             #We should not get here, since the value is not from the user, and there are validations on earlier steps; this is just a failback
             return $currentTime;

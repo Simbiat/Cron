@@ -108,12 +108,12 @@ To use this library, you will need to add at least one task using the below comm
 2. `function` is mandatory name of the function, that will be called. Limited to `VARCHAR(255)`.
 3. `object` can be used, if your `$function` can be called only from an object. You must specify full name of the object with all namespaces, for example `\Simbiat\FFTracker`. Limited to `VARCHAR(255)`.
 4. `parameters` are optional parameters that will be used when creating the optional `$object`. Needs to be either pure array or JSON encoded array of values, that can be expanded (`...` operator). Stored in the database as JSON string and limited to `VARCHAR(5000)`.
-5. `allowedReturns` are optional return values that will be considered as success. By default, the library relies on `boolean` values to determine if the task was completed successfully, but this option allows expanding the possible values. Needs to be either pure array or JSON encoded array of values, that can be expanded (`...` operator). Stored in the database as JSON string and limited to `VARCHAR(5000)`.
+5. `allowed_returns` are optional return values that will be considered as success. By default, the library relies on `boolean` values to determine if the task was completed successfully, but this option allows expanding the possible values. Needs to be either pure array or JSON encoded array of values, that can be expanded (`...` operator). Stored in the database as JSON string and limited to `VARCHAR(5000)`.
 6. `desccription` is an optional description of the task. Limited to `VARCHAR(1000)`.
 7. `enabled` whether a task (and its instances) is enabled (and run as per schedule) or not. Used only when creating new tasks.
 8. `system` whether a task can be removed by this class or not. Used only when creating new tasks.
-9. `maxTime` maximum time in seconds to allow the function to run (will update execution time limit before running the task). `3600` by default.
-10. `minFrequency` minimal allowed frequency (in seconds) at which a task instance can run. Does not apply to one-time jobs.
+9. `max_time` maximum time in seconds to allow the function to run (will update execution time limit before running the task). `3600` by default.
+10. `min_frequency` minimal allowed frequency (in seconds) at which a task instance can run. It does not apply to one-time jobs.
 11. `retry` custom number of seconds to reschedule a failed task instance for instead of determining next run based on `frequency`. `0` (default) disables the functionality, since this can (and most likely will) introduce drift, so best be used on tasks that do not require precise time to be run on. Applies to one-time jobs as well.
 
 Calling this function with `$task`, that is already registered, will update respective values, except for `system`.
@@ -189,11 +189,11 @@ To schedule a task, use this function:
 3. `instance` is optional instance number (or ID if you like). By default, it is `1`. This is useful if you want to create multiple instances for the same task with the same arguments, which you want to run in parallel, when possible.
 4. `frequency` governs how frequent (in seconds) a task is supposed to be run. If set to `0`, it will mean that the task instance is one-time, thus it will be removed from schedule (not from the list of tasks) after successful run.
 5. `message` is an optional custom message to be shown, when running in SSE mode.
-6. `dayOfMonth` is an optional array of integers that limits days of a month on which a task can be run. It is recommended to use it only with `$frequency` set to `86400` (1 day), because otherwise it can cause unexpected shifts and delays. Needs to be either pure array or JSON encoded array of values, that can be expanded (`...` operator). Stored in the database as JSON string and limited to `VARCHAR(255)`.
-7. `dayOfWeek` is an optional array of integers that limits days of a week on which a task can be run. It is recommended to use it only with `$frequency` set to `86400` (1 day), because otherwise it can cause unexpected shifts and delays. Needs to be either pure array or JSON encoded array of values, that can be expanded (`...` operator). Stored in the database as JSON string and limited to `VARCHAR(60)`.
+6. `day_of_month` is an optional array of integers that limits days of a month on which a task can be run. It is recommended to use it only with `$frequency` set to `86400` (1 day), because otherwise it can cause unexpected shifts and delays. Needs to be either pure array or JSON encoded array of values, that can be expanded (`...` operator). Stored in the database as JSON string and limited to `VARCHAR(255)`.
+7. `day_of_week` is an optional array of integers that limits days of a week on which a task can be run. It is recommended to use it only with `$frequency` set to `86400` (1 day), because otherwise it can cause unexpected shifts and delays. Needs to be either pure array or JSON encoded array of values, that can be expanded (`...` operator). Stored in the database as JSON string and limited to `VARCHAR(60)`.
 8. `enabled` whether a task instance is enabled (and run as per schedule) or not. Used only when creating new instances.
 9. `system` whether a task instance can be removed by this class or not. Used only when creating new instances.
-10. `nextRun` time to schedule next run of the task instance. If not passed during creation of the task instance, will schedule it for the current time, which will allow you to run it right away.
+10. `next_run` time to schedule next run of the task instance. If not passed during creation of the task instance, will schedule it for the current time, which will allow you to run it right away.
 
 Same as with `Task` class it is also possible to load settings from DB while creating the object:
 
@@ -257,7 +257,7 @@ You can execute below command to get a suggested `DateTimeImmutable` for next ru
 (new \Simbiat\Cron\TaskInstance('taskName', 'arguments', 1))->updateNextRun($result);
 ```
 
-It will calculate how many jobs were potentially missed based on time difference between current `nextRun` value in the database and current time as well as instance frequency. This is required to keep the schedule consistent, so that if you schedule a task at `02:34` daily, it would always run at `02:34` (or try, at least). If instance has `dayOfWeek` or `dayOfMonth`, the function will find the earliest day that will satisfy both limitations starting from the date, which was determined based on instance frequency. `result` value is optional (`true` by default), and will affect logic only if set to `false` and `retry` value for the task is more than 0, essentially overriding the normal logic.
+It will calculate how many jobs were potentially missed based on time difference between current `next_run` value in the database and current time as well as instance frequency. This is required to keep the schedule consistent, so that if you schedule a task at `02:34` daily, it would always run at `02:34` (or try, at least). If instance has `day_of_week` or `day_of_month`, the function will find the earliest day that will satisfy both limitations starting from the date, which was determined based on instance frequency. `result` value is optional (`true` by default), and will affect logic only if set to `false` and `retry` value for the task is more than 0, essentially overriding the normal logic.
 
 ## Settings
 
@@ -275,11 +275,11 @@ All settings are grabbed from the database on object creation and when triggerin
 Supported settings are as follows:
 
 1. `enabled` governs whether processing is available. Does not block tasks management. Boolean value, thus as per MySQL/MariaDB design accepts only `0` and `1`. Default is `1`.
-2. `errorLife` is number of days to store error logs. Default is `30`.
+2. `log_life` is number of days to store error logs. Default is `30`.
 3. `retry` is the number of seconds to delay execution of failed one-time jobs. Such jobs have frequency set to `0`, thus in case of failure this can result in them spamming. This setting can help avoid that. Default is`3600`.
-4. `sseLoop` governs whether processing can be done in a loop if used in SSE mode. If set to `0` after running `process` cycle SSE will send `SSEEnd` event. If set to `1` - it will continue processing in a loop until stream is closed. Default is `0`.
-5. `sseRetry` is number of milliseconds for connection retry for SSE. Will also be used to determine how long should the loop sleep if no threads or jobs, but will be treated as a number of seconds divided by 20. Default is `10000` (or roughly 8 minutes for empty cycles).
-6. `maxThreads` is maximum number of threads (or rather loops) to be allowed to run at the same time. Does not affect singular `runTask()` calls, only `process()`. Number of current threads is determined by the number of distinct values of `runBy` in the `schedule` table, thus be careful with bad (or no) error catching, or otherwise it can be easily overrun by hanged jobs. Default is `4`.
+4. `sse_loop` governs whether processing can be done in a loop if used in SSE mode. If set to `0` after running `process` cycle SSE will send `SSEEnd` event. If set to `1` - it will continue processing in a loop until stream is closed. Default is `0`.
+5. `sse_retry` is number of milliseconds for connection retry for SSE. Will also be used to determine how long should the loop sleep if no threads or jobs, but will be treated as a number of seconds divided by 20. Default is `10000` (or roughly 8 minutes for empty cycles).
+6. `max_threads` is maximum number of threads (or rather loops) to be allowed to run at the same time. Does not affect singular `runTask()` calls, only `process()`. Number of current threads is determined by the number of distinct values of `run_by` in the `schedule` table, thus be careful with bad (or no) error catching, or otherwise it can be easily overrun by hanged jobs. Default is `4`.
 
 ## Event types
 

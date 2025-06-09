@@ -60,34 +60,34 @@ class Task
     /**
      * @var int Maximum execution time
      */
-    private(set) int $maxTime = 3600 {
+    private(set) int $max_time = 3600 {
         set (mixed $value) {
             if (empty($value)) {
-                $this->maxTime = 0;
+                $this->max_time = 0;
             } elseif (is_numeric($value)) {
-                $this->maxTime = (int)$value;
-                if ($this->maxTime < 0) {
-                    $this->maxTime = 0;
+                $this->max_time = (int)$value;
+                if ($this->max_time < 0) {
+                    $this->max_time = 0;
                 }
             } else {
-                throw new \UnexpectedValueException('`maxTime` is not a valid numeric value');
+                throw new \UnexpectedValueException('`max_time` is not a valid numeric value');
             }
         }
     }
     /**
      * @var int Minimal-allowed frequency (in seconds) at which a task instance can run. Does not apply to one-time jobs.
      */
-    private(set) int $minFrequency = 3600 {
+    private(set) int $min_frequency = 3600 {
         set (mixed $value) {
             if (empty($value)) {
-                $this->minFrequency = 0;
+                $this->min_frequency = 0;
             } elseif (is_numeric($value)) {
-                $this->minFrequency = (int)$value;
-                if ($this->minFrequency < 0) {
-                    $this->minFrequency = 0;
+                $this->min_frequency = (int)$value;
+                if ($this->min_frequency < 0) {
+                    $this->min_frequency = 0;
                 }
             } else {
-                throw new \UnexpectedValueException('`minFrequency` is not a valid numeric value');
+                throw new \UnexpectedValueException('`min_frequency` is not a valid numeric value');
             }
         }
     }
@@ -175,7 +175,7 @@ class Task
                         $this->object = $value;
                     }
                     break;
-                case 'allowedReturns':
+                case 'allowed_returns':
                     $this->returns = $value;
                     break;
                 case 'task':
@@ -183,8 +183,8 @@ class Task
                     break;
                 case 'function':
                 case 'parameters':
-                case 'maxTime':
-                case 'minFrequency':
+                case 'max_time':
+                case 'min_frequency':
                 case 'retry':
                     $this->{$setting} = $value;
                     break;
@@ -222,14 +222,14 @@ class Task
         }
         try {
             $taskDetailsString = json_encode($this, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION);
-            $result = Query::query('INSERT INTO `'.$this->prefix.'tasks` (`task`, `function`, `object`, `parameters`, `allowedReturns`, `maxTime`, `minFrequency`, `retry`, `enabled`, `system`, `description`) VALUES (:task, :function, :object, :parameters, :returns, :maxTime, :minFrequency, :retry, :enabled, :system, :desc) ON DUPLICATE KEY UPDATE `function`=:function, `object`=:object, `parameters`=:parameters, `allowedReturns`=:returns, `maxTime`=:maxTime, `minFrequency`=:minFrequency, `retry`=:retry, `description`=:desc;', [
+            $result = Query::query('INSERT INTO `'.$this->prefix.'tasks` (`task`, `function`, `object`, `parameters`, `allowed_returns`, `max_time`, `min_frequency`, `retry`, `enabled`, `system`, `description`) VALUES (:task, :function, :object, :parameters, :returns, :max_time, :min_frequency, :retry, :enabled, :system, :desc) ON DUPLICATE KEY UPDATE `function`=:function, `object`=:object, `parameters`=:parameters, `allowed_returns`=:returns, `max_time`=:max_time, `min_frequency`=:min_frequency, `retry`=:retry, `description`=:desc;', [
                 ':task' => [$this->taskName, 'string'],
                 ':function' => [$this->function, 'string'],
                 ':object' => [$this->object, (empty($this->object) ? 'null' : 'string')],
                 ':parameters' => [$this->parameters, (empty($this->parameters) ? 'null' : 'string')],
                 ':returns' => [$this->returns, (empty($this->returns) ? 'null' : 'string')],
-                ':maxTime' => [$this->maxTime, 'int'],
-                ':minFrequency' => [$this->minFrequency, 'int'],
+                ':max_time' => [$this->max_time, 'int'],
+                ':min_frequency' => [$this->min_frequency, 'int'],
                 ':retry' => [$this->retry, 'int'],
                 ':enabled' => [$this->enabled, 'bool'],
                 ':system' => [$this->system, 'bool'],

@@ -45,22 +45,22 @@ trait TraitForCron
      * Days to store errors for
      * @var int
      */
-    private(set) int $logLife = 30;
+    private(set) int $log_life = 30;
     /**
      * Flag to indicate whether SSE is looped or not
      * @var bool
      */
-    private(set) bool $sseLoop = false;
+    private(set) bool $sse_loop = false;
     /**
      * Number of milliseconds for connection retry for SSE. Will also be used to determine how long should the loop sleep if no threads or jobs, but will be treated as a number of seconds divided by 20. The default is `10000` (or roughly 8 minutes for empty cycles).
      * @var int
      */
-    private(set) int $sseRetry = 10000;
+    private(set) int $sse_retry = 10000;
     /**
      * Maximum threads
      * @var int
      */
-    private(set) int $maxThreads = 4;
+    private(set) int $max_threads = 4;
     /**
      * List of event types that are allowed to not have TaskInstance object with them
      * @var array
@@ -70,7 +70,7 @@ trait TraitForCron
      * Random ID
      * @var null|string
      */
-    private(set) ?string $runBy = null;
+    private(set) ?string $run_by = null;
     /**
      * Current task object
      * @var null|TaskInstance
@@ -110,8 +110,8 @@ trait TraitForCron
             $this->cronEnabled = (bool)(int)$settings['enabled'];
         }
         #Update SSE loop flag
-        if (isset($settings['sseLoop'])) {
-            $this->sseLoop = (bool)(int)$settings['sseLoop'];
+        if (isset($settings['sse_loop'])) {
+            $this->sse_loop = (bool)(int)$settings['sse_loop'];
         }
         #Update retry time
         if (isset($settings['retry'])) {
@@ -121,24 +121,24 @@ trait TraitForCron
             }
         }
         #Update SSE retry time
-        if (isset($settings['sseRetry'])) {
-            $settings['sseRetry'] = (int)$settings['sseRetry'];
-            if ($settings['sseRetry'] > 0) {
-                $this->sseRetry = $settings['sseRetry'];
+        if (isset($settings['sse_retry'])) {
+            $settings['sse_retry'] = (int)$settings['sse_retry'];
+            if ($settings['sse_retry'] > 0) {
+                $this->sse_retry = $settings['sse_retry'];
             }
         }
         #Update maximum number of threads
-        if (isset($settings['maxThreads'])) {
-            $settings['maxThreads'] = (int)$settings['maxThreads'];
-            if ($settings['maxThreads'] > 0) {
-                $this->maxThreads = $settings['maxThreads'];
+        if (isset($settings['max_threads'])) {
+            $settings['max_threads'] = (int)$settings['max_threads'];
+            if ($settings['max_threads'] > 0) {
+                $this->max_threads = $settings['max_threads'];
             }
         }
         #Update maximum life of an error
-        if (isset($settings['logLife'])) {
-            $settings['logLife'] = (int)$settings['logLife'];
-            if ($settings['logLife'] > 0) {
-                $this->logLife = $settings['logLife'];
+        if (isset($settings['log_life'])) {
+            $settings['log_life'] = (int)$settings['log_life'];
+            if ($settings['log_life'] > 0) {
+                $this->log_life = $settings['log_life'];
             }
         }
         return true;
@@ -163,12 +163,12 @@ trait TraitForCron
             return;
         }
         $skipInsert = false;
-        #If $task was passed, use its value for runBy
-        $runBy = $task?->runBy ?? $this->runBy;
+        #If $task was passed, use its value for run_by
+        $run_by = $task?->run_by ?? $this->run_by;
         #To reduce the amount of NoThreads, Empty and Disabled events in the DB log, we check if the latest event is the same we want to write
         if (in_array($event, ['CronDisabled', 'CronEmpty', 'CronNoThreads'])) {
-            #Reset runBy value to null, since these entries can belong to multiple threads, and we don't really care about which one was the last one
-            $runBy = null;
+            #Reset run_by value to null, since these entries can belong to multiple threads, and we don't really care about which one was the last one
+            $run_by = null;
             #Get last event time and type
             $lastEvent = Query::query('SELECT `time`, `type` FROM `'.$this->prefix.'log` ORDER BY `time` DESC LIMIT 1', return: 'row');
             #Checking for empty, in case there are no logs in the table
@@ -188,10 +188,10 @@ trait TraitForCron
         #Insert log entry only if we did not update the last log on previous check
         if (!$skipInsert) {
             Query::query(
-                'INSERT INTO `'.$this->prefix.'log` (`type`, `runBy`, `sse`, `task`, `arguments`, `instance`, `message`) VALUES (:type,:runBy,:sse,:task, :arguments, :instance, :message);',
+                'INSERT INTO `'.$this->prefix.'log` (`type`, `run_by`, `sse`, `task`, `arguments`, `instance`, `message`) VALUES (:type,:run_by,:sse,:task, :arguments, :instance, :message);',
                 [
                     ':type' => $event,
-                    ':runBy' => [empty($runBy) ? null : $runBy, empty($runBy) ? 'null' : 'string'],
+                    ':run_by' => [empty($run_by) ? null : $run_by, empty($run_by) ? 'null' : 'string'],
                     ':sse' => [SSE::$SSE, 'bool'],
                     ':task' => [$task?->taskName, $task === null ? 'null' : 'string'],
                     ':arguments' => [$task?->arguments, $task === null ? 'null' : 'string'],
@@ -201,7 +201,7 @@ trait TraitForCron
             );
         }
         if (SSE::$SSE) {
-            SSE::send($message, $event, ((($endStream || $error !== null)) ? 0 : $this->sseRetry));
+            SSE::send($message, $event, ((($endStream || $error !== null)) ? 0 : $this->sse_retry));
         }
         if ($endStream) {
             if (SSE::$SSE) {
