@@ -22,7 +22,8 @@
         "simbiat/db-query": "^1",
         "simbiat/sand-clock": "^2.4",
         "simbiat/sse": "^1.1",
-        "simbiat/db-manager": "^1"
+        "simbiat/db-manager": "^1",
+        "simbiat/db-installer": "^1"
     },
     "suggest": {
         "simbiat/db-pool": "Allows use of database connections pool"
