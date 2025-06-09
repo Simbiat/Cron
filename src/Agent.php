@@ -19,12 +19,12 @@ class Agent
      * Supported settings
      * @var array
      */
-    private const array settings = ['enabled', 'log_life', 'retry', 'sse_loop', 'sse_retry', 'max_threads'];
+    private const array SETTINGS = ['enabled', 'log_life', 'retry', 'sse_loop', 'sse_retry', 'max_threads'];
     /**
      * Logic to calculate task priority. Not sure, I fully understand how this provides the results I expect, but it does. Essentially, `priority` is valued higher, while "overdue" time has a smoother scaling. Rare jobs (with higher value of `frequency`) also have higher weight, but one-time jobs have even higher weight, since they are likely to be quick ones.
      * @var string
      */
-    private const string calculatedPriority = '((CASE WHEN `frequency` = 0 THEN 1 ELSE (4294967295 - `frequency`) / 4294967295 END) + LOG(TIMESTAMPDIFF(SECOND, `next_run`, CURRENT_TIMESTAMP(6)) + 2) * 100 + `priority` * 1000)';
+    private const string CALCULATED_PRIORITY = '((CASE WHEN `frequency` = 0 THEN 1 ELSE (4294967295 - `frequency`) / 4294967295 END) + LOG(TIMESTAMPDIFF(SECOND, `next_run`, CURRENT_TIMESTAMP(6)) + 2) * 100 + `priority` * 1000)';
     
     
     /**
@@ -173,7 +173,7 @@ class Agent
                         INNER JOIN
                         (
                             SELECT `task`, `arguments`, `instance` FROM (
-                                SELECT `task`, `arguments`, `instance`, `next_run`, '.self::calculatedPriority.' AS `calculated` FROM `'.$this->prefix.'schedule` AS `instances`
+                                SELECT `task`, `arguments`, `instance`, `next_run`, '.self::CALCULATED_PRIORITY.' AS `calculated` FROM `'.$this->prefix.'schedule` AS `instances`
                                 WHERE `enabled`=1 AND `run_by` IS NULL AND `next_run`<=CURRENT_TIMESTAMP() AND (SELECT `enabled` FROM `'.$this->prefix.'tasks` `tasks` WHERE `tasks`.`task`=`instances`.`task`)=1
                                 ORDER BY `calculated` DESC, `next_run`
                                 LIMIT :innerLimit
@@ -199,7 +199,7 @@ class Agent
         #Get tasks
         try {
             return Query::query(
-                'SELECT `task`, `arguments`, `instance` FROM `'.$this->prefix.'schedule` WHERE `run_by`=:run_by ORDER BY '.self::calculatedPriority.' DESC, `next_run`;',
+                'SELECT `task`, `arguments`, `instance` FROM `'.$this->prefix.'schedule` WHERE `run_by`=:run_by ORDER BY '.self::CALCULATED_PRIORITY.' DESC, `next_run`;',
                 [
                     ':run_by' => $this->run_by,
                 ], return: 'all'
@@ -218,10 +218,10 @@ class Agent
      *
      * @return $this
      */
-    public function setSetting(#[ExpectedValues(self::settings)] string $setting, int $value): self
+    public function setSetting(#[ExpectedValues(self::SETTINGS)] string $setting, int $value): self
     {
         #Check setting name
-        if (!in_array($setting, self::settings, true)) {
+        if (!in_array($setting, self::SETTINGS, true)) {
             throw new \InvalidArgumentException('Attempt to set unsupported setting');
         }
         #Handle values lower than 0

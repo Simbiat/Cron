@@ -65,7 +65,7 @@ trait TraitForCron
      * List of event types that are allowed to not have TaskInstance object with them
      * @var array
      */
-    private const array eventsNoInstance = ['SSEStart', 'CronFail', 'CronEmpty', 'CronNoThreads', 'SSEEnd', 'TaskToSystem', 'TaskToSystemFail', 'TaskAdd', 'TaskAddFail', 'TaskDelete', 'TaskDeleteFail', 'CronDisabled'];
+    private const array EVENTS_NO_INSTANCE = ['SSEStart', 'CronFail', 'CronEmpty', 'CronNoThreads', 'SSEEnd', 'TaskToSystem', 'TaskToSystemFail', 'TaskAdd', 'TaskAddFail', 'TaskDelete', 'TaskDeleteFail', 'CronDisabled'];
     /**
      * Random ID
      * @var null|string
@@ -157,7 +157,7 @@ trait TraitForCron
      */
     public function log(string $message, string $event, bool $endStream = false, ?\Throwable $error = null, ?TaskInstance $task = null): void
     {
-        if ($task === null && !in_array($event, $this::eventsNoInstance, true)) {
+        if ($task === null && !in_array($event, $this::EVENTS_NO_INSTANCE, true)) {
             #Something is trying to use Cron log to write a custom message and does not have associated TaskInstance with it, so probably was called outside Cron classes.
             #We do not want to flood DB with unsupported logs, and for SSE a separate function can be used
             return;

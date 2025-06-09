@@ -14,18 +14,6 @@ class Installer
     use TraitForCron;
     
     /**
-     * Supported settings
-     * @var array
-     */
-    private const array settings = ['enabled', 'log_life', 'retry', 'sse_loop', 'sse_retry', 'max_threads'];
-    /**
-     * Logic to calculate task priority. Not sure, I fully understand how this provides the results I expect, but it does. Essentially, `priority` is valued higher, while "overdue" time has a smoother scaling. Rare jobs (with higher value of `frequency`) also have higher weight, but one-time jobs have even higher weight, since they are likely to be quick ones.
-     * @var string
-     */
-    private const string calculatedPriority = '((CASE WHEN `frequency` = 0 THEN 1 ELSE (4294967295 - `frequency`) / 4294967295 END) + LOG(TIMESTAMPDIFF(SECOND, `nextrun`, CURRENT_TIMESTAMP(6)) + 2) * 100 + `priority` * 1000)';
-    
-    
-    /**
      * Class constructor
      * @param \PDO|null $dbh    PDO object to use for database connection. If not provided, the class expects the existence of `\Simbiat\Database\Pool` to use that instead.
      * @param string    $prefix Cron database prefix.
