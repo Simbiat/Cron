@@ -185,7 +185,7 @@ To schedule a task, use this function:
 ```
 
 1. `task` is mandatory name of the task.
-2. `arguments` are optional arguments that will be passed to the function. Needs to be either pure array or JSON encoded array of values, that can be expanded (`...` operator). Stored in the database as JSON or empty string and limited to `VARCHAR(255)` (due to MySQL limitations). Also supports special string `"$cronInstance"` (when JSON encoded, that is) that will be replaced by task instance value, when run (useful, when you need multiple instances, and need to offset their processing logic).
+2. `arguments` are optional arguments that will be passed to the function. Needs to be either pure array or JSON encoded array of values, that can be expanded (`...` operator). Stored in the database as JSON or empty string and limited to `VARCHAR(255)` (due to MySQL limitations). Also supports special string `"$cron_instance"` (when JSON encoded, that is) that will be replaced by task instance value, when run (useful, when you need multiple instances, and need to offset their processing logic).
 3. `instance` is optional instance number (or ID if you like). By default, it is `1`. This is useful if you want to create multiple instances for the same task with the same arguments, which you want to run in parallel, when possible.
 4. `frequency` governs how frequent (in seconds) a task is supposed to be run. If set to `0`, it will mean that the task instance is one-time, thus it will be removed from schedule (not from the list of tasks) after successful run.
 5. `message` is an optional custom message to be shown, when running in SSE mode.

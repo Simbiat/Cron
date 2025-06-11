@@ -192,7 +192,7 @@ trait TraitForCron
                 [
                     ':type' => $event,
                     ':run_by' => [empty($run_by) ? null : $run_by, empty($run_by) ? 'null' : 'string'],
-                    ':sse' => [SSE::$SSE, 'bool'],
+                    ':sse' => [SSE::$sse, 'bool'],
                     ':task' => [$task?->taskName, $task === null ? 'null' : 'string'],
                     ':arguments' => [$task?->arguments, $task === null ? 'null' : 'string'],
                     ':instance' => [$task?->instance, $task === null ? 'null' : 'int'],
@@ -200,11 +200,11 @@ trait TraitForCron
                 ]
             );
         }
-        if (SSE::$SSE) {
+        if (SSE::$sse) {
             SSE::send($message, $event, ((($endStream || $error !== null)) ? 0 : $this->sse_retry));
         }
         if ($endStream) {
-            if (SSE::$SSE) {
+            if (SSE::$sse) {
                 SSE::close();
             }
             if ($error !== null) {

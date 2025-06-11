@@ -53,7 +53,7 @@ class Agent
         }
         #Generate random ID
         $this->run_by = $this->generateRunBy();
-        if (SSE::$SSE) {
+        if (SSE::$sse) {
             $this->log('Cron processing started in SSE mode', 'SSEStart');
         }
         #Regular maintenance
@@ -93,7 +93,7 @@ class Agent
             try {
                 if (Query::query('SELECT COUNT(DISTINCT(`run_by`)) as `count` FROM `'.$this->prefix.'schedule` WHERE `run_by` IS NOT NULL;', return: 'count') >= $this->max_threads) {
                     $this->log('Cron threads are exhausted', 'CronNoThreads');
-                    if (!SSE::$SSE) {
+                    if (!SSE::$sse) {
                         return false;
                     }
                     #Sleep for a bit
@@ -108,7 +108,7 @@ class Agent
             $tasks = $this->getTasks($items);
             if (empty($tasks)) {
                 $this->log('Cron list is empty', 'CronEmpty');
-                if (SSE::$SSE) {
+                if (SSE::$sse) {
                     #Sleep for a bit
                     sleep($this->sse_retry / 20);
                 }
@@ -119,12 +119,12 @@ class Agent
                 }
             }
             #Additionally, reschedule hanged jobs if we're in SSE
-            if (SSE::$SSE && $this->sse_loop) {
+            if (SSE::$sse && $this->sse_loop) {
                 $this->unHang();
             }
-        } while ($this->cronEnabled && SSE::$SSE && $this->sse_loop && connection_status() === 0);
+        } while ($this->cronEnabled && SSE::$sse && $this->sse_loop && connection_status() === 0);
         #Notify about the end of the stream
-        if (SSE::$SSE) {
+        if (SSE::$sse) {
             $this->log('Cron processing finished', 'SSEEnd', true);
         }
         return true;
@@ -185,7 +185,7 @@ class Agent
                         SET `status`=1, `run_by`=:run_by, `sse`=:sse;',
                 [
                     ':run_by' => $this->run_by,
-                    ':sse' => [SSE::$SSE, 'bool'],
+                    ':sse' => [SSE::$sse, 'bool'],
                     ':limit' => [$items, 'int'],
                     #Using this approach seems to be the best solution so far, so that no temporary tables are used (or smaller ones, at least), and it is still relatively performant.
                     #In the worst case scenario tested with 8mil+ records in schedule, the query took 1.5 minutes, which was happening while there are other queries running on the same table at the same time.

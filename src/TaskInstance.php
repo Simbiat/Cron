@@ -487,7 +487,7 @@ class TaskInstance
                 $result = $function();
             } else {
                 #Replace instance reference
-                $arguments = str_replace('"$cronInstance"', (string)$this->instance, $this->arguments);
+                $arguments = str_replace('"$cron_instance"', (string)$this->instance, $this->arguments);
                 $result = \call_user_func_array($function, json_decode($arguments, flags: JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_BIGINT_AS_STRING | JSON_OBJECT_AS_ARRAY));
             }
         } catch (\Throwable $e) {
