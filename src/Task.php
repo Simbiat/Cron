@@ -16,7 +16,7 @@ class Task
     /**
      * @var string Unique name of the task
      */
-    private(set) string $taskName = '';
+    private(set) string $task_name = '';
     /**
      * @var string Name of the task
      */
@@ -123,20 +123,20 @@ class Task
     /**
      * @var bool Whether a task was found in a database
      */
-    private(set) bool $foundInDB = false;
+    private(set) bool $found_in_db = false;
     
     /**
      * Create a Cron task object
      *
-     * @param string    $taskName If the name is not empty, settings will be attempts to be loaded from the database
-     * @param \PDO|null $dbh      PDO object to use for database connection. If not provided, the class expects that the connection has already been established through `\Simbiat\Cron\Agent`.
-     * @param string    $prefix   Cron database prefix.
+     * @param string    $task_name If the name is not empty, settings will be attempts to be loaded from the database
+     * @param \PDO|null $dbh       PDO object to use for database connection. If not provided, the class expects that the connection has already been established through `\Simbiat\Cron\Agent`.
+     * @param string    $prefix    Cron database prefix.
      */
-    public function __construct(string $taskName = '', \PDO|null $dbh = null, string $prefix = 'cron__')
+    public function __construct(string $task_name = '', \PDO|null $dbh = null, string $prefix = 'cron__')
     {
         $this->init($dbh, $prefix);
-        if (!empty($taskName)) {
-            $this->taskName = $taskName;
+        if (!empty($task_name)) {
+            $this->task_name = $task_name;
             #Attempt to get settings from DB
             $this->getFromDB();
         }
@@ -149,13 +149,13 @@ class Task
      */
     private function getFromDB(): void
     {
-        $settings = Query::query('SELECT * FROM `'.$this->prefix.'tasks` WHERE `task`=:name;', [':name' => $this->taskName], return: 'row');
+        $settings = Query::query('SELECT * FROM `'.$this->prefix.'tasks` WHERE `task`=:name;', [':name' => $this->task_name], return: 'row');
         if (!empty($settings)) {
             $this->settingsFromArray($settings);
             if (empty($this->function)) {
                 throw new \UnexpectedValueException('Task has no assigned function');
             }
-            $this->foundInDB = true;
+            $this->found_in_db = true;
         }
     }
     
@@ -179,7 +179,7 @@ class Task
                     $this->returns = $value;
                     break;
                 case 'task':
-                    $this->taskName = $value;
+                    $this->task_name = $value;
                     break;
                 case 'function':
                 case 'parameters':
@@ -214,16 +214,16 @@ class Task
      */
     public function add(): bool
     {
-        if (empty($this->taskName)) {
+        if (empty($this->task_name)) {
             throw new \UnexpectedValueException('Task name is not set');
         }
         if (empty($this->function)) {
             throw new \UnexpectedValueException('Function name is not set');
         }
         try {
-            $taskDetailsString = json_encode($this, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION);
+            $task_details_string = json_encode($this, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION);
             $result = Query::query('INSERT INTO `'.$this->prefix.'tasks` (`task`, `function`, `object`, `parameters`, `allowed_returns`, `max_time`, `min_frequency`, `retry`, `enabled`, `system`, `description`) VALUES (:task, :function, :object, :parameters, :returns, :max_time, :min_frequency, :retry, :enabled, :system, :desc) ON DUPLICATE KEY UPDATE `function`=:function, `object`=:object, `parameters`=:parameters, `allowed_returns`=:returns, `max_time`=:max_time, `min_frequency`=:min_frequency, `retry`=:retry, `description`=:desc;', [
-                ':task' => [$this->taskName, 'string'],
+                ':task' => [$this->task_name, 'string'],
                 ':function' => [$this->function, 'string'],
                 ':object' => [$this->object, (empty($this->object) ? 'null' : 'string')],
                 ':parameters' => [$this->parameters, (empty($this->parameters) ? 'null' : 'string')],
@@ -235,14 +235,14 @@ class Task
                 ':system' => [$this->system, 'bool'],
                 ':desc' => [$this->description, (empty($this->description) ? 'null' : 'string')],
             ], return: 'affected');
-            $this->foundInDB = true;
+            $this->found_in_db = true;
         } catch (\Throwable $e) {
-            $this->log('Failed to add or update task with following details: '.$taskDetailsString.'.', 'TaskAddFail', error: $e);
+            $this->log('Failed to add or update task with following details: '.$task_details_string.'.', 'TaskAddFail', error: $e);
             return false;
         }
         #Log only if something was actually changed
         if ($result > 0) {
-            $this->log('Added or updated task with following details: '.$taskDetailsString.'.', 'TaskAdd');
+            $this->log('Added or updated task with following details: '.$task_details_string.'.', 'TaskAdd');
         }
         return true;
     }
@@ -254,29 +254,29 @@ class Task
      */
     public function delete(): bool
     {
-        if (empty($this->taskName)) {
+        if (empty($this->task_name)) {
             throw new \UnexpectedValueException('Task name is not set');
         }
         try {
             $result = Query::query('DELETE FROM `'.$this->prefix.'tasks` WHERE `task`=:task AND `system`=0;', [
-                ':task' => [$this->taskName, 'string'],
+                ':task' => [$this->task_name, 'string'],
             ], return: 'affected');
         } catch (\Throwable $e) {
-            $this->log('Failed delete task `'.$this->taskName.'`.', 'TaskDeleteFail', error: $e);
+            $this->log('Failed delete task `'.$this->task_name.'`.', 'TaskDeleteFail', error: $e);
             return false;
         }
         #Log only if something was actually deleted
         if ($result > 0) {
-            $this->foundInDB = false;
+            $this->found_in_db = false;
             try {
                 #Try to delete the respective task instances as well
                 Query::query('DELETE FROM `'.$this->prefix.'schedule` WHERE `task`=:task AND `system`=0;', [
-                    ':task' => [$this->taskName, 'string'],
+                    ':task' => [$this->task_name, 'string'],
                 ]);
             } catch (\Throwable) {
                 #Do nothing, not critical
             }
-            $this->log('Deleted task  `'.$this->taskName.'`.', 'TaskDelete');
+            $this->log('Deleted task  `'.$this->task_name.'`.', 'TaskDelete');
         }
         return true;
     }
@@ -287,22 +287,22 @@ class Task
      */
     public function setSystem(): bool
     {
-        if (empty($this->taskName)) {
+        if (empty($this->task_name)) {
             throw new \UnexpectedValueException('Task name is not set');
         }
-        if ($this->foundInDB) {
+        if ($this->found_in_db) {
             try {
                 $result = Query::query('UPDATE `'.$this->prefix.'tasks` SET `system`=1 WHERE `task`=:task AND `system`=0;', [
-                    ':task' => [$this->taskName, 'string'],
+                    ':task' => [$this->task_name, 'string'],
                 ], return: 'affected');
             } catch (\Throwable $e) {
-                $this->log('Failed to mark task `'.$this->taskName.'` as system one.', 'TaskToSystemFail', error: $e);
+                $this->log('Failed to mark task `'.$this->task_name.'` as system one.', 'TaskToSystemFail', error: $e);
                 return false;
             }
             #Log only if something was actually changed
             if ($result > 0) {
                 $this->system = true;
-                $this->log('Marked task `'.$this->taskName.'` as system one.', 'TaskToSystem');
+                $this->log('Marked task `'.$this->task_name.'` as system one.', 'TaskToSystem');
             }
             return true;
         }
@@ -317,13 +317,13 @@ class Task
      */
     public function setEnabled(bool $enabled = true): bool
     {
-        if (empty($this->taskName)) {
+        if (empty($this->task_name)) {
             throw new \UnexpectedValueException('Task name is not set');
         }
-        if ($this->foundInDB) {
+        if ($this->found_in_db) {
             try {
                 $result = Query::query('UPDATE `'.$this->prefix.'tasks` SET `enabled`=:enabled WHERE `task`=:task;', [
-                    ':task' => [$this->taskName, 'string'],
+                    ':task' => [$this->task_name, 'string'],
                     ':enabled' => [$enabled, 'bool'],
                 ], return: 'affected');
             } catch (\Throwable $e) {

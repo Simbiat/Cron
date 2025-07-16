@@ -35,12 +35,12 @@ trait TraitForCron
      * Flag to indicate whether Cron is enabled
      * @var bool
      */
-    private(set) bool $cronEnabled = false;
+    private(set) bool $cron_enabled = false;
     /**
      * Retry time for one-time jobs
      * @var int
      */
-    private(set) int $oneTimeRetry = 3600;
+    private(set) int $one_time_retry = 3600;
     /**
      * Days to store errors for
      * @var int
@@ -75,7 +75,7 @@ trait TraitForCron
      * Current task object
      * @var null|TaskInstance
      */
-    private ?TaskInstance $currentTask = null;
+    private ?TaskInstance $current_task = null;
     
     /**
      * Class constructor
@@ -107,7 +107,7 @@ trait TraitForCron
         }
         #Update enabled flag
         if (isset($settings['enabled'])) {
-            $this->cronEnabled = (bool)(int)$settings['enabled'];
+            $this->cron_enabled = (bool)(int)$settings['enabled'];
         }
         #Update SSE loop flag
         if (isset($settings['sse_loop'])) {
@@ -117,7 +117,7 @@ trait TraitForCron
         if (isset($settings['retry'])) {
             $settings['retry'] = (int)$settings['retry'];
             if ($settings['retry'] > 0) {
-                $this->oneTimeRetry = $settings['retry'];
+                $this->one_time_retry = $settings['retry'];
             }
         }
         #Update SSE retry time
@@ -147,22 +147,22 @@ trait TraitForCron
     /**
      * Function to end SSE stream and rethrow an error, if it was provided
      *
-     * @param string                          $message   SSE message
-     * @param string                          $event     SSE type
-     * @param bool                            $endStream Flag to indicate whether we end the stream
-     * @param \Throwable|null                 $error     Error object
-     * @param \Simbiat\Cron\TaskInstance|null $task      TaskInstance object
+     * @param string                          $message    SSE message
+     * @param string                          $event      SSE type
+     * @param bool                            $end_stream Flag to indicate whether we end the stream
+     * @param \Throwable|null                 $error      Error object
+     * @param \Simbiat\Cron\TaskInstance|null $task       TaskInstance object
      *
      * @return void
      */
-    public function log(string $message, string $event, bool $endStream = false, ?\Throwable $error = null, ?TaskInstance $task = null): void
+    public function log(string $message, string $event, bool $end_stream = false, ?\Throwable $error = null, ?TaskInstance $task = null): void
     {
         if ($task === null && !in_array($event, $this::EVENTS_NO_INSTANCE, true)) {
             #Something is trying to use Cron log to write a custom message and does not have associated TaskInstance with it, so probably was called outside Cron classes.
             #We do not want to flood DB with unsupported logs, and for SSE a separate function can be used
             return;
         }
-        $skipInsert = false;
+        $skip_insert = false;
         #If $task was passed, use its value for run_by
         $run_by = $task?->run_by ?? $this->run_by;
         #To reduce the amount of NoThreads, Empty and Disabled events in the DB log, we check if the latest event is the same we want to write
@@ -170,30 +170,30 @@ trait TraitForCron
             #Reset run_by value to null, since these entries can belong to multiple threads, and we don't really care about which one was the last one
             $run_by = null;
             #Get last event time and type
-            $lastEvent = Query::query('SELECT `time`, `type` FROM `'.$this->prefix.'log` ORDER BY `time` DESC LIMIT 1', return: 'row');
+            $last_event = Query::query('SELECT `time`, `type` FROM `'.$this->prefix.'log` ORDER BY `time` DESC LIMIT 1', return: 'row');
             #Checking for empty, in case there are no logs in the table
-            if (!empty($lastEvent['type']) && $lastEvent['type'] === $event) {
+            if (!empty($last_event['type']) && $last_event['type'] === $event) {
                 #Update the message of last event with current time
                 Query::query(
                     'UPDATE `'.$this->prefix.'log` SET `message`=:message WHERE `time`=:time AND `type`=:type;',
                     [
                         ':type' => $event,
-                        ':time' => [$lastEvent['time'], 'datetime'],
+                        ':time' => [$last_event['time'], 'datetime'],
                         ':message' => [$message.' (last check at '.SandClock::format(0, 'c').')', 'string'],
                     ]
                 );
-                $skipInsert = true;
+                $skip_insert = true;
             }
         }
         #Insert log entry only if we did not update the last log on previous check
-        if (!$skipInsert) {
+        if (!$skip_insert) {
             Query::query(
                 'INSERT INTO `'.$this->prefix.'log` (`type`, `run_by`, `sse`, `task`, `arguments`, `instance`, `message`) VALUES (:type,:run_by,:sse,:task, :arguments, :instance, :message);',
                 [
                     ':type' => $event,
                     ':run_by' => [empty($run_by) ? null : $run_by, empty($run_by) ? 'null' : 'string'],
                     ':sse' => [SSE::$sse, 'bool'],
-                    ':task' => [$task?->taskName, $task === null ? 'null' : 'string'],
+                    ':task' => [$task?->task_name, $task === null ? 'null' : 'string'],
                     ':arguments' => [$task?->arguments, $task === null ? 'null' : 'string'],
                     ':instance' => [$task?->instance, $task === null ? 'null' : 'int'],
                     ':message' => [$message.($error !== null ? "\r\n".$error->getMessage()."\r\n".$error->getTraceAsString() : ''), 'string'],
@@ -201,9 +201,9 @@ trait TraitForCron
             );
         }
         if (SSE::$sse) {
-            SSE::send($message, $event, ((($endStream || $error !== null)) ? 0 : $this->sse_retry));
+            SSE::send($message, $event, ((($end_stream || $error !== null)) ? 0 : $this->sse_retry));
         }
-        if ($endStream) {
+        if ($end_stream) {
             if (SSE::$sse) {
                 SSE::close();
             }

@@ -75,7 +75,7 @@ class Agent
             return false;
         }
         #Check if cron is enabled and process only if it is
-        if (!$this->cronEnabled) {
+        if (!$this->cron_enabled) {
             #Notify about the end of the stream
             $this->log('Cron processing is disabled', 'CronDisabled', true);
             return false;
@@ -113,16 +113,16 @@ class Agent
                     sleep($this->sse_retry / 20);
                 }
             } else {
-                $totalTasks = \count($tasks);
+                $total_tasks = count($tasks);
                 foreach ($tasks as $number => $task) {
-                    $this->runTask($task, $number + 1, $totalTasks);
+                    $this->runTask($task, $number + 1, $total_tasks);
                 }
             }
             #Additionally, reschedule hanged jobs if we're in SSE
             if (SSE::$sse && $this->sse_loop) {
                 $this->unHang();
             }
-        } while ($this->cronEnabled && SSE::$sse && $this->sse_loop && connection_status() === 0);
+        } while ($this->cron_enabled && SSE::$sse && $this->sse_loop && connection_status() === 0);
         #Notify about the end of the stream
         if (SSE::$sse) {
             $this->log('Cron processing finished', 'SSEEnd', true);
@@ -132,31 +132,31 @@ class Agent
     
     /**
      * Wrapper for running the task
-     * @param array $task       Task object
-     * @param int   $number     Current task number
-     * @param int   $totalTasks Total number of tasks
+     * @param array $task        Task object
+     * @param int   $number      Current task number
+     * @param int   $total_tasks Total number of tasks
      *
      * @return void
      */
-    private function runTask(array $task, int $number, int $totalTasks): void
+    private function runTask(array $task, int $number, int $total_tasks): void
     {
         try {
-            $taskInstance = (new TaskInstance($task['task'], $task['arguments'], $task['instance']));
+            $task_instance = (new TaskInstance($task['task'], $task['arguments'], $task['instance']));
             #Notify of the task starting
-            $this->log($number.'/'.$totalTasks.' '.(empty($task['message']) ? $task['task'].' starting' : $task['message']), 'InstanceStart', task: $taskInstance);
+            $this->log($number.'/'.$total_tasks.' '.(empty($task['message']) ? $task['task'].' starting' : $task['message']), 'InstanceStart', task: $task_instance);
             #Attemp to run
-            $result = $taskInstance->run();
+            $result = $task_instance->run();
         } catch (\Throwable $exception) {
-            $this->log('Failed to run task `'.$task['task'].'` ('.$number.'/'.$totalTasks.')', 'InstanceFail', false, $exception, ($taskInstance ?? null));
+            $this->log('Failed to run task `'.$task['task'].'` ('.$number.'/'.$total_tasks.')', 'InstanceFail', false, $exception, ($task_instance ?? null));
             return;
         } finally {
-            $this->currentTask = null;
+            $this->current_task = null;
         }
         #Notify of the task finishing
         if ($result) {
-            $this->log($number.'/'.$totalTasks.' '.$task['task'].' finished'.($taskInstance->frequency === 0 ? ' and deleted' : ''), 'InstanceEnd', task: $taskInstance);
+            $this->log($number.'/'.$total_tasks.' '.$task['task'].' finished'.($task_instance->frequency === 0 ? ' and deleted' : ''), 'InstanceEnd', task: $task_instance);
         } else {
-            $this->log($number.'/'.$totalTasks.' '.$task['task'].' failed', 'InstanceFail', task: $taskInstance);
+            $this->log($number.'/'.$total_tasks.' '.$task['task'].' failed', 'InstanceFail', task: $task_instance);
         }
     }
     
@@ -169,19 +169,19 @@ class Agent
     private function getTasks(int $items): bool|array
     {
         try {
-            Query::query('UPDATE `'.$this->prefix.'schedule` AS `toUpdate`
+            Query::query('UPDATE `'.$this->prefix.'schedule` AS `to_update`
                         INNER JOIN
                         (
                             SELECT `task`, `arguments`, `instance` FROM (
                                 SELECT `task`, `arguments`, `instance`, `next_run`, '.self::CALCULATED_PRIORITY.' AS `calculated` FROM `'.$this->prefix.'schedule` AS `instances`
                                 WHERE `enabled`=1 AND `run_by` IS NULL AND `next_run`<=CURRENT_TIMESTAMP() AND (SELECT `enabled` FROM `'.$this->prefix.'tasks` `tasks` WHERE `tasks`.`task`=`instances`.`task`)=1
                                 ORDER BY `calculated` DESC, `next_run`
-                                LIMIT :innerLimit
+                                LIMIT :inner_limit
                             ) `instances` GROUP BY `task`, `arguments` ORDER BY `calculated` DESC, `next_run` LIMIT :limit FOR UPDATE SKIP LOCKED
-                        ) `toSelect`
-                        ON `toUpdate`.`task`=`toSelect`.`task`
-                            AND `toUpdate`.`arguments`=`toSelect`.`arguments`
-                            AND `toUpdate`.`instance`=`toSelect`.`instance`
+                        ) `to_select`
+                        ON `to_update`.`task`=`to_select`.`task`
+                            AND `to_update`.`arguments`=`to_select`.`arguments`
+                            AND `to_update`.`instance`=`to_select`.`instance`
                         SET `status`=1, `run_by`=:run_by, `sse`=:sse;',
                 [
                     ':run_by' => $this->run_by,
@@ -190,7 +190,7 @@ class Agent
                     #Using this approach seems to be the best solution so far, so that no temporary tables are used (or smaller ones, at least), and it is still relatively performant.
                     #In the worst case scenario tested with 8mil+ records in schedule, the query took 1.5 minutes, which was happening while there are other queries running on the same table at the same time.
                     #On smaller (and more realistic) data sets performance hit is negligible.
-                    ':innerLimit' => [$items * 2, 'int']
+                    ':inner_limit' => [$items * 2, 'int']
                 ]);
         } catch (\Throwable $exception) {
             #Notify about the end of the stream
@@ -240,7 +240,7 @@ class Agent
         ])) {
             switch ($setting) {
                 case 'enabled':
-                    $this->cronEnabled = (bool)$value;
+                    $this->cron_enabled = (bool)$value;
                     break;
                 case 'sse_loop':
                     $this->sse_loop = (bool)$value;
@@ -249,7 +249,7 @@ class Agent
                     $this->log_life = $value;
                     break;
                 case 'retry':
-                    $this->oneTimeRetry = $value;
+                    $this->one_time_retry = $value;
                     break;
                 case 'sse_retry':
                     $this->sse_retry = $value;

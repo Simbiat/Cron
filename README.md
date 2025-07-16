@@ -24,7 +24,7 @@ Despite the name this is not a CRON replacement, but it **is** a task scheduler 
 
 # Why
 
-Originally my [fftracker](https://github.com/Simbiat/FFTracker) was hosted on a server that did not have CRON accessible by users, and thus I stored tasks for entities' updates (and not only) in a database and triggered them through Server Side Events (SSE). While Tracker was moved to a better server this approached stayed with little changes and allowed to have parallel processing despite having no proper PHP libraries to have proper parallel processing (or multithreading).
+Originally my [fftracker](https://github.com/Simbiat/FFTracker) was hosted on a server that did not have CRON accessible by users, and thus I stored tasks for entities' updates (and not only) in a database and triggered them through Server-Sent Events (SSE). While Tracker was moved to a better server this approached stayed with little changes and allowed to have parallel processing despite having no proper PHP libraries to have proper parallel processing (or multithreading).
 
 # Features
 
@@ -118,10 +118,10 @@ To use this library, you will need to add at least one task using the below comm
 
 Calling this function with `$task`, that is already registered, will update respective values, except for `system`.
 
-`parameters` argument also supports special array key `'extraMethods'`. This is a multidimensional array like this:
+`parameters` argument also supports special array key `'extra_methods'`. This is a multidimensional array like this:
 
 ```php
-'extraMethods' =>
+'extra_methods' =>
     [
         [
             'method' => 'method1',
@@ -141,15 +141,15 @@ Keep in mind that each method should be returning an object (normally `return $t
 It is also possible to load settings from DB while creating the object by passing the task name into Task constructor:
 
 ```php
-(new \Simbiat\Cron\Task('taskName'));
+(new \Simbiat\Cron\Task('task_name'));
 ```
 
 ### Deleting a task
 
-To delete a task pass appropriate `taskName` to constructor and call `delete`.
+To delete a task pass appropriate `task_name` to constructor and call `delete`.
 
 ```php
-(new \Simbiat\Cron\Task('taskName'))->delete();
+(new \Simbiat\Cron\Task('task_name'))->delete();
 ```
 
 Note, that tasks with `system` flag set to `1` will not be deleted.
@@ -159,7 +159,7 @@ Note, that tasks with `system` flag set to `1` will not be deleted.
 If you are creating a task from scratch, then just pass `enabled` setting set to `1` (default) or `0` in the settings array. If it's an existing task, do this:
 
 ```php
-(new \Simbiat\Cron\Task('taskName'))->setEnabled(bool $enabled = true);
+(new \Simbiat\Cron\Task('task_name'))->setEnabled(bool $enabled = true);
 ```
 
 ### Setting a task as a system one
@@ -167,7 +167,7 @@ If you are creating a task from scratch, then just pass `enabled` setting set to
 If you are creating a task from scratch, then just pass `system` setting set to `1` in the settings array. If it's an existing task, do this:
 
 ```php
-(new \Simbiat\Cron\Task('taskName'))->setSystem();
+(new \Simbiat\Cron\Task('task_name'))->setSystem();
 ```
 
 This flag can't be set to `0` from the class, because it would defeat its security purpose. To remove it — update the database directly.
@@ -198,17 +198,17 @@ To schedule a task, use this function:
 Same as with `Task` class it is also possible to load settings from DB while creating the object:
 
 ```php
-(new \Simbiat\Cron\TaskInstance('taskName', 'arguments', 1));
+(new \Simbiat\Cron\TaskInstance('task_name', 'arguments', 1));
 ```
 
-Only `'taskName'` is mandatory, but if you have multiple instances of a task, be sure to pass respective arguments and instance, since only the combination of the three ensures uniqueness.
+Only `'task_name'` is mandatory, but if you have multiple instances of a task, be sure to pass respective arguments and instance, since only the combination of the three ensures uniqueness.
 
 ### Removing a task from the schedule
 
 To remove a task from schedule pass appropriate `$task` and `$arguments` to
 
 ```php
-(new \Simbiat\Cron\TaskInstance('taskName', 'arguments', 1))->delete();
+(new \Simbiat\Cron\TaskInstance('task_name', 'arguments', 1))->delete();
 ```
 
 ### Enabling or disabling task instance as system
@@ -216,7 +216,7 @@ To remove a task from schedule pass appropriate `$task` and `$arguments` to
 If you are creating a task instance from scratch, then just pass `enabled` setting set to `1` (default) or `0` in the settings array. If it's an existing instance, do this:
 
 ```php
-(new \Simbiat\Cron\TaskInstance('taskName', 'arguments', 1))->setEnabled(bool $enabled = true);
+(new \Simbiat\Cron\TaskInstance('task_name', 'arguments', 1))->setEnabled(bool $enabled = true);
 ```
 
 ### Setting task instance as system
@@ -224,7 +224,7 @@ If you are creating a task instance from scratch, then just pass `enabled` setti
 If you are creating a task instance from scratch, then just pass `system` setting set to `1` in the settings array. If it's an existing task, do this:
 
 ```php
-(new \Simbiat\Cron\TaskInstance('taskName', 'arguments', 1))->setSystem();
+(new \Simbiat\Cron\TaskInstance('task_name', 'arguments', 1))->setSystem();
 ```
 
 ### Manual task instance trigger
@@ -232,7 +232,7 @@ If you are creating a task instance from scratch, then just pass `system` settin
 In some cases you may want to manually trigger a task. You can do this like this:
 
 ```php
-(new \Simbiat\Cron\TaskInstance('taskName', 'arguments', 1))->run();
+(new \Simbiat\Cron\TaskInstance('task_name', 'arguments', 1))->run();
 ```
 
 Note, that if the task is not found in the database when `run()` is executed, you will get an exception, which differs from automated processing, when function would simply return `false` under the assumption, that this was a one-time instance, that was executed by another process (although unlikely to happen).
@@ -242,7 +242,7 @@ Note, that if the task is not found in the database when `run()` is executed, yo
 You can also manually reschedule a task using
 
 ```php
-(new \Simbiat\Cron\TaskInstance('taskName', 'arguments', 1))->reSchedule($result, $timestamp);
+(new \Simbiat\Cron\TaskInstance('task_name', 'arguments', 1))->reSchedule($result, $timestamp);
 ```
 
 `$result` is a `boolean` value indicating whether the last run of a task (even if it did not happen) should be considered as successful (`true`) or not (`false`). Determines which timestamp in the database will be updated and whether to remove one-time instances.
@@ -254,7 +254,7 @@ You can also manually reschedule a task using
 You can execute below command to get a suggested `DateTimeImmutable` for next run of a task.
 
 ```php
-(new \Simbiat\Cron\TaskInstance('taskName', 'arguments', 1))->updateNextRun($result);
+(new \Simbiat\Cron\TaskInstance('task_name', 'arguments', 1))->updateNextRun($result);
 ```
 
 It will calculate how many jobs were potentially missed based on time difference between current `next_run` value in the database and current time as well as instance frequency. This is required to keep the schedule consistent, so that if you schedule a task at `02:34` daily, it would always run at `02:34` (or try, at least). If instance has `day_of_week` or `day_of_month`, the function will find the earliest day that will satisfy both limitations starting from the date, which was determined based on instance frequency. `result` value is optional (`true` by default), and will affect logic only if set to `false` and `retry` value for the task is more than 0, essentially overriding the normal logic.
@@ -331,13 +331,13 @@ You might have noticed that among the event types there are a few starting with 
 To log events call
 
 ```php
-(new \Simbiat\Cron\Agent)->log(string $message, string $event, bool $endStream = false, ?\Throwable $error = null, ?TaskInstance $task = null);
+(new \Simbiat\Cron\Agent)->log(string $message, string $event, bool $end_stream = false, ?\Throwable $error = null, ?TaskInstance $task = null);
 ```
 
 Instead of `Agent` you can use `Task` or `TaskInstance`, since `log` is part of a `TrainForCron` and is available in all of them.
 
 `$message` is the text of your message you want to send.  
 `$event` is the event type.  
-`$endStream` is a `bool` value indicating whether the execution should stop after sending the message. This will also end the SSE stream.  
+`$end_stream` is a `bool` value indicating whether the execution should stop after sending the message. This will also end the SSE stream.  
 `$error` is optional `\Throwable` object, that will be used to log details of an error, that you have caught.  
 `$task` is an optional `\Simbiat\Cron\TaskInstance` object, that you ***SHOULD NOT*** pass to this function normally. If you are using the class normally, it will be populated automatically. Treat this as an internally used parameter. At the same time all event types besides `Cron*`, `Task*` and `SSE*` ones require it, and if not passed, no messages will be logged neither in DB nor in SSE stream.
