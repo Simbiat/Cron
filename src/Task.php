@@ -244,7 +244,7 @@ class Task
             throw new \UnexpectedValueException('Function name is not set');
         }
         try {
-            $task_details_string = json_encode($this, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION);
+            $task_details_string = \json_encode($this, \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_UNESCAPED_UNICODE | \JSON_PRESERVE_ZERO_FRACTION);
             $result = Query::query('INSERT INTO `'.$this->prefix.'tasks` (`task`, `function`, `object`, `parameters`, `allowed_returns`, `max_time`, `min_frequency`, `retry`, `enabled`, `system`, `description`) VALUES (:task, :function, :object, :parameters, :returns, :max_time, :min_frequency, :retry, :enabled, :system, :desc) ON DUPLICATE KEY UPDATE `function`=:function, `object`=:object, `parameters`=:parameters, `allowed_returns`=:returns, `max_time`=:max_time, `min_frequency`=:min_frequency, `retry`=:retry, `description`=:desc;', [
                 ':task' => [$this->task_name, 'string'],
                 ':function' => [$this->function, 'string'],

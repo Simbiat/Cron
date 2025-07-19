@@ -484,8 +484,8 @@ class TaskInstance
             return true;
         }
         if ($this->next_time !== SandClock::suggestNextDay($this->next_time,
-                (!empty($this->day_of_week) ? json_decode($this->day_of_week, flags: JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_BIGINT_AS_STRING | JSON_OBJECT_AS_ARRAY) : []),
-                (!empty($this->day_of_month) ? json_decode($this->day_of_month, flags: JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_BIGINT_AS_STRING | JSON_OBJECT_AS_ARRAY) : []))
+                (!empty($this->day_of_week) ? \json_decode($this->day_of_week, flags: \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_BIGINT_AS_STRING | \JSON_OBJECT_AS_ARRAY) : []),
+                (!empty($this->day_of_month) ? \json_decode($this->day_of_month, flags: \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_BIGINT_AS_STRING | \JSON_OBJECT_AS_ARRAY) : []))
         ) {
             #Register error.
             $this->log('Attempted to run function during forbidden day of week or day of month.', 'InstanceFail', task: $this);
@@ -493,7 +493,7 @@ class TaskInstance
             return false;
         }
         #Set the time limit for the task
-        set_time_limit($this->task_object->max_time);
+        \set_time_limit($this->task_object->max_time);
         #Update last run
         $affected = Query::query('UPDATE `'.$this->prefix.'schedule` SET `status`=2, `run_by`=:run_by, `last_run` = CURRENT_TIMESTAMP() WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance AND `status` IN (0, 1);', [
             ':task' => [$this->task_name, 'string'],
@@ -507,7 +507,7 @@ class TaskInstance
         }
         #Decode allowed returns if any
         if (!empty($this->task_object->returns)) {
-            $allowed_returns = json_decode($this->task_object->returns, flags: JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_BIGINT_AS_STRING | JSON_OBJECT_AS_ARRAY);
+            $allowed_returns = \json_decode($this->task_object->returns, flags: \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_BIGINT_AS_STRING | \JSON_OBJECT_AS_ARRAY);
         }
         try {
             $function = $this->functionCreation();
@@ -516,8 +516,8 @@ class TaskInstance
                 $result = $function();
             } else {
                 #Replace instance reference
-                $arguments = str_replace('"$cron_instance"', (string)$this->instance, $this->arguments);
-                $result = call_user_func_array($function, json_decode($arguments, flags: JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_BIGINT_AS_STRING | JSON_OBJECT_AS_ARRAY));
+                $arguments = \str_replace('"$cron_instance"', (string)$this->instance, $this->arguments);
+                $result = \call_user_func_array($function, \json_decode($arguments, flags: \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_BIGINT_AS_STRING | \JSON_OBJECT_AS_ARRAY));
             }
         } catch (\Throwable $e) {
             $result = $e->getMessage()."\r\n".$e->getTraceAsString();
@@ -530,11 +530,11 @@ class TaskInstance
                     #Override the value
                     $result = true;
                 } else {
-                    $this->log('Unexpected return `'.json_encode($result, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION).'`.', 'InstanceFail', task: $this);
+                    $this->log('Unexpected return `'.\json_encode($result, \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_UNESCAPED_UNICODE | \JSON_PRESERVE_ZERO_FRACTION).'`.', 'InstanceFail', task: $this);
                     $result = false;
                 }
             } elseif ($result !== false) {
-                $this->log('Unexpected return `'.json_encode($result, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION).'`.', 'InstanceFail', task: $this);
+                $this->log('Unexpected return `'.\json_encode($result, \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_UNESCAPED_UNICODE | \JSON_PRESERVE_ZERO_FRACTION).'`.', 'InstanceFail', task: $this);
                 $result = false;
             }
         }
@@ -556,7 +556,7 @@ class TaskInstance
         if (!empty($this->task_object->object)) {
             #Check if parameters for the object are set
             if (!empty($this->task_object->parameters)) {
-                $parameters = json_decode($this->task_object->parameters, flags: JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_BIGINT_AS_STRING | JSON_OBJECT_AS_ARRAY);
+                $parameters = \json_decode($this->task_object->parameters, flags: \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_BIGINT_AS_STRING | \JSON_OBJECT_AS_ARRAY);
                 #Check if extra methods are set
                 if (!empty($parameters['extra_methods'])) {
                     #Separate extra methods
@@ -598,7 +598,7 @@ class TaskInstance
             $function = [$object, $this->task_object->function];
         }
         #Check if callable
-        if (!is_callable($function)) {
+        if (!\is_callable($function)) {
             throw new \RuntimeException('Function is not callable');
         }
         return $function;
@@ -637,10 +637,10 @@ class TaskInstance
             #Determine the time difference between current time and run time that was initially set
             $time_diff = $current_time->getTimestamp() - $this->next_time->getTimestamp();
             #Determine how many runs (based on frequency) could have happened within the time difference, essentially to "skip" over the missed runs
-            $possible_runs = (int)ceil($time_diff / $seconds);
+            $possible_runs = (int)\ceil($time_diff / $seconds);
             #Increase time value by
             try {
-                $new_time = $this->next_time->modify('+'.(max($possible_runs, 1) * $seconds).' seconds');
+                $new_time = $this->next_time->modify('+'.(\max($possible_runs, 1) * $seconds).' seconds');
             } catch (\DateMalformedStringException) {
                 #We should not get here, since the value is not from the user, and there are validations on earlier steps; this is just a failback
                 $new_time = $current_time;
@@ -652,8 +652,8 @@ class TaskInstance
         #Check if the new time will satisfy day of week/month requirements
         try {
             return SandClock::suggestNextDay($new_time,
-                (!empty($this->day_of_week) ? json_decode($this->day_of_week, flags: JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_BIGINT_AS_STRING | JSON_OBJECT_AS_ARRAY) : []),
-                (!empty($this->day_of_month) ? json_decode($this->day_of_month, flags: JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_BIGINT_AS_STRING | JSON_OBJECT_AS_ARRAY) : []));
+                (!empty($this->day_of_week) ? \json_decode($this->day_of_week, flags: \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_BIGINT_AS_STRING | \JSON_OBJECT_AS_ARRAY) : []),
+                (!empty($this->day_of_month) ? \json_decode($this->day_of_month, flags: \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_BIGINT_AS_STRING | \JSON_OBJECT_AS_ARRAY) : []));
         } catch (\Throwable) {
             #We should not get here, since the value is not from the user, and there are validations on earlier steps; this is just a failback
             return $current_time;

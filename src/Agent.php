@@ -62,7 +62,7 @@ class Agent
             $this->unHang();
             #Depending on the number of events in the log, this may take a while, so use a bit of randomization to not do this on very run.
             try {
-                if (random_int(1, 60 * $this->max_threads) < 60 * ($this->max_threads - 1)) {
+                if (\random_int(1, 60 * $this->max_threads) < 60 * ($this->max_threads - 1)) {
                     #Clean old logs
                     $this->logPurge();
                 }
@@ -97,7 +97,7 @@ class Agent
                         return false;
                     }
                     #Sleep for a bit
-                    sleep($this->sse_retry / 20);
+                    \sleep($this->sse_retry / 20);
                     continue;
                 }
             } catch (\Throwable $exception) {
@@ -110,10 +110,10 @@ class Agent
                 $this->log('Cron list is empty', 'CronEmpty');
                 if (SSE::$sse) {
                     #Sleep for a bit
-                    sleep($this->sse_retry / 20);
+                    \sleep($this->sse_retry / 20);
                 }
             } else {
-                $total_tasks = count($tasks);
+                $total_tasks = \count($tasks);
                 foreach ($tasks as $number => $task) {
                     $this->runTask($task, $number + 1, $total_tasks);
                 }
@@ -122,7 +122,7 @@ class Agent
             if (SSE::$sse && $this->sse_loop) {
                 $this->unHang();
             }
-        } while ($this->cron_enabled && SSE::$sse && $this->sse_loop && connection_status() === 0);
+        } while ($this->cron_enabled && SSE::$sse && $this->sse_loop && \connection_status() === 0);
         #Notify about the end of the stream
         if (SSE::$sse) {
             $this->log('Cron processing finished', 'SSEEnd', true);
@@ -275,7 +275,7 @@ class Agent
         #Depending on the number of task instances, this may take a while, so use a bit of randomization to not do this on very run.
         #It is also not critical: these tasks, if picked-up, will fail to run due to `function` ending up being `null`, and thus not callable.
         try {
-            if (random_int(1, 60 * $this->max_threads) >= 60 * ($this->max_threads - 1)) {
+            if (\random_int(1, 60 * $this->max_threads) >= 60 * ($this->max_threads - 1)) {
                 Query::query('DELETE FROM `'.$this->prefix.'schedule` WHERE `task` IS NOT IN (SELECT `task` FROM `'.$this->prefix.'tasks`);');
             }
         } catch (\Throwable) {

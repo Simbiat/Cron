@@ -24,7 +24,7 @@ trait TraitForCron
      */
     private(set) string $prefix = 'cron__' {
         set {
-            if (preg_match('/^[\w\-]{0,53}$/u', $value) === 1) {
+            if (\preg_match('/^[\w\-]{0,53}$/u', $value) === 1) {
                 $this->prefix = $value;
             } else {
                 throw new \UnexpectedValueException('Invalid database prefix');
@@ -221,7 +221,7 @@ trait TraitForCron
     private function generateRunBy(): false|string
     {
         try {
-            return bin2hex(random_bytes(15));
+            return \bin2hex(\random_bytes(15));
         } catch (\Throwable $exception) {
             $this->log('Failed to generate random ID', 'CronFail', true, $exception);
             return false;
