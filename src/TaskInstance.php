@@ -16,17 +16,25 @@ class TaskInstance
     
     /**
      * @var string Unique name of the task
+     * @noinspection AccessModifierPresentedInspection https://github.com/kalessil/phpinspectionsea/issues/1970
      */
     private(set) string $task_name = '';
     /**
      * @var string Optional arguments
+     * @noinspection AccessModifierPresentedInspection https://github.com/kalessil/phpinspectionsea/issues/1970
      */
     private(set) string $arguments = '' {
+        /**
+         * @noinspection ReturnTypeCanBeDeclaredInspection https://github.com/kalessil/phpinspectionsea/issues/1970
+         * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81990
+         * @noinspection PhpUnusedParameterInspection https://youtrack.jetbrains.com/issue/WI-81990
+         */
         set (mixed $value) {
+            /** @noinspection IsEmptyFunctionUsageInspection We do not know what values to expect here, so this should be fine as a universal solution */
             if (empty($value)) {
                 $this->arguments = '';
             } elseif (is_array($value)) {
-                $this->arguments = json_encode($value, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION);
+                $this->arguments = \json_encode($value, \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_UNESCAPED_UNICODE | \JSON_PRESERVE_ZERO_FRACTION);
             } elseif (is_string($value) && json_validate($value)) {
                 $this->arguments = $value;
             } else {
@@ -36,66 +44,76 @@ class TaskInstance
     }
     /**
      * @var int Task instance number
+     * @noinspection AccessModifierPresentedInspection https://github.com/kalessil/phpinspectionsea/issues/1970
      */
     private(set) int $instance = 1 {
-        set (mixed $value) {
-            if (empty($value)) {
+        /**
+         * @noinspection ReturnTypeCanBeDeclaredInspection https://github.com/kalessil/phpinspectionsea/issues/1970
+         * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81990
+         * @noinspection PhpUnusedParameterInspection https://youtrack.jetbrains.com/issue/WI-81990
+         */
+        set (int $value) {
+            $this->instance = $value;
+            if ($this->instance < 1) {
                 $this->instance = 1;
-            } elseif (is_numeric($value)) {
-                $this->instance = (int)$value;
-                if ($this->instance < 1) {
-                    $this->instance = 1;
-                }
-            } else {
-                throw new \UnexpectedValueException('`instance` is not a valid numeric value');
             }
         }
     }
     /**
      * @var int Task instance status. `0` means a task is not running; `1` - queued; `2` - running; `3` - to be removed (used only in case of failed removal)
+     * @noinspection AccessModifierPresentedInspection https://github.com/kalessil/phpinspectionsea/issues/1970
      */
     private(set) int $status = 0;
     /**
      * @var bool Whether the task instance is system one or not
+     * @noinspection AccessModifierPresentedInspection https://github.com/kalessil/phpinspectionsea/issues/1970
      */
     private(set) bool $system = false;
     /**
      * @var bool Whether the task instance is enabled
+     * @noinspection AccessModifierPresentedInspection https://github.com/kalessil/phpinspectionsea/issues/1970
      */
     private(set) bool $enabled = true;
     /**
      * @var int Task instance frequency
+     * @noinspection AccessModifierPresentedInspection https://github.com/kalessil/phpinspectionsea/issues/1970
      */
     private(set) int $frequency = 0 {
-        set (mixed $value) {
-            if (empty($value)) {
-                $this->frequency = 0;
-            } elseif (is_numeric($value)) {
-                $frequency = (int)$value;
-                if ($frequency < 0) {
-                    $frequency = 0;
-                }
-                if ($frequency > 0 && $frequency < $this->task_object->min_frequency) {
-                    throw new \UnexpectedValueException('`frequency` for `'.$this->task_name.'` should be either 0 (one-time job) or equal or more than '.$this->task_object->min_frequency.' seconds');
-                }
-                if ($frequency === 0 && $this->system) {
-                    throw new \UnexpectedValueException('`frequency` cannot be set to 0 (one-time job), if task instance is system one');
-                }
-                $this->frequency = $frequency;
-            } else {
-                throw new \UnexpectedValueException('`frequency` is not a valid numeric value');
+        /**
+         * @noinspection ReturnTypeCanBeDeclaredInspection https://github.com/kalessil/phpinspectionsea/issues/1970
+         * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81990
+         * @noinspection PhpUnusedParameterInspection https://youtrack.jetbrains.com/issue/WI-81990
+         */
+        set (int $value) {
+            $frequency = $value;
+            if ($frequency < 0) {
+                $frequency = 0;
             }
+            if ($frequency > 0 && $frequency < $this->task_object->min_frequency) {
+                throw new \UnexpectedValueException('`frequency` for `'.$this->task_name.'` should be either 0 (one-time job) or equal or more than '.$this->task_object->min_frequency.' seconds');
+            }
+            if ($frequency === 0 && $this->system) {
+                throw new \UnexpectedValueException('`frequency` cannot be set to 0 (one-time job), if task instance is system one');
+            }
+            $this->frequency = $frequency;
         }
     }
     /**
      * @var string|null Day of month limitation
+     * @noinspection AccessModifierPresentedInspection https://github.com/kalessil/phpinspectionsea/issues/1970
      */
     private(set) ?string $day_of_month = null {
+        /**
+         * @noinspection ReturnTypeCanBeDeclaredInspection https://github.com/kalessil/phpinspectionsea/issues/1970
+         * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81990
+         * @noinspection PhpUnusedParameterInspection https://youtrack.jetbrains.com/issue/WI-81990
+         */
         set (mixed $value) {
+            /** @noinspection IsEmptyFunctionUsageInspection We do not know what values to expect here, so this should be fine as a universal solution */
             if (empty($value)) {
                 $this->day_of_month = null;
             } elseif (is_array($value)) {
-                $this->day_of_month = json_encode($value, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION);
+                $this->day_of_month = \json_encode($value, \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_UNESCAPED_UNICODE | \JSON_PRESERVE_ZERO_FRACTION);
             } elseif (is_string($value) && json_validate($value)) {
                 $this->day_of_month = $value;
             } else {
@@ -105,13 +123,20 @@ class TaskInstance
     }
     /**
      * @var string|null Day of week limitation
+     * @noinspection AccessModifierPresentedInspection https://github.com/kalessil/phpinspectionsea/issues/1970
      */
     private(set) ?string $day_of_week = null {
+        /**
+         * @noinspection ReturnTypeCanBeDeclaredInspection https://github.com/kalessil/phpinspectionsea/issues/1970
+         * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81990
+         * @noinspection PhpUnusedParameterInspection https://youtrack.jetbrains.com/issue/WI-81990
+         */
         set (mixed $value) {
+            /** @noinspection IsEmptyFunctionUsageInspection We do not know what values to expect here, so this should be fine as a universal solution */
             if (empty($value)) {
                 $this->day_of_week = null;
             } elseif (is_array($value)) {
-                $this->day_of_week = json_encode($value, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION);
+                $this->day_of_week = \json_encode($value, \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_UNESCAPED_UNICODE | \JSON_PRESERVE_ZERO_FRACTION);
             } elseif (is_string($value) && json_validate($value)) {
                 $this->day_of_week = $value;
             } else {
@@ -121,37 +146,41 @@ class TaskInstance
     }
     /**
      * @var int Task instance priority
+     * @noinspection AccessModifierPresentedInspection https://github.com/kalessil/phpinspectionsea/issues/1970
      */
     private(set) int $priority = 0 {
-        set (mixed $value) {
-            if (empty($value)) {
+        /**
+         * @noinspection ReturnTypeCanBeDeclaredInspection https://github.com/kalessil/phpinspectionsea/issues/1970
+         * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81990
+         * @noinspection PhpUnusedParameterInspection https://youtrack.jetbrains.com/issue/WI-81990
+         */
+        set (int $value) {
+            $this->priority = $value;
+            if ($this->priority < 0) {
                 $this->priority = 0;
-            } elseif (is_numeric($value)) {
-                $this->priority = (int)$value;
-                if ($this->priority < 0) {
-                    $this->priority = 0;
-                } elseif ($this->priority > 255) {
-                    $this->priority = 255;
-                }
-            } else {
-                throw new \UnexpectedValueException('`priority` is not a valid numeric value');
+            } elseif ($this->priority > 255) {
+                $this->priority = 255;
             }
         }
     }
     /**
      * @var string|null Message to show in SSE mode
+     * @noinspection AccessModifierPresentedInspection https://github.com/kalessil/phpinspectionsea/issues/1970
      */
     private(set) ?string $message = null;
     /**
      * @var null|\DateTimeImmutable Time of the next run
+     * @noinspection AccessModifierPresentedInspection https://github.com/kalessil/phpinspectionsea/issues/1970
      */
     private(set) ?\DateTimeImmutable $next_time = null;
     /**
      * @var bool Whether the task was found in the database
+     * @noinspection AccessModifierPresentedInspection https://github.com/kalessil/phpinspectionsea/issues/1970
      */
     private(set) bool $found_in_db = false;
     /**
      * @var Task|null Task object
+     * @noinspection AccessModifierPresentedInspection https://github.com/kalessil/phpinspectionsea/issues/1970
      */
     private(set) ?Task $task_object = null;
     

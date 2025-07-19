@@ -15,25 +15,35 @@ class Task
     
     /**
      * @var string Unique name of the task
+     * @noinspection AccessModifierPresentedInspection https://github.com/kalessil/phpinspectionsea/issues/1970
      */
     private(set) string $task_name = '';
     /**
      * @var string Name of the task
+     * @noinspection AccessModifierPresentedInspection https://github.com/kalessil/phpinspectionsea/issues/1970
      */
     private(set) string $function = '';
     /**
      * @var string|null Optional object reference
+     * @noinspection AccessModifierPresentedInspection https://github.com/kalessil/phpinspectionsea/issues/1970
      */
     private(set) ?string $object = null;
     /**
      * @var string|null Parameters to set for the object (passed to construct)
+     * @noinspection AccessModifierPresentedInspection https://github.com/kalessil/phpinspectionsea/issues/1970
      */
     private(set) ?string $parameters = '' {
+        /**
+         * @noinspection ReturnTypeCanBeDeclaredInspection https://github.com/kalessil/phpinspectionsea/issues/1970
+         * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81990
+         * @noinspection PhpUnusedParameterInspection https://youtrack.jetbrains.com/issue/WI-81990
+         */
         set (mixed $value) {
+            /** @noinspection IsEmptyFunctionUsageInspection We do not know what values to expect here, so this should be fine as a universal solution */
             if (empty($value)) {
                 $this->parameters = null;
             } elseif (is_array($value)) {
-                $this->parameters = json_encode($value, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION);
+                $this->parameters = \json_encode($value, \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_UNESCAPED_UNICODE | \JSON_PRESERVE_ZERO_FRACTION);
             } elseif (is_string($value) && json_validate($value)) {
                 $this->parameters = $value;
             } else {
@@ -43,13 +53,20 @@ class Task
     }
     /**
      * @var string|null Expected (and allowed) return values
+     * @noinspection AccessModifierPresentedInspection https://github.com/kalessil/phpinspectionsea/issues/1970
      */
     private(set) ?string $returns = '' {
+        /**
+         * @noinspection ReturnTypeCanBeDeclaredInspection https://github.com/kalessil/phpinspectionsea/issues/1970
+         * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81990
+         * @noinspection PhpUnusedParameterInspection https://youtrack.jetbrains.com/issue/WI-81990
+         */
         set (mixed $value) {
+            /** @noinspection IsEmptyFunctionUsageInspection We do not know what values to expect here, so this should be fine as a universal solution */
             if (empty($value)) {
                 $this->returns = null;
             } elseif (is_array($value)) {
-                $this->returns = json_encode($value, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION);
+                $this->returns = \json_encode($value, \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_UNESCAPED_UNICODE | \JSON_PRESERVE_ZERO_FRACTION);
             } elseif (is_string($value) && json_validate($value)) {
                 $this->returns = $value;
             } else {
@@ -59,69 +76,75 @@ class Task
     }
     /**
      * @var int Maximum execution time
+     * @noinspection AccessModifierPresentedInspection https://github.com/kalessil/phpinspectionsea/issues/1970
      */
     private(set) int $max_time = 3600 {
-        set (mixed $value) {
-            if (empty($value)) {
+        /**
+         * @noinspection ReturnTypeCanBeDeclaredInspection https://github.com/kalessil/phpinspectionsea/issues/1970
+         * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81990
+         * @noinspection PhpUnusedParameterInspection https://youtrack.jetbrains.com/issue/WI-81990
+         */
+        set (int $value) {
+            $this->max_time = $value;
+            if ($this->max_time < 0) {
                 $this->max_time = 0;
-            } elseif (is_numeric($value)) {
-                $this->max_time = (int)$value;
-                if ($this->max_time < 0) {
-                    $this->max_time = 0;
-                }
-            } else {
-                throw new \UnexpectedValueException('`max_time` is not a valid numeric value');
             }
         }
     }
+    
     /**
      * @var int Minimal-allowed frequency (in seconds) at which a task instance can run. Does not apply to one-time jobs.
+     * @noinspection AccessModifierPresentedInspection https://github.com/kalessil/phpinspectionsea/issues/1970
      */
     private(set) int $min_frequency = 3600 {
-        set (mixed $value) {
-            if (empty($value)) {
+        /**
+         * @noinspection ReturnTypeCanBeDeclaredInspection https://github.com/kalessil/phpinspectionsea/issues/1970
+         * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81990
+         * @noinspection PhpUnusedParameterInspection https://youtrack.jetbrains.com/issue/WI-81990
+         */
+        set (int $value) {
+            $this->min_frequency = $value;
+            if ($this->min_frequency < 0) {
                 $this->min_frequency = 0;
-            } elseif (is_numeric($value)) {
-                $this->min_frequency = (int)$value;
-                if ($this->min_frequency < 0) {
-                    $this->min_frequency = 0;
-                }
-            } else {
-                throw new \UnexpectedValueException('`min_frequency` is not a valid numeric value');
             }
         }
     }
+    
     /**
      * @var int Custom number of seconds to reschedule a failed task instance for. 0 disables the functionality.
+     * @noinspection AccessModifierPresentedInspection https://github.com/kalessil/phpinspectionsea/issues/1970
      */
     private(set) int $retry = 3600 {
-        set (mixed $value) {
-            if (empty($value)) {
+        /**
+         * @noinspection ReturnTypeCanBeDeclaredInspection https://github.com/kalessil/phpinspectionsea/issues/1970
+         * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81990
+         * @noinspection PhpUnusedParameterInspection https://youtrack.jetbrains.com/issue/WI-81990
+         */
+        set (int $value) {
+            $this->retry = $value;
+            if ($this->retry < 0) {
                 $this->retry = 0;
-            } elseif (is_numeric($value)) {
-                $this->retry = (int)$value;
-                if ($this->retry < 0) {
-                    $this->retry = 0;
-                }
-            } else {
-                throw new \UnexpectedValueException('`retry` is not a valid numeric value');
             }
         }
     }
     /**
      * @var bool Whether a task is system one or not
+     * @noinspection AccessModifierPresentedInspection https://github.com/kalessil/phpinspectionsea/issues/1970
      */
     private(set) bool $system = false;
     /**
      * @var bool Whether a task (and its task instances) is enabled
+     * @noinspection AccessModifierPresentedInspection https://github.com/kalessil/phpinspectionsea/issues/1970
      */
     private(set) bool $enabled = true;
     /**
      * @var string|null Description of the task
+     * @noinspection AccessModifierPresentedInspection https://github.com/kalessil/phpinspectionsea/issues/1970
      */
     private(set) ?string $description = null;
     /**
      * @var bool Whether a task was found in a database
+     * @noinspection AccessModifierPresentedInspection https://github.com/kalessil/phpinspectionsea/issues/1970
      */
     private(set) bool $found_in_db = false;
     
