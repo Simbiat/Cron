@@ -16,16 +16,13 @@ class TaskInstance
     
     /**
      * @var string Unique name of the task
-     * @noinspection AccessModifierPresentedInspection https://github.com/kalessil/phpinspectionsea/issues/1970
      */
     private(set) string $task_name = '';
     /**
      * @var string Optional arguments
-     * @noinspection AccessModifierPresentedInspection https://github.com/kalessil/phpinspectionsea/issues/1970
      */
     private(set) string $arguments = '' {
         /**
-         * @noinspection ReturnTypeCanBeDeclaredInspection https://github.com/kalessil/phpinspectionsea/issues/1970
          * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81990
          * @noinspection PhpUnusedParameterInspection https://youtrack.jetbrains.com/issue/WI-81990
          */
@@ -44,11 +41,9 @@ class TaskInstance
     }
     /**
      * @var int Task instance number
-     * @noinspection AccessModifierPresentedInspection https://github.com/kalessil/phpinspectionsea/issues/1970
      */
     private(set) int $instance = 1 {
         /**
-         * @noinspection ReturnTypeCanBeDeclaredInspection https://github.com/kalessil/phpinspectionsea/issues/1970
          * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81990
          * @noinspection PhpUnusedParameterInspection https://youtrack.jetbrains.com/issue/WI-81990
          */
@@ -61,30 +56,24 @@ class TaskInstance
     }
     /**
      * @var int Task instance status. `0` means a task is not running; `1` - queued; `2` - running; `3` - to be removed (used only in case of failed removal)
-     * @noinspection AccessModifierPresentedInspection https://github.com/kalessil/phpinspectionsea/issues/1970
      */
     private(set) int $status = 0;
     /**
      * @var bool Whether the task instance is system one or not
-     * @noinspection AccessModifierPresentedInspection https://github.com/kalessil/phpinspectionsea/issues/1970
      */
     private(set) bool $system = false;
     /**
      * @var bool Whether the task instance is enabled
-     * @noinspection AccessModifierPresentedInspection https://github.com/kalessil/phpinspectionsea/issues/1970
      */
     private(set) bool $enabled = true;
     /**
      * @var int Task instance frequency
-     * @noinspection AccessModifierPresentedInspection https://github.com/kalessil/phpinspectionsea/issues/1970
      */
     private(set) int $frequency = 0 {
         /**
-         * @noinspection ReturnTypeCanBeDeclaredInspection https://github.com/kalessil/phpinspectionsea/issues/1970
          * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81990
-         * @noinspection PhpUnusedParameterInspection https://youtrack.jetbrains.com/issue/WI-81990
          */
-        set (int $value) {
+        set {
             $frequency = $value;
             if ($frequency < 0) {
                 $frequency = 0;
@@ -100,11 +89,9 @@ class TaskInstance
     }
     /**
      * @var string|null Day of month limitation
-     * @noinspection AccessModifierPresentedInspection https://github.com/kalessil/phpinspectionsea/issues/1970
      */
     private(set) ?string $day_of_month = null {
         /**
-         * @noinspection ReturnTypeCanBeDeclaredInspection https://github.com/kalessil/phpinspectionsea/issues/1970
          * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81990
          * @noinspection PhpUnusedParameterInspection https://youtrack.jetbrains.com/issue/WI-81990
          */
@@ -123,11 +110,9 @@ class TaskInstance
     }
     /**
      * @var string|null Day of week limitation
-     * @noinspection AccessModifierPresentedInspection https://github.com/kalessil/phpinspectionsea/issues/1970
      */
     private(set) ?string $day_of_week = null {
         /**
-         * @noinspection ReturnTypeCanBeDeclaredInspection https://github.com/kalessil/phpinspectionsea/issues/1970
          * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81990
          * @noinspection PhpUnusedParameterInspection https://youtrack.jetbrains.com/issue/WI-81990
          */
@@ -146,15 +131,12 @@ class TaskInstance
     }
     /**
      * @var int Task instance priority
-     * @noinspection AccessModifierPresentedInspection https://github.com/kalessil/phpinspectionsea/issues/1970
      */
     private(set) int $priority = 0 {
         /**
-         * @noinspection ReturnTypeCanBeDeclaredInspection https://github.com/kalessil/phpinspectionsea/issues/1970
          * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81990
-         * @noinspection PhpUnusedParameterInspection https://youtrack.jetbrains.com/issue/WI-81990
          */
-        set (int $value) {
+        set {
             $this->priority = $value;
             if ($this->priority < 0) {
                 $this->priority = 0;
@@ -165,22 +147,18 @@ class TaskInstance
     }
     /**
      * @var string|null Message to show in SSE mode
-     * @noinspection AccessModifierPresentedInspection https://github.com/kalessil/phpinspectionsea/issues/1970
      */
     private(set) ?string $message = null;
     /**
      * @var null|\DateTimeImmutable Time of the next run
-     * @noinspection AccessModifierPresentedInspection https://github.com/kalessil/phpinspectionsea/issues/1970
      */
     private(set) ?\DateTimeImmutable $next_time = null;
     /**
      * @var bool Whether the task was found in the database
-     * @noinspection AccessModifierPresentedInspection https://github.com/kalessil/phpinspectionsea/issues/1970
      */
     private(set) bool $found_in_db = false;
     /**
      * @var Task|null Task object
-     * @noinspection AccessModifierPresentedInspection https://github.com/kalessil/phpinspectionsea/issues/1970
      */
     private(set) ?Task $task_object = null;
     
