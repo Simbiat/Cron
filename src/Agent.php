@@ -174,7 +174,7 @@ class Agent
                         (
                             SELECT `task`, `arguments`, `instance` FROM (
                                 SELECT `task`, `arguments`, `instance`, `next_run`, '.self::CALCULATED_PRIORITY.' AS `calculated` FROM `'.$this->prefix.'schedule` AS `instances`
-                                WHERE `enabled`=1 AND `run_by` IS NULL AND `next_run`<=CURRENT_TIMESTAMP() AND (SELECT `enabled` FROM `'.$this->prefix.'tasks` `tasks` WHERE `tasks`.`task`=`instances`.`task`)=1
+                                WHERE `enabled`=1 AND `run_by` IS NULL AND `next_run`<=CURRENT_TIMESTAMP(6) AND (SELECT `enabled` FROM `'.$this->prefix.'tasks` `tasks` WHERE `tasks`.`task`=`instances`.`task`)=1
                                 ORDER BY `calculated` DESC, `next_run`
                                 LIMIT :inner_limit
                             ) `instances` GROUP BY `task`, `arguments` ORDER BY `calculated` DESC, `next_run` LIMIT :limit FOR UPDATE SKIP LOCKED
@@ -286,7 +286,7 @@ class Agent
         foreach ($tasks as $task) {
             new TaskInstance($task['task'], $task['arguments'], $task['instance'])->delete();
         }
-        $tasks = Query::query('SELECT `task`, `arguments`, `instance`, `frequency` FROM `'.$this->prefix.'schedule` as `a` WHERE `run_by` IS NOT NULL AND CURRENT_TIMESTAMP()>DATE_ADD(IF(`last_run` IS NOT NULL, `last_run`, `next_run`), INTERVAL (SELECT `max_time` FROM `'.$this->prefix.'tasks` WHERE `'.$this->prefix.'tasks`.`task`=`a`.`task`) SECOND);', return: 'all');
+        $tasks = Query::query('SELECT `task`, `arguments`, `instance`, `frequency` FROM `'.$this->prefix.'schedule` as `a` WHERE `run_by` IS NOT NULL AND CURRENT_TIMESTAMP(6)>DATE_ADD(IF(`last_run` IS NOT NULL, `last_run`, `next_run`), INTERVAL (SELECT `max_time` FROM `'.$this->prefix.'tasks` WHERE `'.$this->prefix.'tasks`.`task`=`a`.`task`) SECOND);', return: 'all');
         foreach ($tasks as $task) {
             #If this was a one-time task, schedule it for right now, to avoid delaying it for double the time.
             try {
@@ -308,7 +308,7 @@ class Agent
     public function logPurge(): bool
     {
         try {
-            return Query::query('DELETE FROM `'.$this->prefix.'log` WHERE `time` <= DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL :log_life DAY);', [
+            return Query::query('DELETE FROM `'.$this->prefix.'log` WHERE `time` <= DATE_SUB(CURRENT_TIMESTAMP(6), INTERVAL :log_life DAY);', [
                 ':log_life' => [$this->log_life, 'int'],
             ]);
         } catch (\Throwable) {
