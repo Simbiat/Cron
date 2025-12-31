@@ -425,14 +425,14 @@ class TaskInstance
             throw new \UnexpectedValueException('Not found in database.');
         }
         #Check whether this is a successful one-time job
-        if ($this->frequency === 0 && $result) {
+        if ($this->frequency === 0 && $result === true) {
             #Since this is a one-time task, we can just remove it
             return $this->delete();
         }
         #Determine a new time
         /** @noinspection IsEmptyFunctionUsageInspection Valid scenario due to multiple possible types used for the variable */
         if (empty($timestamp)) {
-            $time = $this->updateNextRun($result);
+            $time = $this->updateNextRun(is_string($result) ? false : $result);
         } else {
             $time = SandClock::valueToDateTime($timestamp);
         }
@@ -461,7 +461,7 @@ class TaskInstance
         if ($affected > 0) {
             $this->log('Task instance rescheduled for '.SandClock::format($time, 'c').'.', 'Reschedule', task: $this);
         }
-        return $result;
+        return true;
     }
     
     /**
