@@ -532,6 +532,9 @@ class TaskInstance
         #Reschedule
         $this->reSchedule($result);
         #Return
+        if (is_string($result)) {
+            return false;
+        }
         return $result;
     }
     
