@@ -30,15 +30,19 @@ class Task
      */
     private(set) ?string $parameters = '' {
         /**
-         * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81990
+         * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81560
          */
         set (mixed $value) {
             /** @noinspection IsEmptyFunctionUsageInspection We do not know what values to expect here, so this should be fine as a universal solution */
             if (empty($value)) {
                 $this->parameters = null;
             } elseif (is_array($value)) {
-                $this->parameters = \json_encode($value, \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_UNESCAPED_UNICODE | \JSON_PRESERVE_ZERO_FRACTION);
-            } elseif (is_string($value) && json_validate($value)) {
+                try {
+                    $this->parameters = \json_encode($value, \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_UNESCAPED_UNICODE | \JSON_PRESERVE_ZERO_FRACTION);
+                } catch (\Throwable) {
+                    $this->parameters = null;
+                }
+            } elseif (is_string($value) && \json_validate($value)) {
                 $this->parameters = $value;
             } else {
                 throw new \UnexpectedValueException('`parameters` is not an array or a valid JSON string');
@@ -50,15 +54,19 @@ class Task
      */
     private(set) ?string $returns = '' {
         /**
-         * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81990
+         * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81560
          */
         set (mixed $value) {
             /** @noinspection IsEmptyFunctionUsageInspection We do not know what values to expect here, so this should be fine as a universal solution */
             if (empty($value)) {
                 $this->returns = null;
             } elseif (is_array($value)) {
-                $this->returns = \json_encode($value, \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_UNESCAPED_UNICODE | \JSON_PRESERVE_ZERO_FRACTION);
-            } elseif (is_string($value) && json_validate($value)) {
+                try {
+                    $this->returns = \json_encode($value, \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_UNESCAPED_UNICODE | \JSON_PRESERVE_ZERO_FRACTION);
+                } catch (\Throwable) {
+                    $this->returns = null;
+                }
+            } elseif (is_string($value) && \json_validate($value)) {
                 $this->returns = $value;
             } else {
                 throw new \UnexpectedValueException('`returns` is not an array or a valid JSON string');
@@ -70,7 +78,7 @@ class Task
      */
     private(set) int $max_time = 3600 {
         /**
-         * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81990
+         * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81560
          */
         set {
             $this->max_time = $value;
@@ -85,7 +93,7 @@ class Task
      */
     private(set) int $min_frequency = 3600 {
         /**
-         * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81990
+         * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81560
          */
         set {
             $this->min_frequency = $value;
@@ -100,7 +108,7 @@ class Task
      */
     private(set) int $retry = 3600 {
         /**
-         * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81990
+         * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81560
          */
         set {
             $this->retry = $value;
@@ -136,7 +144,7 @@ class Task
     public function __construct(string $task_name = '', \PDO|null $dbh = null, string $prefix = 'cron__')
     {
         $this->init($dbh, $prefix);
-        if (!empty($task_name)) {
+        if (\preg_match('/^\s*$/u', $task_name ?? '') === 0) {
             $this->task_name = $task_name;
             #Attempt to get settings from DB
             $this->getFromDB();
@@ -151,9 +159,9 @@ class Task
     private function getFromDB(): void
     {
         $settings = Query::query('SELECT * FROM `'.$this->prefix.'tasks` WHERE `task`=:name;', [':name' => $this->task_name], return: 'row');
-        if (!empty($settings)) {
+        if ($settings !== []) {
             $this->settingsFromArray($settings);
-            if (empty($this->function)) {
+            if (\preg_match('/^\s*$/u', $this->function ?? '') !== 0) {
                 throw new \UnexpectedValueException('Task has no assigned function');
             }
             $this->found_in_db = true;
@@ -170,6 +178,7 @@ class Task
         foreach ($settings as $setting => $value) {
             switch ($setting) {
                 case 'object':
+                    /** @noinspection IsEmptyFunctionUsageInspection Valid use case, we don't know what's in the provided array */
                     if (empty($value)) {
                         $this->object = null;
                     } else {
@@ -194,6 +203,7 @@ class Task
                     $this->{$setting} = (bool)$value;
                     break;
                 case 'description':
+                    /** @noinspection IsEmptyFunctionUsageInspection Valid use case, we don't know what's in the provided array */
                     if (empty($value)) {
                         $this->description = null;
                     } else {
@@ -215,10 +225,10 @@ class Task
      */
     public function add(): bool
     {
-        if (empty($this->task_name)) {
+        if (\preg_match('/^\s*$/u', $this->task_name ?? '') !== 0) {
             throw new \UnexpectedValueException('Task name is not set');
         }
-        if (empty($this->function)) {
+        if (\preg_match('/^\s*$/u', $this->function ?? '') !== 0) {
             throw new \UnexpectedValueException('Function name is not set');
         }
         try {
@@ -226,19 +236,19 @@ class Task
             $result = Query::query('INSERT INTO `'.$this->prefix.'tasks` (`task`, `function`, `object`, `parameters`, `allowed_returns`, `max_time`, `min_frequency`, `retry`, `enabled`, `system`, `description`) VALUES (:task, :function, :object, :parameters, :returns, :max_time, :min_frequency, :retry, :enabled, :system, :desc) ON DUPLICATE KEY UPDATE `function`=:function, `object`=:object, `parameters`=:parameters, `allowed_returns`=:returns, `max_time`=:max_time, `min_frequency`=:min_frequency, `retry`=:retry, `description`=:desc;', [
                 ':task' => [$this->task_name, 'string'],
                 ':function' => [$this->function, 'string'],
-                ':object' => [$this->object, (empty($this->object) ? 'null' : 'string')],
-                ':parameters' => [$this->parameters, (empty($this->parameters) ? 'null' : 'string')],
-                ':returns' => [$this->returns, (empty($this->returns) ? 'null' : 'string')],
+                ':object' => [$this->object, (\preg_match('/^\s*$/u', $this->object ?? '') !== 0 ? 'null' : 'string')],
+                ':parameters' => [$this->parameters, (\preg_match('/^\s*$/u', $this->parameters ?? '') !== 0 ? 'null' : 'string')],
+                ':returns' => [$this->returns, (\preg_match('/^\s*$/u', $this->returns ?? '') !== 0 ? 'null' : 'string')],
                 ':max_time' => [$this->max_time, 'int'],
                 ':min_frequency' => [$this->min_frequency, 'int'],
                 ':retry' => [$this->retry, 'int'],
                 ':enabled' => [$this->enabled, 'bool'],
                 ':system' => [$this->system, 'bool'],
-                ':desc' => [$this->description, (empty($this->description) ? 'null' : 'string')],
+                ':desc' => [$this->description, (\preg_match('/^\s*$/u', $this->description ?? '') !== 0 ? 'null' : 'string')],
             ], return: 'affected');
             $this->found_in_db = true;
-        } catch (\Throwable $e) {
-            $this->log('Failed to add or update task with following details: '.$task_details_string.'.', 'TaskAddFail', error: $e);
+        } catch (\Throwable $throwable) {
+            $this->log('Failed to add or update task with following details: '.$task_details_string.'.', 'TaskAddFail', error: $throwable);
             return false;
         }
         #Log only if something was actually changed
@@ -255,15 +265,15 @@ class Task
      */
     public function delete(): bool
     {
-        if (empty($this->task_name)) {
+        if (\preg_match('/^\s*$/u', $this->task_name ?? '') !== 0) {
             throw new \UnexpectedValueException('Task name is not set');
         }
         try {
             $result = Query::query('DELETE FROM `'.$this->prefix.'tasks` WHERE `task`=:task AND `system`=0;', [
                 ':task' => [$this->task_name, 'string'],
             ], return: 'affected');
-        } catch (\Throwable $e) {
-            $this->log('Failed delete task `'.$this->task_name.'`.', 'TaskDeleteFail', error: $e);
+        } catch (\Throwable $throwable) {
+            $this->log('Failed delete task `'.$this->task_name.'`.', 'TaskDeleteFail', error: $throwable);
             return false;
         }
         #Log only if something was actually deleted
@@ -288,7 +298,7 @@ class Task
      */
     public function setSystem(): bool
     {
-        if (empty($this->task_name)) {
+        if (\preg_match('/^\s*$/u', $this->task_name ?? '') !== 0) {
             throw new \UnexpectedValueException('Task name is not set');
         }
         if ($this->found_in_db) {
@@ -296,8 +306,8 @@ class Task
                 $result = Query::query('UPDATE `'.$this->prefix.'tasks` SET `system`=1 WHERE `task`=:task AND `system`=0;', [
                     ':task' => [$this->task_name, 'string'],
                 ], return: 'affected');
-            } catch (\Throwable $e) {
-                $this->log('Failed to mark task `'.$this->task_name.'` as system one.', 'TaskToSystemFail', error: $e);
+            } catch (\Throwable $throwable) {
+                $this->log('Failed to mark task `'.$this->task_name.'` as system one.', 'TaskToSystemFail', error: $throwable);
                 return false;
             }
             #Log only if something was actually changed
@@ -318,7 +328,7 @@ class Task
      */
     public function setEnabled(bool $enabled = true): bool
     {
-        if (empty($this->task_name)) {
+        if (\preg_match('/^\s*$/u', $this->task_name ?? '') !== 0) {
             throw new \UnexpectedValueException('Task name is not set');
         }
         if ($this->found_in_db) {
@@ -327,8 +337,8 @@ class Task
                     ':task' => [$this->task_name, 'string'],
                     ':enabled' => [$enabled, 'bool'],
                 ], return: 'affected');
-            } catch (\Throwable $e) {
-                $this->log('Failed to '.($enabled ? 'enable' : 'disable').' task.', 'Task'.($enabled ? 'Enable' : 'Disable').'Fail', error: $e);
+            } catch (\Throwable $throwable) {
+                $this->log('Failed to '.($enabled ? 'enable' : 'disable').' task.', 'Task'.($enabled ? 'Enable' : 'Disable').'Fail', error: $throwable);
                 return false;
             }
             #Log only if something was actually changed

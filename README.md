@@ -18,15 +18,15 @@
     * [Settings](#settings)
     * [Event types](#event-types)
 
-# What
+## What
 
 Despite the name this is not a CRON replacement, but it **is** a task scheduler nonetheless, that uses MySQL/MariaDB database to store tasks and their schedule.
 
-# Why
+## Why
 
 Originally my [fftracker](https://github.com/Simbiat/FFTracker) was hosted on a server that did not have CRON accessible by users, and thus I stored tasks for entities' updates (and not only) in a database and triggered them through Server-Sent Events (SSE). While Tracker was moved to a better server this approached stayed with little changes and allowed to have parallel processing despite having no proper PHP libraries to have proper parallel processing (or multithreading).
 
-# Features
+## Features
 
 1. Usable both in CLI and called from a web page.
 2. If called from a web page, it will output headers and statuses as per SSE specification.
@@ -42,9 +42,9 @@ Originally my [fftracker](https://github.com/Simbiat/FFTracker) was hosted on a 
 12. Auto-reset of hanged jobs and auto-purge of old logs.
 13. Allows globally disabling tasks processing yet allows their management.
 
-# How to
+## How to
 
-## Installation
+### Installation
 
 1. Download (manually or through composer).
 2. Establish DB connection using my [DB-Pool](https://github.com/Simbiat/db-pool) library or passing a `PDO` object to `Agent`'s (or `Task`'s or `TaskInstance`'s) constructor.
@@ -62,15 +62,15 @@ If you do not want to run installation, but rather just check the current versio
 (new \Simbiat\Cron\Installer($dbh))->getVersion();
 ```
 
-### Changing prefix
+#### Changing prefix
 
 By default, tables use `cron__` prefix, but you can change that by passing your own prefix. All classes (`Installer`, `Agent`, `Task` and `TaskInstance`) support a `prefix` argument, so if you do change it during installation, you can use it even when managing stuff outside of `Agent`.
 
-### Changing database connection
+#### Changing database connection
 
 Similar logic applies for the database connection object (`dbh`), in case you are not using [DB-Pool](https://github.com/Simbiat/db-pool).
 
-## Trigger processing
+### Trigger processing
 
 To trigger processing, you need to simply run this:
 
@@ -92,9 +92,9 @@ This command will do the following:
 
 Task run is expected to return `boolean` values by default, but this can be expanded (read below). Only `true` is considered as actual success unless values are expanded. Any other value will be treated as `false`. This value will be converted to string and logged, thus it is encouraged to have your own error handling inside the called function, especially considering that, by design, this library **cannot guarantee** catching those errors.
 
-## Tasks management
+### Tasks management
 
-### Adding a task
+#### Adding a task
 
 To use this library, you will need to add at least one task using the below command.
 
@@ -144,7 +144,7 @@ It is also possible to load settings from DB while creating the object by passin
 (new \Simbiat\Cron\Task('task_name'));
 ```
 
-### Deleting a task
+#### Deleting a task
 
 To delete a task pass appropriate `task_name` to constructor and call `delete`.
 
@@ -154,7 +154,7 @@ To delete a task pass appropriate `task_name` to constructor and call `delete`.
 
 Note, that tasks with `system` flag set to `1` will not be deleted.
 
-### Enabling or disabling task
+#### Enabling or disabling task
 
 If you are creating a task from scratch, then just pass `enabled` setting set to `1` (default) or `0` in the settings array. If it's an existing task, do this:
 
@@ -162,7 +162,7 @@ If you are creating a task from scratch, then just pass `enabled` setting set to
 (new \Simbiat\Cron\Task('task_name'))->setEnabled(bool $enabled = true);
 ```
 
-### Setting a task as a system one
+#### Setting a task as a system one
 
 If you are creating a task from scratch, then just pass `system` setting set to `1` in the settings array. If it's an existing task, do this:
 
@@ -172,11 +172,11 @@ If you are creating a task from scratch, then just pass `system` setting set to 
 
 This flag can't be set to `0` from the class, because it would defeat its security purpose. To remove it — update the database directly.
 
-## Scheduling
+### Scheduling
 
 Actual scheduling is done through "task instances" managed by `TaskInstance` class.
 
-### Adding a task instance
+#### Adding a task instance
 
 To schedule a task, use this function:
 
@@ -203,7 +203,7 @@ Same as with `Task` class it is also possible to load settings from DB while cre
 
 Only `'task_name'` is mandatory, but if you have multiple instances of a task, be sure to pass respective arguments and instance, since only the combination of the three ensures uniqueness.
 
-### Removing a task from the schedule
+#### Removing a task from the schedule
 
 To remove a task from schedule pass appropriate `$task` and `$arguments` to
 
@@ -211,7 +211,7 @@ To remove a task from schedule pass appropriate `$task` and `$arguments` to
 (new \Simbiat\Cron\TaskInstance('task_name', 'arguments', 1))->delete();
 ```
 
-### Enabling or disabling task instance as system
+#### Enabling or disabling task instance as system
 
 If you are creating a task instance from scratch, then just pass `enabled` setting set to `1` (default) or `0` in the settings array. If it's an existing instance, do this:
 
@@ -219,7 +219,7 @@ If you are creating a task instance from scratch, then just pass `enabled` setti
 (new \Simbiat\Cron\TaskInstance('task_name', 'arguments', 1))->setEnabled(bool $enabled = true);
 ```
 
-### Setting task instance as system
+#### Setting task instance as system
 
 If you are creating a task instance from scratch, then just pass `system` setting set to `1` in the settings array. If it's an existing task, do this:
 
@@ -227,7 +227,7 @@ If you are creating a task instance from scratch, then just pass `system` settin
 (new \Simbiat\Cron\TaskInstance('task_name', 'arguments', 1))->setSystem();
 ```
 
-### Manual task instance trigger
+#### Manual task instance trigger
 
 In some cases you may want to manually trigger a task. You can do this like this:
 
@@ -235,9 +235,9 @@ In some cases you may want to manually trigger a task. You can do this like this
 (new \Simbiat\Cron\TaskInstance('task_name', 'arguments', 1))->run();
 ```
 
-Note, that if the task is not found in the database when `run()` is executed, you will get an exception, which differs from automated processing, when function would simply return `false` under the assumption, that this was a one-time instance, that was executed by another process (although unlikely to happen).
+Note, that if the task is not found in the database when `run()` is executed, you will get an exception. This differs from automated processing, when function would simply return `false` under the assumption, that this was a one-time instance, executed by another process (although unlikely to happen).
 
-### Manual task instance rescheduling
+#### Manual task instance rescheduling
 
 You can also manually reschedule a task using
 
@@ -249,7 +249,7 @@ You can also manually reschedule a task using
 
 `$timestamp` is optional time, that you want to set. If not provided (`null`), will calculate the best time for next run.
 
-### Time for next run
+#### Time for next run
 
 You can execute below command to get a suggested `DateTimeImmutable` for next run of a task.
 
@@ -259,7 +259,7 @@ You can execute below command to get a suggested `DateTimeImmutable` for next ru
 
 It will calculate how many jobs were potentially missed based on time difference between current `next_run` value in the database and current time as well as instance frequency. This is required to keep the schedule consistent, so that if you schedule a task at `02:34` daily, it would always run at `02:34` (or try, at least). If instance has `day_of_week` or `day_of_month`, the function will find the earliest day that will satisfy both limitations starting from the date, which was determined based on instance frequency. `result` value is optional (`true` by default), and will affect logic only if set to `false` and `retry` value for the task is more than 0, essentially overriding the normal logic.
 
-## Settings
+### Settings
 
 To change any settings, use
 
@@ -281,7 +281,7 @@ Supported settings are as follows:
 5. `sse_retry` is number of milliseconds for connection retry for SSE. Will also be used to determine how long should the loop sleep if no threads or jobs, but will be treated as a number of seconds divided by 20. Default is `10000` (or roughly 8 minutes for empty cycles).
 6. `max_threads` is maximum number of threads (or rather loops) to be allowed to run at the same time. Does not affect singular `runTask()` calls, only `process()`. Number of current threads is determined by the number of distinct values of `run_by` in the `schedule` table, thus be careful with bad (or no) error catching, or otherwise it can be easily overrun by hanged jobs. Default is `4`.
 
-## Event types
+### Event types
 
 Below is the list of event types that are used when logging and when outputting SSE stream:
 
@@ -325,7 +325,7 @@ Below is the list of event types that are used when logging and when outputting 
 38. `CustomInformation` - custom event indicating an informative message (SysLog standard level 6).
 39. `CustomDebug` - custom event indicating a debugging message (SysLog standard level 7).
 
-## Custom events
+### Custom events
 
 You might have noticed that among the event types there are a few starting with `Custom` prefix. They are added to allow you to log custom events from functions called by Cron. These are just default ones, and if required you can add new ones to `cron__event_types` table.  
 To log events call

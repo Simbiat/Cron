@@ -101,36 +101,36 @@ trait TraitForCron
             return false;
         }
         #Update enabled flag
-        if (isset($settings['enabled'])) {
+        if (\array_key_exists('enabled', $settings)) {
             $this->cron_enabled = (bool)(int)$settings['enabled'];
         }
         #Update SSE loop flag
-        if (isset($settings['sse_loop'])) {
+        if (\array_key_exists('sse_loop', $settings)) {
             $this->sse_loop = (bool)(int)$settings['sse_loop'];
         }
         #Update retry time
-        if (isset($settings['retry'])) {
+        if (\array_key_exists('retry', $settings)) {
             $settings['retry'] = (int)$settings['retry'];
             if ($settings['retry'] > 0) {
                 $this->one_time_retry = $settings['retry'];
             }
         }
         #Update SSE retry time
-        if (isset($settings['sse_retry'])) {
+        if (\array_key_exists('sse_retry', $settings)) {
             $settings['sse_retry'] = (int)$settings['sse_retry'];
             if ($settings['sse_retry'] > 0) {
                 $this->sse_retry = $settings['sse_retry'];
             }
         }
         #Update maximum number of threads
-        if (isset($settings['max_threads'])) {
+        if (\array_key_exists('max_threads', $settings)) {
             $settings['max_threads'] = (int)$settings['max_threads'];
             if ($settings['max_threads'] > 0) {
                 $this->max_threads = $settings['max_threads'];
             }
         }
         #Update maximum life of an error
-        if (isset($settings['log_life'])) {
+        if (\array_key_exists('log_life', $settings)) {
             $settings['log_life'] = (int)$settings['log_life'];
             if ($settings['log_life'] > 0) {
                 $this->log_life = $settings['log_life'];
@@ -181,7 +181,7 @@ trait TraitForCron
                 'INSERT INTO `'.$this->prefix.'log` (`type`, `run_by`, `sse`, `task`, `arguments`, `instance`, `message`) VALUES (:type,:run_by,:sse,:task, :arguments, :instance, :message);',
                 [
                     ':type' => $event,
-                    ':run_by' => [empty($run_by) ? null : $run_by, empty($run_by) ? 'null' : 'string'],
+                    ':run_by' => [$run_by ?? null, $run_by === null ? 'null' : 'string'],
                     ':sse' => [SSE::$sse, 'bool'],
                     ':task' => [$task?->task_name, $task === null ? 'null' : 'string'],
                     ':arguments' => [$task?->arguments, $task === null ? 'null' : 'string'],

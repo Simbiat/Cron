@@ -106,7 +106,7 @@ class Agent
             }
             #Queue tasks for this random ID
             $tasks = $this->getTasks($items);
-            if (empty($tasks)) {
+            if ($tasks === false || $tasks === []) {
                 $this->log('Cron list is empty', 'CronEmpty');
                 if (SSE::$sse) {
                     #Sleep for a bit

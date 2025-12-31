@@ -23,16 +23,19 @@ class TaskInstance
      */
     private(set) string $arguments = '' {
         /**
-         * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81990
-         * @noinspection PhpUnusedParameterInspection https://youtrack.jetbrains.com/issue/WI-81990
+         * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81560
          */
         set (mixed $value) {
             /** @noinspection IsEmptyFunctionUsageInspection We do not know what values to expect here, so this should be fine as a universal solution */
             if (empty($value)) {
                 $this->arguments = '';
             } elseif (is_array($value)) {
-                $this->arguments = \json_encode($value, \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_UNESCAPED_UNICODE | \JSON_PRESERVE_ZERO_FRACTION);
-            } elseif (is_string($value) && json_validate($value)) {
+                try {
+                    $this->arguments = \json_encode($value, \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_UNESCAPED_UNICODE | \JSON_PRESERVE_ZERO_FRACTION);
+                } catch (\Throwable) {
+                    $this->arguments = '';
+                }
+            } elseif (is_string($value) && \json_validate($value)) {
                 $this->arguments = $value;
             } else {
                 throw new \UnexpectedValueException('`arguments` is not an array or a valid JSON string');
@@ -44,7 +47,7 @@ class TaskInstance
      */
     private(set) int $instance = 1 {
         /**
-         * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81990
+         * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81560
          * @noinspection PhpUnusedParameterInspection https://youtrack.jetbrains.com/issue/WI-81990
          */
         set (int $value) {
@@ -71,7 +74,7 @@ class TaskInstance
      */
     private(set) int $frequency = 0 {
         /**
-         * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81990
+         * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81560
          */
         set {
             $frequency = $value;
@@ -92,16 +95,19 @@ class TaskInstance
      */
     private(set) ?string $day_of_month = null {
         /**
-         * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81990
-         * @noinspection PhpUnusedParameterInspection https://youtrack.jetbrains.com/issue/WI-81990
+         * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81560
          */
         set (mixed $value) {
             /** @noinspection IsEmptyFunctionUsageInspection We do not know what values to expect here, so this should be fine as a universal solution */
             if (empty($value)) {
                 $this->day_of_month = null;
             } elseif (is_array($value)) {
-                $this->day_of_month = \json_encode($value, \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_UNESCAPED_UNICODE | \JSON_PRESERVE_ZERO_FRACTION);
-            } elseif (is_string($value) && json_validate($value)) {
+                try {
+                    $this->day_of_month = \json_encode($value, \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_UNESCAPED_UNICODE | \JSON_PRESERVE_ZERO_FRACTION);
+                } catch (\Throwable) {
+                    $this->day_of_month = null;
+                }
+            } elseif (is_string($value) && \json_validate($value)) {
                 $this->day_of_month = $value;
             } else {
                 throw new \UnexpectedValueException('`day_of_month` is not an array or a valid JSON string');
@@ -113,16 +119,19 @@ class TaskInstance
      */
     private(set) ?string $day_of_week = null {
         /**
-         * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81990
-         * @noinspection PhpUnusedParameterInspection https://youtrack.jetbrains.com/issue/WI-81990
+         * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81560
          */
         set (mixed $value) {
             /** @noinspection IsEmptyFunctionUsageInspection We do not know what values to expect here, so this should be fine as a universal solution */
             if (empty($value)) {
                 $this->day_of_week = null;
             } elseif (is_array($value)) {
-                $this->day_of_week = \json_encode($value, \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_UNESCAPED_UNICODE | \JSON_PRESERVE_ZERO_FRACTION);
-            } elseif (is_string($value) && json_validate($value)) {
+                try {
+                    $this->day_of_week = \json_encode($value, \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_UNESCAPED_UNICODE | \JSON_PRESERVE_ZERO_FRACTION);
+                } catch (\Throwable) {
+                    $this->day_of_week = null;
+                }
+            } elseif (is_string($value) && \json_validate($value)) {
                 $this->day_of_week = $value;
             } else {
                 throw new \UnexpectedValueException('`day_of_week` is not an array or a valid JSON string');
@@ -134,7 +143,7 @@ class TaskInstance
      */
     private(set) int $priority = 0 {
         /**
-         * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81990
+         * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81560
          */
         set {
             $this->priority = $value;
@@ -174,7 +183,7 @@ class TaskInstance
     public function __construct(string $task_name = '', string|array|null $arguments = null, int $instance = 1, \PDO|null $dbh = null, string $prefix = 'cron__')
     {
         $this->init($dbh, $prefix);
-        if (!empty($task_name)) {
+        if (\preg_match('/^\s*$/u', $task_name) === 0) {
             $this->task_name = $task_name;
             $this->arguments = $arguments;
             $this->instance = $instance;
@@ -197,7 +206,7 @@ class TaskInstance
                 ':instance' => [$this->instance, 'int'],
             ], return: 'row'
         );
-        if (!empty($settings)) {
+        if (\count($settings) > 0) {
             #Set `run_by` value, if present
             if (!empty($settings['run_by'])) {
                 $this->run_by = $settings['run_by'];
@@ -226,7 +235,7 @@ class TaskInstance
             $this->task_object = (new Task($settings['task']));
         }
         #We need to process system status first, since frequency depends on it
-        if (isset($settings['system'])) {
+        if (\array_key_exists('system', $settings)) {
             $this->system = (bool)$settings['system'];
         }
         foreach ($settings as $setting => $value) {
@@ -249,7 +258,7 @@ class TaskInstance
                     $this->next_time = SandClock::valueToDateTime($value);
                     break;
                 case 'message':
-                    if (empty($value)) {
+                    if (!is_string($value) || \preg_match('/^\s*$/u', $value) !== 0) {
                         $this->message = null;
                     } else {
                         $this->message = $value;
@@ -270,7 +279,7 @@ class TaskInstance
      */
     public function add(): bool
     {
-        if (empty($this->task_name)) {
+        if (\preg_match('/^\s*$/u', $this->task_name) !== 0) {
             throw new \UnexpectedValueException('Task name is not set');
         }
         try {
@@ -280,16 +289,16 @@ class TaskInstance
                 ':instance' => [$this->instance, 'int'],
                 ':enabled' => [$this->enabled, 'enabled'],
                 ':system' => [$this->system, 'bool'],
-                ':frequency' => [(empty($this->frequency) ? 0 : $this->frequency), 'int'],
-                ':day_of_month' => [$this->day_of_month, (empty($this->day_of_month) ? 'null' : 'string')],
-                ':day_of_week' => [$this->day_of_week, (empty($this->day_of_week) ? 'null' : 'string')],
-                ':priority' => [(empty($this->priority) ? 0 : $this->priority), 'int'],
-                ':message' => [$this->message, (empty($this->message) ? 'null' : 'string')],
+                ':frequency' => [$this->frequency, 'int'],
+                ':day_of_month' => [$this->day_of_month, (\preg_match('/^\s*$/u', $this->day_of_month ?? '') !== 0 ? 'null' : 'string')],
+                ':day_of_week' => [$this->day_of_week, (\preg_match('/^\s*$/u', $this->day_of_week ?? '') !== 0 ? 'null' : 'string')],
+                ':priority' => [$this->priority, 'int'],
+                ':message' => [$this->message, (\preg_match('/^\s*$/u', $this->message ?? '') !== 0 ? 'null' : 'string')],
                 ':next_run' => [$this->next_time, 'datetime'],
             ], return: 'affected');
             $this->found_in_db = true;
-        } catch (\Throwable $e) {
-            $this->log('Failed to add or update task instance.', 'InstanceAddFail', error: $e, task: $this);
+        } catch (\Throwable $throwable) {
+            $this->log('Failed to add or update task instance.', 'InstanceAddFail', error: $throwable, task: $this);
             return false;
         }
         #Log only if something was actually changed
@@ -306,7 +315,7 @@ class TaskInstance
      */
     public function delete(): bool
     {
-        if (empty($this->task_name)) {
+        if (\preg_match('/^\s*$/u', $this->task_name) !== 0) {
             throw new \UnexpectedValueException('Task name is not set');
         }
         try {
@@ -360,8 +369,8 @@ class TaskInstance
                 ':arguments' => [$this->arguments, 'string'],
                 ':instance' => [$this->instance, 'int'],
             ], return: 'affected');
-        } catch (\Throwable $e) {
-            $this->log('Failed to mark task instance as system one.', 'InstanceToSystemFail', error: $e, task: $this);
+        } catch (\Throwable $throwable) {
+            $this->log('Failed to mark task instance as system one.', 'InstanceToSystemFail', error: $throwable, task: $this);
             return false;
         }
         #Log only if something was actually changed
@@ -390,8 +399,8 @@ class TaskInstance
                 ':instance' => [$this->instance, 'int'],
                 ':enabled' => [$enabled, 'bool'],
             ], return: 'affected');
-        } catch (\Throwable $e) {
-            $this->log('Failed to '.($enabled ? 'enable' : 'disable').' task instance.', 'Instance'.($enabled ? 'Enable' : 'Disable').'Fail', error: $e, task: $this);
+        } catch (\Throwable $throwable) {
+            $this->log('Failed to '.($enabled ? 'enable' : 'disable').' task instance.', 'Instance'.($enabled ? 'Enable' : 'Disable').'Fail', error: $throwable, task: $this);
             return false;
         }
         #Log only if something was actually changed
@@ -421,6 +430,7 @@ class TaskInstance
             return $this->delete();
         }
         #Determine a new time
+        /** @noinspection IsEmptyFunctionUsageInspection Valid scenario due to multiple possible types used for the variable */
         if (empty($timestamp)) {
             $time = $this->updateNextRun($result);
         } else {
@@ -434,8 +444,8 @@ class TaskInstance
                 ':arguments' => [$this->arguments, 'string'],
                 ':instance' => [$this->instance, 'int'],
             ], return: 'affected');
-        } catch (\Throwable $e) {
-            $this->log('Failed to reschedule task instance for '.SandClock::format($time, 'c').'.', 'RescheduleFail', error: $e, task: $this);
+        } catch (\Throwable $throwable) {
+            $this->log('Failed to reschedule task instance for '.SandClock::format($time, 'c').'.', 'RescheduleFail', error: $throwable, task: $this);
             return false;
         }
         #Log only if something was actually changed
@@ -454,7 +464,7 @@ class TaskInstance
     public function run(): bool
     {
         #If run_by value is empty (a job is being run manually) - generate it
-        if (empty($this->run_by)) {
+        if (\preg_match('/^\s*$/u', $this->run_by ?? '') !== 0) {
             $this->run_by = $this->generateRunBy();
         }
         if (!$this->found_in_db) {
@@ -462,8 +472,8 @@ class TaskInstance
             return true;
         }
         if ($this->next_time !== SandClock::suggestNextDay($this->next_time,
-                (!empty($this->day_of_week) ? \json_decode($this->day_of_week, flags: \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_BIGINT_AS_STRING | \JSON_OBJECT_AS_ARRAY) : []),
-                (!empty($this->day_of_month) ? \json_decode($this->day_of_month, flags: \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_BIGINT_AS_STRING | \JSON_OBJECT_AS_ARRAY) : []))
+                (\preg_match('/^\s*$/u', $this->day_of_week ?? '') === 0 ? \json_decode($this->day_of_week, flags: \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_BIGINT_AS_STRING | \JSON_OBJECT_AS_ARRAY) : []),
+                (\preg_match('/^\s*$/u', $this->day_of_month ?? '') === 0 ? \json_decode($this->day_of_month, flags: \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_BIGINT_AS_STRING | \JSON_OBJECT_AS_ARRAY) : []))
         ) {
             #Register error.
             $this->log('Attempted to run function during forbidden day of week or day of month.', 'InstanceFail', task: $this);
@@ -484,25 +494,26 @@ class TaskInstance
             return true;
         }
         #Decode allowed returns if any
-        if (!empty($this->task_object->returns)) {
+        if (\preg_match('/^\s*$/u', $this->task_object->returns ?? '') === 0) {
             $allowed_returns = \json_decode($this->task_object->returns, flags: \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_BIGINT_AS_STRING | \JSON_OBJECT_AS_ARRAY);
         }
         try {
             $function = $this->functionCreation();
             #Run function
-            if (empty($this->arguments)) {
+            if (\preg_match('/^\s*$/u', $this->arguments ?? '') !== 0) {
                 $result = $function();
             } else {
                 #Replace instance reference
                 $arguments = \str_replace('"$cron_instance"', (string)$this->instance, $this->arguments);
                 $result = \call_user_func_array($function, \json_decode($arguments, flags: \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_BIGINT_AS_STRING | \JSON_OBJECT_AS_ARRAY));
             }
-        } catch (\Throwable $e) {
-            $result = $e->getMessage()."\r\n".$e->getTraceAsString();
+        } catch (\Throwable $throwable) {
+            $result = $throwable->getMessage()."\r\n".$throwable->getTraceAsString();
         }
         #Validate result
         if ($result !== true) {
             #Check if it's an allowed return value
+            /** @noinspection IsEmptyFunctionUsageInspection Valid case, since we do not know to what the JSON got decoded here */
             if (!empty($allowed_returns)) {
                 if (in_array($result, $allowed_returns, true)) {
                     #Override the value
@@ -530,10 +541,11 @@ class TaskInstance
     private function functionCreation(): string|array
     {
         $object = null;
+        $extra_methods = [];
         #Check if an object is required
-        if (!empty($this->task_object->object)) {
+        if (\preg_match('/^\s*$/u', $this->task_object->object ?? '') === 0) {
             #Check if parameters for the object are set
-            if (!empty($this->task_object->parameters)) {
+            if (\preg_match('/^\s*$/u', $this->task_object->parameters ?? '') === 0) {
                 $parameters = \json_decode($this->task_object->parameters, flags: \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_BIGINT_AS_STRING | \JSON_OBJECT_AS_ARRAY);
                 #Check if extra methods are set
                 if (!empty($parameters['extra_methods'])) {
@@ -546,13 +558,13 @@ class TaskInstance
                 $parameters = null;
             }
             #Generate object
-            if (empty($parameters)) {
+            if ($parameters === null || $parameters === []) {
                 $object = (new $this->task_object->object());
             } else {
                 $object = (new $this->task_object->object(...$parameters));
             }
             #Call the extra methods
-            if (!empty($extra_methods)) {
+            if ($extra_methods !== []) {
                 foreach ($extra_methods as $method) {
                     #Check if the method value is present, skip the method, if not
                     if (empty($method['method']) || !is_string($method['method'])) {
@@ -624,14 +636,14 @@ class TaskInstance
                 $new_time = $current_time;
             }
         }
-        if (empty($this->day_of_month) && empty($this->day_of_week)) {
+        if (\preg_match('/^\s*$/u', $this->day_of_month ?? '') !== 0 && \preg_match('/^\s*$/u', $this->day_of_week ?? '') !== 0) {
             return $new_time;
         }
         #Check if the new time will satisfy day of week/month requirements
         try {
             return SandClock::suggestNextDay($new_time,
-                (!empty($this->day_of_week) ? \json_decode($this->day_of_week, flags: \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_BIGINT_AS_STRING | \JSON_OBJECT_AS_ARRAY) : []),
-                (!empty($this->day_of_month) ? \json_decode($this->day_of_month, flags: \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_BIGINT_AS_STRING | \JSON_OBJECT_AS_ARRAY) : []));
+                (\preg_match('/^\s*$/u', $this->day_of_week ?? '') === 0 ? \json_decode($this->day_of_week, flags: \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_BIGINT_AS_STRING | \JSON_OBJECT_AS_ARRAY) : []),
+                (\preg_match('/^\s*$/u', $this->day_of_month ?? '') === 0 ? \json_decode($this->day_of_month, flags: \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_BIGINT_AS_STRING | \JSON_OBJECT_AS_ARRAY) : []));
         } catch (\Throwable) {
             #We should not get here, since the value is not from the user, and there are validations on earlier steps; this is just a failback
             return $current_time;

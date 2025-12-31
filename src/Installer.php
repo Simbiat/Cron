@@ -43,7 +43,7 @@ class Installer
             #Assume that we have installed the database, try to get the version
             $version = Query::query('SELECT `value` FROM `'.$this->prefix.'settings` WHERE `setting`=\'version\'', return: 'value');
             #If an empty installer script was run before 2.1.2, we need to determine what version we have based on other things
-            if (empty($version)) {
+            if (\preg_match('/^\s*$/u', $version ?? '') !== 0) {
                 #If errors' table does not exist, and the log table does - we are on version 2.0.0
                 if (Manage::checkTable($this->prefix.'errors') === 0 && Manage::checkTable($this->prefix.'log') === 1) {
                     $version = '2.0.0';
