@@ -245,7 +245,7 @@ You can also manually reschedule a task using
 (new \Simbiat\Cron\TaskInstance('task_name', 'arguments', 1))->reSchedule($result, $timestamp);
 ```
 
-`$result` is a `boolean` value indicating whether the last run of a task (even if it did not happen) should be considered as successful (`true`) or not (`false`). Determines which timestamp in the database will be updated and whether to remove one-time instances.
+`$result` is a `boolean` value indicating whether the last run of a task (even if it did not happen) should be considered as successful (`true`) or not (`false`). Determines which timestamp and which counters in the database will be updated and whether to remove one-time instances. `string` can be provided as well, and in that case it will be treated as `false`, but also update `last_error_message` column with respective text.
 
 `$timestamp` is optional time, that you want to set. If not provided (`null`), will calculate the best time for next run.
 

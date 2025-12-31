@@ -43,6 +43,9 @@ ALTER TABLE `cron__schedule`
     ADD `error_streak`       BIGINT(20) UNSIGNED                                   NOT NULL DEFAULT '0' COMMENT 'Erroneous runs since last success' AFTER `error_total`,
     ADD `last_error_message` TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL     DEFAULT NULL COMMENT 'Message from last error run' AFTER `error_streak`;
 
+ALTER TABLE `cron__schedule`
+    CHANGE `status` `status` TINYINT(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '0 - not being processed, 1 - picked up by a job, 2 - running';
+
 UPDATE `cron__settings`
 SET `value` = '2.4.0'
 WHERE `setting` = 'version';
