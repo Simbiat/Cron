@@ -34,6 +34,15 @@ UPDATE `cron__settings`
 SET `setting` = 'sse_retry'
 WHERE `cron__settings`.`setting` = 'sseRetry';
 
+ALTER TABLE `cron__schedule`
+    ADD `success_total`  BIGINT(20) UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Total of successful runs' AFTER `last_success`,
+    ADD `success_streak` BIGINT(20) UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Successful runs since last error' AFTER `success_total`;
+
+ALTER TABLE `cron__schedule`
+    ADD `error_total`        BIGINT(20) UNSIGNED                                   NOT NULL DEFAULT '0' COMMENT 'Total of erroneous runs' AFTER `last_error`,
+    ADD `error_streak`       BIGINT(20) UNSIGNED                                   NOT NULL DEFAULT '0' COMMENT 'Erroneous runs since last success' AFTER `error_total`,
+    ADD `last_error_message` TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL     DEFAULT NULL COMMENT 'Message from last error run' AFTER `error_streak`;
+
 UPDATE `cron__settings`
-SET `value` = '2.3.5'
+SET `value` = '2.4.0'
 WHERE `setting` = 'version';

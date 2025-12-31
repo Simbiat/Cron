@@ -414,12 +414,12 @@ class TaskInstance
     /**
      * Reschedule a task (or remove it if it's onetime)
      *
-     * @param bool                                               $result    Whether a task was successful
+     * @param bool|string                                        $result    Whether a task was successful
      * @param string|float|int|\DateTime|\DateTimeImmutable|null $timestamp Optional timestamp to use
      *
      * @return bool
      */
-    public function reSchedule(bool $result = true, string|float|int|\DateTime|\DateTimeImmutable|null $timestamp = null): bool
+    public function reSchedule(bool|string $result = true, string|float|int|\DateTime|\DateTimeImmutable|null $timestamp = null): bool
     {
         if (!$this->found_in_db) {
             throw new \UnexpectedValueException('Not found in database.');
@@ -438,11 +438,20 @@ class TaskInstance
         }
         #Actually reschedule. One task time task will be rescheduled for the retry time from settings
         try {
-            $affected = Query::query('UPDATE `'.$this->prefix.'schedule` SET `status`=0, `run_by`=NULL, `sse`=0, `next_run`=:time, `'.($result ? 'last_success' : 'last_error').'`=CURRENT_TIMESTAMP(6) WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance;', [
+            if ($result === true) {
+                $query = /** @lang SQL */
+                    'UPDATE `'.$this->prefix.'schedule` SET `status`=0, `run_by`=NULL, `sse`=0, `next_run`=:time, `last_success`=CURRENT_TIMESTAMP(6), `success_total`=`success_total`+1, `success_streak`=`success_streak`+1, `error_streak`=0 WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance;';
+            } else {
+                #If `last_run` is NULL, then the job was not tried to be run, and probably is being rescheduled due to some issue not related to this specific instance
+                $query = /** @lang SQL */
+                    'UPDATE `'.$this->prefix.'schedule` SET `status`=0, `run_by`=NULL, `sse`=0, `next_run`=:time, `last_error`=IF(`last_run` IS NULL, NULL, CURRENT_TIMESTAMP(6)), `error_total`=`error_total`+1, `error_streak`=`error_streak`+1, `success_streak`=0, `last_error_message`=:error_text WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance;';
+            }
+            $affected = Query::query($query, [
                 ':time' => [$time, 'datetime'],
                 ':task' => [$this->task_name, 'string'],
                 ':arguments' => [$this->arguments, 'string'],
                 ':instance' => [$this->instance, 'int'],
+                ':error_text' => [\is_bool($result) ? null : $result, \is_bool($result) ? 'null' : 'string']
             ], return: 'affected');
         } catch (\Throwable $throwable) {
             $this->log('Failed to reschedule task instance for '.SandClock::format($time, 'c').'.', 'RescheduleFail', error: $throwable, task: $this);
@@ -510,21 +519,14 @@ class TaskInstance
         } catch (\Throwable $throwable) {
             $result = $throwable->getMessage()."\r\n".$throwable->getTraceAsString();
         }
-        #Validate result
-        if ($result !== true) {
-            #Check if it's an allowed return value
+        #Check if it's an allowed return value, unless it's regular boolean
+        if (!\is_bool($result)) {
             /** @noinspection IsEmptyFunctionUsageInspection Valid case, since we do not know to what the JSON got decoded here */
-            if (!empty($allowed_returns)) {
-                if (in_array($result, $allowed_returns, true)) {
-                    #Override the value
-                    $result = true;
-                } else {
-                    $this->log('Unexpected return `'.\json_encode($result, \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_UNESCAPED_UNICODE | \JSON_PRESERVE_ZERO_FRACTION).'`.', 'InstanceFail', task: $this);
-                    $result = false;
-                }
-            } elseif ($result !== false) {
-                $this->log('Unexpected return `'.\json_encode($result, \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_UNESCAPED_UNICODE | \JSON_PRESERVE_ZERO_FRACTION).'`.', 'InstanceFail', task: $this);
-                $result = false;
+            if (!empty($allowed_returns) && in_array($result, $allowed_returns, true)) {
+                $result = true;
+            } else {
+                $result = 'Unexpected return `'.\json_encode($result, \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_UNESCAPED_UNICODE | \JSON_PRESERVE_ZERO_FRACTION).'`.';
+                $this->log($result, 'InstanceFail', task: $this);
             }
         }
         #Reschedule
