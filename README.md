@@ -334,7 +334,7 @@ To log events call
 (new \Simbiat\Cron\Agent)->log(string $message, string $event, bool $end_stream = false, ?\Throwable $error = null, ?TaskInstance $task = null);
 ```
 
-Instead of `Agent` you can use `Task` or `TaskInstance`, since `log` is part of a `TrainForCron` and is available in all of them.
+Instead of `Agent` you can use `Task` or `TaskInstance`, since `log` is part of a `TraitForCron` and is available in all of them.
 
 `$message` is the text of your message you want to send.  
 `$event` is the event type.  
