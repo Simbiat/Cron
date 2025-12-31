@@ -459,7 +459,14 @@ class TaskInstance
         }
         #Log only if something was actually changed
         if ($affected > 0) {
-            $this->log('Task instance rescheduled for '.SandClock::format($time, 'c').'.', 'Reschedule', task: $this);
+            if ($result === true) {
+                $reason = '';
+            } elseif ($result === 'Hanged job') {
+                $reason = ' due to hanging';
+            } else {
+                $reason = ' due to error';
+            }
+            $this->log('Task instance rescheduled for '.SandClock::format($time, 'c').$reason.'.', 'Reschedule', task: $this);
         }
         return true;
     }

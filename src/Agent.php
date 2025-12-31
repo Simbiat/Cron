@@ -290,7 +290,7 @@ class Agent
         foreach ($tasks as $task) {
             #If this was a one-time task, schedule it for right now, to avoid delaying it for double the time.
             try {
-                new TaskInstance($task['task'], $task['arguments'], $task['instance'])->reSchedule(false);
+                new TaskInstance($task['task'], $task['arguments'], $task['instance'])->reSchedule('Hanged job');
             } catch (\Throwable $exception) {
                 #If the instance was not found in the database, it was probably deleted, so we can safely ignore the error.
                 if ($exception->getMessage() !== 'Not found in database.') {
