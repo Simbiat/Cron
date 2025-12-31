@@ -440,7 +440,7 @@ class TaskInstance
         try {
             if ($result === true) {
                 $query = /** @lang SQL */
-                    'UPDATE `'.$this->prefix.'schedule` SET `status`=0, `run_by`=NULL, `sse`=0, `next_run`=:time, `last_success`=CURRENT_TIMESTAMP(6), `success_total`=`success_total`+1, `success_streak`=`success_streak`+1, `error_streak`=0 WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance;';
+                    'UPDATE `'.$this->prefix.'schedule` SET `status`=0, `run_by`=NULL, `sse`=0, `next_run`=:time, `last_success`=CURRENT_TIMESTAMP(6), `success_total`=`success_total`+1, `success_streak`=`success_streak`+1, `error_streak`=0, `last_error_message`=NULL WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance;';
             } else {
                 #If `last_run` is NULL, then the job was not tried to be run, and probably is being rescheduled due to some issue not related to this specific instance
                 $query = /** @lang SQL */
