@@ -211,6 +211,11 @@ class TaskInstance
             if (!empty($settings['run_by'])) {
                 $this->run_by = $settings['run_by'];
             }
+            #When function is called from Agent (or something that was invoked by an Agent), we need to get the `run_by` of that Agent instance and use that instead
+            $run_by = $this->runByFromBackTrace();
+            if ($run_by !== null) {
+                $this->run_by = $run_by;
+            }
             #Status is not allowed to be changed from outside, so `settingsFromArray` does not handle it, but we do update it in the class itself
             $this->status = $settings['status'];
             unset($settings['status']);
@@ -440,11 +445,11 @@ class TaskInstance
         try {
             if ($result === true) {
                 $query = /** @lang SQL */
-                    'UPDATE `'.$this->prefix.'schedule` SET `status`=0, `run_by`=NULL, `sse`=0, `next_run`=:time, `last_success`=CURRENT_TIMESTAMP(6), `success_total`=`success_total`+1, `success_streak`=`success_streak`+1, `error_streak`=0, `last_error_message`=NULL WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance;';
+                    'UPDATE `'.$this->prefix.'schedule` SET `status`=0, `run_by`=NULL, `thread_heartbeat`=NULL, `sse`=0, `next_run`=:time, `last_success`=CURRENT_TIMESTAMP(6), `success_total`=`success_total`+1, `success_streak`=`success_streak`+1, `error_streak`=0, `last_error_message`=NULL WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance;';
             } else {
-                #If `last_run` is NULL, then the job was not tried to be run, and probably is being rescheduled due to some issue not related to this specific instance
+                #If `status` is not equal to 2, then the job was not tried to be run, and probably is being rescheduled due to some issue not related to this specific run, so not increasing counters
                 $query = /** @lang SQL */
-                    'UPDATE `'.$this->prefix.'schedule` SET `status`=0, `run_by`=NULL, `sse`=0, `next_run`=:time, `last_error`=IF(`last_run` IS NULL, NULL, CURRENT_TIMESTAMP(6)), `error_total`=IF(`last_run` IS NULL, `error_total`, `error_total`+1), `error_streak`=IF(`last_run` IS NULL, `error_streak`, `error_streak`+1), `success_streak`=IF(`last_run` IS NULL, `success_streak`, 0), `last_error_message`=:error_text WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance;';
+                    'UPDATE `'.$this->prefix.'schedule` SET `run_by`=NULL, `sse`=0, `next_run`=:time, `last_error`=COALESCE(GREATEST(`last_run`, `thread_heartbeat`), CURRENT_TIMESTAMP(6)), `error_total`=IF(`status`=2, `error_total`+1, `error_total`), `error_streak`=IF(`status`=2, `error_streak`+1, `error_streak`), `success_streak`=IF(`status`=2, 0, `success_streak`), `last_error_message`=:error_text, `thread_heartbeat`=NULL, `status`=0 WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance;';
             }
             $affected = Query::query($query, [
                 ':time' => [$time, 'datetime'],
@@ -460,8 +465,8 @@ class TaskInstance
         #Log only if something was actually changed
         if ($affected > 0) {
             if ($result === true) {
-                $reason = '';
-            } elseif ($result === 'Hanged job') {
+                $reason = ' on success';
+            } elseif ($result === 'Hanged job' || $result === 'Hanged thread') {
                 $reason = ' due to hanging';
             } else {
                 $reason = ' due to error';
@@ -493,13 +498,13 @@ class TaskInstance
         ) {
             #Register error.
             $this->log('Attempted to run function during forbidden day of week or day of month.', 'InstanceFail', task: $this);
-            $this->reSchedule(false);
+            $this->reSchedule('Wrong day of week or month');
             return false;
         }
         #Set the time limit for the task
         \set_time_limit($this->task_object->max_time);
         #Update last run
-        $affected = Query::query('UPDATE `'.$this->prefix.'schedule` SET `status`=2, `run_by`=:run_by, `last_run` = CURRENT_TIMESTAMP(6) WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance AND `status` IN (0, 1);', [
+        $affected = Query::query(/** @lang SQL */ 'UPDATE `'.$this->prefix.'schedule` SET `status`=2, `run_by`=:run_by, `thread_heartbeat` = CURRENT_TIMESTAMP(6), `last_run` = CURRENT_TIMESTAMP(6) WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance AND `status` IN (0, 1);', [
             ':task' => [$this->task_name, 'string'],
             ':arguments' => [$this->arguments, 'string'],
             ':instance' => [$this->instance, 'int'],

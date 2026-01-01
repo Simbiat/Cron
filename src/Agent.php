@@ -115,6 +115,8 @@ class Agent
             } else {
                 $total_tasks = \count($tasks);
                 foreach ($tasks as $number => $task) {
+                    #Send heartbeat indicating activity of the thread
+                    Query::query('UPDATE `'.$this->prefix.'schedule` SET `thread_heartbeat`=CURRENT_TIMESTAMP(6) WHERE `run_by`=:run_by;', [':run_by' => $this->run_by]);
                     $this->runTask($task, $number + 1, $total_tasks);
                 }
             }
@@ -286,11 +288,11 @@ class Agent
         foreach ($tasks as $task) {
             new TaskInstance($task['task'], $task['arguments'], $task['instance'])->delete();
         }
-        $tasks = Query::query('SELECT `task`, `arguments`, `instance`, `frequency` FROM `'.$this->prefix.'schedule` as `a` WHERE `run_by` IS NOT NULL AND CURRENT_TIMESTAMP(6)>DATE_ADD(IF(`last_run` IS NOT NULL, `last_run`, `next_run`), INTERVAL (SELECT `max_time` FROM `'.$this->prefix.'tasks` WHERE `'.$this->prefix.'tasks`.`task`=`a`.`task`) SECOND);', return: 'all');
+        $tasks = Query::query('SELECT `task`, `arguments`, `instance`, `status` FROM `'.$this->prefix.'schedule` as `a` WHERE `run_by` IS NOT NULL AND (`thread_heartbeat` IS NULL OR CURRENT_TIMESTAMP(6)>DATE_ADD(`thread_heartbeat`, INTERVAL (SELECT `max_time` FROM `'.$this->prefix.'tasks` WHERE `'.$this->prefix.'tasks`.`task`=`a`.`task`) SECOND));', return: 'all');
         foreach ($tasks as $task) {
             #If this was a one-time task, schedule it for right now, to avoid delaying it for double the time.
             try {
-                new TaskInstance($task['task'], $task['arguments'], $task['instance'])->reSchedule('Hanged job');
+                new TaskInstance($task['task'], $task['arguments'], $task['instance'])->reSchedule($task['status'] === 1 ? 'Hanged thread' : 'Hanged job');
             } catch (\Throwable $exception) {
                 #If the instance was not found in the database, it was probably deleted, so we can safely ignore the error.
                 if ($exception->getMessage() !== 'Not found in database.') {

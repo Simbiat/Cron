@@ -46,6 +46,12 @@ ALTER TABLE `cron__schedule`
 ALTER TABLE `cron__schedule`
     CHANGE `status` `status` TINYINT(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '0 - not being processed, 1 - picked up by a job, 2 - running, 3 - scheduled for removal';
 
+ALTER TABLE `cron__schedule`
+    ADD `thread_heartbeat` DATETIME(6) NULL DEFAULT NULL COMMENT 'Time of last activity of the thread working on the task (if any)' AFTER `run_by`;
+
+ALTER TABLE `cron__schedule`
+    ADD INDEX (`thread_heartbeat`);
+
 UPDATE `cron__settings`
 SET `value` = '2.4.0'
 WHERE `setting` = 'version';

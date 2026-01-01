@@ -153,8 +153,14 @@ trait TraitForCron
     public function log(string $message, string $event, bool $end_stream = false, ?\Throwable $error = null, ?TaskInstance $task = null): void
     {
         $skip_insert = false;
-        #If $task was passed, use its value for run_by
-        $run_by = $task?->run_by ?? $this->run_by;
+        $run_by = null;
+        #If task instance was not passed, attempt to find it in backtrace
+        if ($task === null) {
+            $run_by = $this->runByFromBackTrace();
+        } else {
+            #If $task instance was passed, or we found it, use its value for run_by
+            $run_by = $task?->run_by ?? $this->run_by;
+        }
         #To reduce the amount of NoThreads, Empty and Disabled events in the DB log, we check if the latest event is the same we want to write
         if (in_array($event, ['CronDisabled', 'CronEmpty', 'CronNoThreads'])) {
             #Reset run_by value to null, since these entries can belong to multiple threads, and we don't really care about which one was the last one
@@ -178,8 +184,9 @@ trait TraitForCron
         #Insert log entry only if we did not update the last log on previous check
         if (!$skip_insert) {
             Query::query(
-                'INSERT INTO `'.$this->prefix.'log` (`type`, `run_by`, `sse`, `task`, `arguments`, `instance`, `message`) VALUES (:type,:run_by,:sse,:task, :arguments, :instance, :message);',
+                'INSERT INTO `'.$this->prefix.'log` (`time`, `type`, `run_by`, `sse`, `task`, `arguments`, `instance`, `message`) VALUES (:time, :type,:run_by,:sse,:task, :arguments, :instance, :message);',
                 [
+                    ':time' => [\microtime(true), 'timestamp'],
                     ':type' => $event,
                     ':run_by' => [$run_by ?? null, $run_by === null ? 'null' : 'string'],
                     ':sse' => [SSE::$sse, 'bool'],
@@ -202,6 +209,20 @@ trait TraitForCron
             }
             exit(0);
         }
+    }
+    
+    private function runByFromBackTrace(): ?string
+    {
+        $run_by = null;
+        $task_instance_class = Agent::class;
+        $backtrace = \debug_backtrace(\DEBUG_BACKTRACE_PROVIDE_OBJECT | \DEBUG_BACKTRACE_IGNORE_ARGS);
+        foreach ($backtrace as $frame) {
+            if (!empty($frame['object']) && $frame['object'] instanceof $task_instance_class) {
+                $run_by = $frame['object']->run_by;
+                break;
+            }
+        }
+        return $run_by;
     }
     
     /**
