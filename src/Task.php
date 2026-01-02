@@ -8,6 +8,7 @@ use function is_string, is_array;
 
 /**
  * Cron task object
+ * @noinspection ContractViolationInspection https://github.com/kalessil/phpinspectionsea/issues/1996
  */
 class Task
 {
@@ -248,12 +249,12 @@ class Task
             ], return: 'affected');
             $this->found_in_db = true;
         } catch (\Throwable $throwable) {
-            $this->log('Failed to add or update task with following details: '.$task_details_string.'.', 'TaskAddFail', error: $throwable);
+            $this->log('Failed to add or update task with following details: '.$task_details_string.'.', EventTypes::TaskAddFail, error: $throwable);
             return false;
         }
         #Log only if something was actually changed
         if ($result > 0) {
-            $this->log('Added or updated task with following details: '.$task_details_string.'.', 'TaskAdd');
+            $this->log('Added or updated task with following details: '.$task_details_string.'.', EventTypes::TaskAdd);
         }
         return true;
     }
@@ -273,7 +274,7 @@ class Task
                 ':task' => [$this->task_name, 'string'],
             ], return: 'affected');
         } catch (\Throwable $throwable) {
-            $this->log('Failed delete task `'.$this->task_name.'`.', 'TaskDeleteFail', error: $throwable);
+            $this->log('Failed delete task `'.$this->task_name.'`.', EventTypes::TaskDeleteFail, error: $throwable);
             return false;
         }
         #Log only if something was actually deleted
@@ -287,7 +288,7 @@ class Task
             } catch (\Throwable) {
                 #Do nothing, not critical
             }
-            $this->log('Deleted task  `'.$this->task_name.'`.', 'TaskDelete');
+            $this->log('Deleted task  `'.$this->task_name.'`.', EventTypes::TaskDelete);
         }
         return true;
     }
@@ -307,13 +308,13 @@ class Task
                     ':task' => [$this->task_name, 'string'],
                 ], return: 'affected');
             } catch (\Throwable $throwable) {
-                $this->log('Failed to mark task `'.$this->task_name.'` as system one.', 'TaskToSystemFail', error: $throwable);
+                $this->log('Failed to mark task `'.$this->task_name.'` as system one.', EventTypes::TaskToSystemFail, error: $throwable);
                 return false;
             }
             #Log only if something was actually changed
             if ($result > 0) {
                 $this->system = true;
-                $this->log('Marked task `'.$this->task_name.'` as system one.', 'TaskToSystem');
+                $this->log('Marked task `'.$this->task_name.'` as system one.', EventTypes::TaskToSystem);
             }
             return true;
         }
@@ -338,13 +339,13 @@ class Task
                     ':enabled' => [$enabled, 'bool'],
                 ], return: 'affected');
             } catch (\Throwable $throwable) {
-                $this->log('Failed to '.($enabled ? 'enable' : 'disable').' task.', 'Task'.($enabled ? 'Enable' : 'Disable').'Fail', error: $throwable);
+                $this->log('Failed to '.($enabled ? 'enable' : 'disable').' task.', ($enabled ? EventTypes::TaskEnableFail : EventTypes::TaskDisableFail), error: $throwable);
                 return false;
             }
             #Log only if something was actually changed
             if ($result > 0) {
                 $this->enabled = $enabled;
-                $this->log(($enabled ? 'Enabled' : 'Disabled').' task.', 'Task'.($enabled ? 'Enable' : 'Disable'));
+                $this->log(($enabled ? 'Enabled' : 'Disabled').' task.', ($enabled ? EventTypes::TaskEnable : EventTypes::TaskDisable));
             }
             return true;
         }

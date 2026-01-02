@@ -327,17 +327,17 @@ Below is the list of event types that are used when logging and when outputting 
 
 ### Custom events
 
-You might have noticed that among the event types there are a few starting with `Custom` prefix. They are added to allow you to log custom events from functions called by Cron. These are just default ones, and if required you can add new ones to `cron__event_types` table.  
-To log events call
+You might have noticed that among the event types there are a few starting with `Custom` prefix. They are added to allow you to log custom events from functions called by Cron.  
+To log events call:
 
 ```php
-(new \Simbiat\Cron\Agent)->log(string $message, string $event, bool $end_stream = false, ?\Throwable $error = null, ?TaskInstance $task = null);
+(new \Simbiat\Cron\Agent)->log(string $message, \Simbiat\Cron\EventTypes $event, bool $end_stream = false, ?\Throwable $error = null, ?TaskInstance $task = null);
 ```
 
 Instead of `Agent` you can use `Task` or `TaskInstance`, since `log` is part of a `TraitForCron` and is available in all of them.
 
 `$message` is the text of your message you want to send.  
-`$event` is the event type.  
+`$event` is the event type taken from enum `\Simbiat\Cron\EventTypes`.  
 `$end_stream` is a `bool` value indicating whether the execution should stop after sending the message. This will also end the SSE stream.  
 `$error` is optional `\Throwable` object, that will be used to log details of an error, that you have caught.  
-`$task` is an optional `\Simbiat\Cron\TaskInstance` object, that you ***SHOULD NOT*** pass to this function normally. If you are using the class normally, it will be populated automatically. Treat this as an internally used parameter. You may want to pass it, if you have one, when calling this function from custom code.
+`$task` is an optional `\Simbiat\Cron\TaskInstance` object, that you ***SHOULD NOT*** pass to this function normally. If you are using the class normally, it will be populated automatically. Treat this as an internally used parameter. You may want to pass it, if you have one, when calling this function from some custom code, but you will unlikely need to do that.

@@ -9,6 +9,7 @@ use function is_string, is_array, in_array;
 
 /**
  * Scheduled task instance object
+ * @noinspection ContractViolationInspection https://github.com/kalessil/phpinspectionsea/issues/1996
  */
 class TaskInstance
 {
@@ -303,12 +304,12 @@ class TaskInstance
             ], return: 'affected');
             $this->found_in_db = true;
         } catch (\Throwable $throwable) {
-            $this->log('Failed to add or update task instance.', 'InstanceAddFail', error: $throwable, task: $this);
+            $this->log('Failed to add or update task instance.', EventTypes::InstanceAddFail, error: $throwable, task: $this);
             return false;
         }
         #Log only if something was actually changed
         if ($result > 0) {
-            $this->log('Added or updated task instance.', 'InstanceAdd', task: $this);
+            $this->log('Added or updated task instance.', EventTypes::InstanceAdd, task: $this);
         }
         return true;
     }
@@ -330,7 +331,7 @@ class TaskInstance
                 ':instance' => [$this->instance, 'int'],
             ], return: 'affected');
         } catch (\Throwable $first) {
-            $this->log('Failed to delete task instance.', 'InstanceDeleteFail', error: $first, task: $this);
+            $this->log('Failed to delete task instance.', EventTypes::InstanceDeleteFail, error: $first, task: $this);
             try {
                 $result = Query::query('UPDATE `'.$this->prefix.'schedule` SET `status` = 3 WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance AND `system`=0;', [
                     ':task' => [$this->task_name, 'string'],
@@ -339,10 +340,10 @@ class TaskInstance
                 ], return: 'affected');
                 #Log only if something was actually deleted, and if it's not a one-time job
                 if ($result > 0) {
-                    $this->log('Task instance marked for removal.', 'InstanceDelete', task: $this);
+                    $this->log('Task instance marked for removal.', EventTypes::InstanceDelete, task: $this);
                 }
             } catch (\Throwable $second) {
-                $this->log('Failed to mark task instance for removal.', 'InstanceDeleteFail', error: $second, task: $this);
+                $this->log('Failed to mark task instance for removal.', EventTypes::InstanceDeleteFail, error: $second, task: $this);
             }
             return false;
         }
@@ -350,7 +351,7 @@ class TaskInstance
             $this->found_in_db = false;
             #Log only if something was actually deleted, and if it's not a one-time job
             if ($this->frequency > 0) {
-                $this->log('Deleted task instance.', 'InstanceDelete', task: $this);
+                $this->log('Deleted task instance.', EventTypes::InstanceDelete, task: $this);
             }
         }
         return true;
@@ -375,13 +376,13 @@ class TaskInstance
                 ':instance' => [$this->instance, 'int'],
             ], return: 'affected');
         } catch (\Throwable $throwable) {
-            $this->log('Failed to mark task instance as system one.', 'InstanceToSystemFail', error: $throwable, task: $this);
+            $this->log('Failed to mark task instance as system one.', EventTypes::InstanceToSystemFail, error: $throwable, task: $this);
             return false;
         }
         #Log only if something was actually changed
         if ($result > 0) {
             $this->system = true;
-            $this->log('Marked task instance as system one.', 'InstanceToSystem', task: $this);
+            $this->log('Marked task instance as system one.', EventTypes::InstanceToSystem, task: $this);
         }
         return true;
     }
@@ -405,13 +406,13 @@ class TaskInstance
                 ':enabled' => [$enabled, 'bool'],
             ], return: 'affected');
         } catch (\Throwable $throwable) {
-            $this->log('Failed to '.($enabled ? 'enable' : 'disable').' task instance.', 'Instance'.($enabled ? 'Enable' : 'Disable').'Fail', error: $throwable, task: $this);
+            $this->log('Failed to '.($enabled ? 'enable' : 'disable').' task instance.', ($enabled ? EventTypes::InstanceEnableFail : EventTypes::InstanceDisableFail), error: $throwable, task: $this);
             return false;
         }
         #Log only if something was actually changed
         if ($result > 0) {
             $this->enabled = $enabled;
-            $this->log(($enabled ? 'Enabled' : 'Disabled').' task instance.', 'Instance'.($enabled ? 'Enable' : 'Disable'), task: $this);
+            $this->log(($enabled ? 'Enabled' : 'Disabled').' task instance.', ($enabled ? EventTypes::InstanceEnable : EventTypes::InstanceDisable), task: $this);
         }
         return true;
     }
@@ -459,7 +460,7 @@ class TaskInstance
                 ':error_text' => [\is_bool($result) ? null : $result, \is_bool($result) ? 'null' : 'string']
             ], return: 'affected');
         } catch (\Throwable $throwable) {
-            $this->log('Failed to reschedule task instance for '.SandClock::format($time, 'c').'.', 'RescheduleFail', error: $throwable, task: $this);
+            $this->log('Failed to reschedule task instance for '.SandClock::format($time, 'c').'.', EventTypes::RescheduleFail, error: $throwable, task: $this);
             return false;
         }
         #Log only if something was actually changed
@@ -471,7 +472,7 @@ class TaskInstance
             } else {
                 $reason = ' due to error';
             }
-            $this->log('Task instance rescheduled for '.SandClock::format($time, 'c').$reason.'.', 'Reschedule', task: $this);
+            $this->log('Task instance rescheduled for '.SandClock::format($time, 'c').$reason.'.', EventTypes::Reschedule, task: $this);
         }
         return true;
     }
@@ -497,7 +498,7 @@ class TaskInstance
                 (\preg_match('/^\s*$/u', $this->day_of_month ?? '') === 0 ? \json_decode($this->day_of_month, flags: \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_BIGINT_AS_STRING | \JSON_OBJECT_AS_ARRAY) : []))
         ) {
             #Register error.
-            $this->log('Attempted to run function during forbidden day of week or day of month.', 'InstanceFail', task: $this);
+            $this->log('Attempted to run function during forbidden day of week or day of month.', EventTypes::InstanceFail, task: $this);
             $this->reSchedule('Wrong day of week or month');
             return false;
         }
@@ -538,7 +539,7 @@ class TaskInstance
                 $result = true;
             } else {
                 $result = 'Unexpected return `'.\json_encode($result, \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_UNESCAPED_UNICODE | \JSON_PRESERVE_ZERO_FRACTION).'`.';
-                $this->log($result, 'InstanceFail', task: $this);
+                $this->log($result, EventTypes::InstanceFail, task: $this);
             }
         }
         #Reschedule

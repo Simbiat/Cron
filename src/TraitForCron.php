@@ -23,6 +23,9 @@ trait TraitForCron
      * @var string
      */
     private(set) string $prefix = 'cron__' {
+        /**
+         * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81560
+         */
         set {
             if (\preg_match('/^[\w\-]{0,53}$/u', $value) === 1) {
                 $this->prefix = $value;
@@ -143,37 +146,36 @@ trait TraitForCron
      * Function to end SSE stream and rethrow an error, if it was provided
      *
      * @param string                          $message    Log message
-     * @param string                          $event      log event type
+     * @param \Simbiat\Cron\EventTypes        $event      Log event type
      * @param bool                            $end_stream Flag to indicate whether we end the stream
      * @param \Throwable|null                 $error      Error object
      * @param \Simbiat\Cron\TaskInstance|null $task       TaskInstance object
      *
      * @return void
      */
-    public function log(string $message, string $event, bool $end_stream = false, ?\Throwable $error = null, ?TaskInstance $task = null): void
+    public function log(string $message, EventTypes $event, bool $end_stream = false, ?\Throwable $error = null, ?TaskInstance $task = null): void
     {
         $skip_insert = false;
-        $run_by = null;
         #If task instance was not passed, attempt to find it in backtrace
         if ($task === null) {
             $run_by = $this->runByFromBackTrace();
         } else {
             #If $task instance was passed, or we found it, use its value for run_by
-            $run_by = $task?->run_by ?? $this->run_by;
+            $run_by = $task->run_by ?? $this->run_by;
         }
         #To reduce the amount of NoThreads, Empty and Disabled events in the DB log, we check if the latest event is the same we want to write
-        if (in_array($event, ['CronDisabled', 'CronEmpty', 'CronNoThreads'])) {
+        if (in_array($event->name, ['CronDisabled', 'CronEmpty', 'CronNoThreads'])) {
             #Reset run_by value to null, since these entries can belong to multiple threads, and we don't really care about which one was the last one
             $run_by = null;
             #Get last event time and type
             $last_event = Query::query('SELECT `time`, `type` FROM `'.$this->prefix.'log` ORDER BY `time` DESC LIMIT 1', return: 'row');
             #Checking for empty, in case there are no logs in the table
-            if (!empty($last_event['type']) && $last_event['type'] === $event) {
+            if (!empty($last_event['type']) && $last_event['type'] === $event->value) {
                 #Update the message of last event with current time
                 Query::query(
                     'UPDATE `'.$this->prefix.'log` SET `message`=:message WHERE `time`=:time AND `type`=:type;',
                     [
-                        ':type' => $event,
+                        ':type' => [$event->value, 'int'],
                         ':time' => [$last_event['time'], 'datetime'],
                         ':message' => [$message.' (last check at '.SandClock::format(0, 'c').')', 'string'],
                     ]
@@ -187,7 +189,7 @@ trait TraitForCron
                 'INSERT INTO `'.$this->prefix.'log` (`time`, `type`, `run_by`, `sse`, `task`, `arguments`, `instance`, `message`) VALUES (:time, :type,:run_by,:sse,:task, :arguments, :instance, :message);',
                 [
                     ':time' => [\microtime(true), 'timestamp'],
-                    ':type' => $event,
+                    ':type' => [$event->value, 'int'],
                     ':run_by' => [$run_by ?? null, $run_by === null ? 'null' : 'string'],
                     ':sse' => [SSE::$sse, 'bool'],
                     ':task' => [$task?->task_name, $task === null ? 'null' : 'string'],
@@ -198,7 +200,7 @@ trait TraitForCron
             );
         }
         if (SSE::$sse) {
-            SSE::send($message, $event, ((($end_stream || $error !== null)) ? 0 : $this->sse_retry));
+            SSE::send($message, $event->name, ((($end_stream || $error !== null)) ? 0 : $this->sse_retry));
         }
         if ($end_stream) {
             if (SSE::$sse) {
@@ -211,6 +213,10 @@ trait TraitForCron
         }
     }
     
+    /**
+     * Get `run_by` value based from backtrace
+     * @return string|null
+     */
     private function runByFromBackTrace(): ?string
     {
         $run_by = null;
@@ -234,7 +240,7 @@ trait TraitForCron
         try {
             return \bin2hex(\random_bytes(15));
         } catch (\Throwable $exception) {
-            $this->log('Failed to generate random ID', 'CronFail', true, $exception);
+            $this->log('Failed to generate random ID', EventTypes::CronFail, true, $exception);
             return false;
         }
     }

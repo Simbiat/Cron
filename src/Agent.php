@@ -10,6 +10,7 @@ use function in_array;
 
 /**
  * Task scheduler that uses MySQL/MariaDB database to store tasks and their schedule.
+ * @noinspection ContractViolationInspection https://github.com/kalessil/phpinspectionsea/issues/1996
  */
 class Agent
 {
@@ -54,7 +55,7 @@ class Agent
         #Generate random ID
         $this->run_by = $this->generateRunBy();
         if (SSE::$sse) {
-            $this->log('Cron processing started in SSE mode', 'SSEStart');
+            $this->log('Cron processing started in SSE mode', EventTypes::SSEStart);
         }
         #Regular maintenance
         if (Query::$dbh !== null) {
@@ -71,13 +72,13 @@ class Agent
             }
         } else {
             #Notify about the end of the stream
-            $this->log('Cron database not available', 'CronFail', true);
+            $this->log('Cron database not available', EventTypes::CronFail, true);
             return false;
         }
         #Check if cron is enabled and process only if it is
         if (!$this->cron_enabled) {
             #Notify about the end of the stream
-            $this->log('Cron processing is disabled', 'CronDisabled', true);
+            $this->log('Cron processing is disabled', EventTypes::CronDisabled, true);
             return false;
         }
         #Sanitize the number of items
@@ -86,13 +87,13 @@ class Agent
         }
         do {
             if (!$this->getCronSettings()) {
-                $this->log('Failed to get CRON settings', 'CronFail', true);
+                $this->log('Failed to get CRON settings', EventTypes::CronFail, true);
                 return false;
             }
             #Check if enough threads are available
             try {
                 if (Query::query('SELECT COUNT(DISTINCT(`run_by`)) as `count` FROM `'.$this->prefix.'schedule` WHERE `run_by` IS NOT NULL;', return: 'count') >= $this->max_threads) {
-                    $this->log('Cron threads are exhausted', 'CronNoThreads');
+                    $this->log('Cron threads are exhausted', EventTypes::CronNoThreads);
                     if (!SSE::$sse) {
                         return false;
                     }
@@ -101,13 +102,13 @@ class Agent
                     continue;
                 }
             } catch (\Throwable $exception) {
-                $this->log('Failed to check for available threads', 'CronFail', true, $exception);
+                $this->log('Failed to check for available threads', EventTypes::CronFail, true, $exception);
                 return false;
             }
             #Queue tasks for this random ID
             $tasks = $this->getTasks($items);
             if ($tasks === false || $tasks === []) {
-                $this->log('Cron list is empty', 'CronEmpty');
+                $this->log('Cron list is empty', EventTypes::CronEmpty);
                 if (SSE::$sse) {
                     #Sleep for a bit
                     \sleep($this->sse_retry / 20);
@@ -127,7 +128,7 @@ class Agent
         } while ($this->cron_enabled && SSE::$sse && $this->sse_loop && \connection_status() === 0);
         #Notify about the end of the stream
         if (SSE::$sse) {
-            $this->log('Cron processing finished', 'SSEEnd', true);
+            $this->log('Cron processing finished', EventTypes::SSEEnd, true);
         }
         return true;
     }
@@ -145,20 +146,20 @@ class Agent
         try {
             $task_instance = (new TaskInstance($task['task'], $task['arguments'], $task['instance']));
             #Notify of the task starting
-            $this->log($number.'/'.$total_tasks.' '.(empty($task['message']) ? $task['task'].' starting' : $task['message']), 'InstanceStart', task: $task_instance);
+            $this->log($number.'/'.$total_tasks.' '.(empty($task['message']) ? $task['task'].' starting' : $task['message']), EventTypes::InstanceStart, task: $task_instance);
             #Attemp to run
             $result = $task_instance->run();
         } catch (\Throwable $exception) {
-            $this->log('Failed to run task `'.$task['task'].'` ('.$number.'/'.$total_tasks.')', 'InstanceFail', false, $exception, ($task_instance ?? null));
+            $this->log('Failed to run task `'.$task['task'].'` ('.$number.'/'.$total_tasks.')', EventTypes::InstanceFail, false, $exception, ($task_instance ?? null));
             return;
         } finally {
             $this->current_task = null;
         }
         #Notify of the task finishing
         if ($result) {
-            $this->log($number.'/'.$total_tasks.' '.$task['task'].' finished'.($task_instance->frequency === 0 ? ' and deleted' : ''), 'InstanceEnd', task: $task_instance);
+            $this->log($number.'/'.$total_tasks.' '.$task['task'].' finished'.($task_instance->frequency === 0 ? ' and deleted' : ''), EventTypes::InstanceEnd, task: $task_instance);
         } else {
-            $this->log($number.'/'.$total_tasks.' '.$task['task'].' failed', 'InstanceFail', task: $task_instance);
+            $this->log($number.'/'.$total_tasks.' '.$task['task'].' failed', EventTypes::InstanceFail, task: $task_instance);
         }
     }
     
@@ -196,7 +197,7 @@ class Agent
                 ]);
         } catch (\Throwable $exception) {
             #Notify about the end of the stream
-            $this->log('Failed to queue job', 'CronFail', true, $exception);
+            $this->log('Failed to queue job', EventTypes::CronFail, true, $exception);
         }
         #Get tasks
         try {
@@ -208,7 +209,7 @@ class Agent
             );
         } catch (\Throwable $exception) {
             #Notify about the end the stream
-            $this->log('Failed to get queued tasks', 'CronFail', true, $exception);
+            $this->log('Failed to get queued tasks', EventTypes::CronFail, true, $exception);
         }
         return [];
     }
