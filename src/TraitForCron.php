@@ -142,8 +142,8 @@ trait TraitForCron
     /**
      * Function to end SSE stream and rethrow an error, if it was provided
      *
-     * @param string                          $message    SSE message
-     * @param string                          $event      SSE type
+     * @param string                          $message    Log message
+     * @param string                          $event      log event type
      * @param bool                            $end_stream Flag to indicate whether we end the stream
      * @param \Throwable|null                 $error      Error object
      * @param \Simbiat\Cron\TaskInstance|null $task       TaskInstance object
