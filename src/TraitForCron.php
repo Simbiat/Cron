@@ -223,7 +223,7 @@ trait TraitForCron
         $task_instance_class = Agent::class;
         $backtrace = \debug_backtrace(\DEBUG_BACKTRACE_PROVIDE_OBJECT | \DEBUG_BACKTRACE_IGNORE_ARGS);
         foreach ($backtrace as $frame) {
-            if (!empty($frame['object']) && $frame['object'] instanceof $task_instance_class) {
+            if (!empty($frame['object']) && $frame['object'] instanceof $task_instance_class && $frame['object']->run_by !== null) {
                 $run_by = $frame['object']->run_by;
                 break;
             }
