@@ -159,6 +159,9 @@ trait TraitForCron
         #If task instance was not passed, attempt to find it in backtrace
         if ($task === null) {
             $run_by = $this->runByFromBackTrace();
+            if ($run_by !== null) {
+                $task = $this->taskInstanceFromBackTrace($run_by);
+            }
         } else {
             #If $task instance was passed, or we found it, use its value for run_by
             $run_by = $task->run_by ?? $this->run_by;
@@ -220,15 +223,41 @@ trait TraitForCron
     private function runByFromBackTrace(): ?string
     {
         $run_by = null;
-        $task_instance_class = Agent::class;
+        $agent_class = Agent::class;
         $backtrace = \debug_backtrace(\DEBUG_BACKTRACE_PROVIDE_OBJECT | \DEBUG_BACKTRACE_IGNORE_ARGS);
         foreach ($backtrace as $frame) {
-            if (!empty($frame['object']) && $frame['object'] instanceof $task_instance_class && $frame['object']->run_by !== null) {
+            if (!empty($frame['object']) && $frame['object'] instanceof $agent_class && $frame['object']->run_by !== null) {
                 $run_by = $frame['object']->run_by;
                 break;
             }
         }
         return $run_by;
+    }
+    
+    /**
+     * Get task instance from which is associated with provided `run_by`
+     * @param string $run_by
+     *
+     * @return \Simbiat\Cron\TaskInstance|null
+     */
+    private function taskInstanceFromBackTrace(string $run_by): ?TaskInstance
+    {
+        $instance = null;
+        $instance_class = TaskInstance::class;
+        $backtrace = \debug_backtrace(\DEBUG_BACKTRACE_PROVIDE_OBJECT | \DEBUG_BACKTRACE_IGNORE_ARGS);
+        foreach ($backtrace as $frame) {
+            if (
+                !empty($frame['object']) && $frame['object'] instanceof $instance_class && $frame['object']->run_by === $run_by &&
+                #TaskInstance calls logs with reference to itself, so this matters only if we are in a Task/Agent
+                #or if we are in TaskInstance, that was triggered by another TaskInstance (e.g. TaskInstance creating other one)
+                (!$this instanceof $instance_class || $frame['object'] !== $this)
+            ) {
+                $instance = $frame['object'];
+                break;
+            }
+        }
+        /* @noinspection PhpIncompatibleReturnTypeInspection Peculiarity of how backtrace works */
+        return $instance;
     }
     
     /**

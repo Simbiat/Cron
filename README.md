@@ -340,4 +340,4 @@ Instead of `Agent` you can use `Task` or `TaskInstance`, since `log` is part of 
 `$event` is the event type taken from enum `\Simbiat\Cron\EventTypes`.  
 `$end_stream` is a `bool` value indicating whether the execution should stop after sending the message. This will also end the SSE stream.  
 `$error` is optional `\Throwable` object, that will be used to log details of an error, that you have caught.  
-`$task` is an optional `\Simbiat\Cron\TaskInstance` object, that you ***SHOULD NOT*** pass to this function normally. If you are using the class normally, it will be populated automatically. Treat this as an internally used parameter. You may want to pass it, if you have one, when calling this function from some custom code, but you will unlikely need to do that.
+`$task` is an optional `\Simbiat\Cron\TaskInstance` object, that you ***SHOULD NOT*** pass to this function normally. If you are using the class normally, it will be populated automatically even when not passed (appropriate `TaskInstance` will be determined using backtrace).
