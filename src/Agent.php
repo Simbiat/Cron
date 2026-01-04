@@ -116,8 +116,6 @@ class Agent
             } else {
                 $total_tasks = \count($tasks);
                 foreach ($tasks as $number => $task) {
-                    #Send heartbeat indicating activity of the thread
-                    Query::query('UPDATE `'.$this->prefix.'schedule` SET `thread_heartbeat`=CURRENT_TIMESTAMP(6) WHERE `run_by`=:run_by;', [':run_by' => $this->run_by]);
                     $this->runTask($task, $number + 1, $total_tasks);
                 }
             }
