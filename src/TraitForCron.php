@@ -166,6 +166,7 @@ trait TraitForCron
             #If $task instance was passed, or we found it, use its value for run_by
             $run_by = $task->run_by ?? $this->run_by;
         }
+        $queries = [];
         #To reduce the amount of NoThreads, Empty and Disabled events in the DB log, we check if the latest event is the same we want to write
         if (in_array($event->name, ['CronDisabled', 'CronEmpty', 'CronNoThreads'])) {
             #Reset run_by value to null, since these entries can belong to multiple threads, and we don't really care about which one was the last one
@@ -175,20 +176,20 @@ trait TraitForCron
             #Checking for empty, in case there are no logs in the table
             if (!empty($last_event['type']) && $last_event['type'] === $event->value) {
                 #Update the message of last event with current time
-                Query::query(
+                $queries[] = [
                     'UPDATE `'.$this->prefix.'log` SET `message`=:message WHERE `time`=:time AND `type`=:type;',
                     [
                         ':type' => [$event->value, 'int'],
                         ':time' => [$last_event['time'], 'datetime'],
                         ':message' => [$message.' (last check at '.SandClock::format(0, 'c').')', 'string'],
                     ]
-                );
+                ];
                 $skip_insert = true;
             }
         }
         #Insert log entry only if we did not update the last log on previous check
         if (!$skip_insert) {
-            Query::query(
+            $queries[] = [
                 'INSERT INTO `'.$this->prefix.'log` (`time`, `type`, `run_by`, `sse`, `task`, `arguments`, `instance`, `message`) VALUES (:time, :type,:run_by,:sse,:task, :arguments, :instance, :message);',
                 [
                     ':time' => [\microtime(true), 'timestamp'],
@@ -200,8 +201,17 @@ trait TraitForCron
                     ':instance' => [$task?->instance, $task === null ? 'null' : 'int'],
                     ':message' => [$message.($error !== null ? "\r\n".$error->getMessage()."\r\n".$error->getTraceAsString() : ''), 'string'],
                 ]
-            );
+            ];
         }
+        if ($run_by !== null) {
+            $queries[] = [
+                'UPDATE `'.$this->prefix.'schedule` SET `thread_heartbeat`=CURRENT_TIMESTAMP(6) WHERE `run_by`=:run_by;',
+                [
+                    ':run_by' => $run_by
+                ]
+            ];
+        }
+        Query::query($queries);
         if (SSE::$sse) {
             SSE::send($message, $event->name, ((($end_stream || $error !== null)) ? 0 : $this->sse_retry));
         }
