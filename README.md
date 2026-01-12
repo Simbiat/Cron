@@ -24,7 +24,7 @@ Despite the name this is not a CRON replacement, but it **is** a task scheduler 
 
 ## Why
 
-Originally my [fftracker](https://github.com/Simbiat/FFTracker) was hosted on a server that did not have CRON accessible by users, and thus I stored tasks for entities' updates (and not only) in a database and triggered them through Server-Sent Events (SSE). While Tracker was moved to a better server this approached stayed with little changes and allowed to have parallel processing despite having no proper PHP libraries to have proper parallel processing (or multithreading).
+Originally my [fftracker](https://github.com/Simbiat/FFTracker) was hosted on a server that did not have CRON accessible by users, and thus I stored tasks for entities' updates (and not only) in a database and triggered them through Server-Sent Events (SSE). While Tracker was moved to a better server this approached stayed with little changes and allowed to have parallel processing despite having no proper PHP libraries to have proper parallel processing (or multithreading). Now it's used for automatically generated tasks with various priority, which would be difficult to handle using regular CRON.
 
 ## Features
 
