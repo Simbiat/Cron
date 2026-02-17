@@ -174,11 +174,15 @@ class Agent
                         INNER JOIN
                         (
                             SELECT `task`, `arguments`, `instance` FROM (
-                                SELECT `task`, `arguments`, `instance`, `next_run`, '.self::CALCULATED_PRIORITY.' AS `calculated` FROM `'.$this->prefix.'schedule` AS `instances`
-                                WHERE `enabled`=1 AND `run_by` IS NULL AND `next_run`<=CURRENT_TIMESTAMP(6) AND (SELECT `enabled` FROM `'.$this->prefix.'tasks` `tasks` WHERE `tasks`.`task`=`instances`.`task`)=1
-                                ORDER BY `calculated` DESC, `next_run`
-                                LIMIT :inner_limit FOR UPDATE SKIP LOCKED
-                            ) `instances` GROUP BY `task`, `arguments` ORDER BY `calculated` DESC, `next_run` LIMIT :limit FOR UPDATE SKIP LOCKED
+                                SELECT `task`, `arguments`, `instance`, `next_run`, `calculated`, ROW_NUMBER() OVER (PARTITION BY `task`, `arguments` ORDER BY `calculated` DESC, `next_run`) AS `row_number` FROM (
+                                    SELECT `task`, `arguments`, `instance`, `next_run`, '.self::CALCULATED_PRIORITY.' AS `calculated` FROM `'.$this->prefix.'schedule` AS `instances`
+                                    WHERE `enabled`=1 AND `run_by` IS NULL AND `next_run`<=CURRENT_TIMESTAMP(6) AND (SELECT `enabled` FROM `'.$this->prefix.'tasks` `tasks` WHERE `tasks`.`task`=`instances`.`task`)=1
+                                    ORDER BY `calculated` DESC, `next_run`
+                                    LIMIT :inner_limit FOR UPDATE SKIP LOCKED
+                                ) `ranked`
+                            ) `deduped`
+                            WHERE `row_number` = 1
+                            ORDER BY `calculated` DESC, `next_run` LIMIT :limit FOR UPDATE SKIP LOCKED
                         ) `to_select`
                         ON `to_update`.`task`=`to_select`.`task`
                             AND `to_update`.`arguments`=`to_select`.`arguments`
