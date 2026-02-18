@@ -21,12 +21,6 @@ class Agent
      * @var array
      */
     private const array SETTINGS = ['enabled', 'log_life', 'retry', 'sse_loop', 'sse_retry', 'max_threads'];
-    /**
-     * Logic to calculate task priority. Not sure, I fully understand how this provides the results I expect, but it does. Essentially, `priority` is valued higher, while "overdue" time has a smoother scaling. Rare jobs (with higher value of `frequency`) also have higher weight, but one-time jobs have even higher weight, since they are likely to be quick ones.
-     * @var string
-     */
-    private const string CALCULATED_PRIORITY = '((CASE WHEN `frequency` = 0 THEN 1 ELSE (4294967295 - `frequency`) / 4294967295 END) + LOG(TIMESTAMPDIFF(SECOND, `next_run`, CURRENT_TIMESTAMP(6)) + 2) * 100 + `priority` * 1000)';
-    
     
     /**
      * Class constructor
@@ -174,15 +168,14 @@ class Agent
                         INNER JOIN
                         (
                             SELECT `task`, `arguments`, `instance` FROM (
-                                SELECT `task`, `arguments`, `instance`, `next_run`, `calculated`, ROW_NUMBER() OVER (PARTITION BY `task`, `arguments` ORDER BY `calculated` DESC, `next_run`) AS `row_number` FROM (
-                                    SELECT `task`, `arguments`, `instance`, `next_run`, '.self::CALCULATED_PRIORITY.' AS `calculated` FROM `'.$this->prefix.'schedule` AS `instances`
-                                    WHERE `enabled`=1 AND `run_by` IS NULL AND `next_run`<=CURRENT_TIMESTAMP(6) AND (SELECT `enabled` FROM `'.$this->prefix.'tasks` `tasks` WHERE `tasks`.`task`=`instances`.`task`)=1
-                                    ORDER BY `calculated` DESC, `next_run`
-                                    LIMIT :inner_limit FOR UPDATE SKIP LOCKED
+                                SELECT `task`, `arguments`, `instance`, `next_run`, `priority`, `frequency`, ROW_NUMBER() OVER (PARTITION BY `task`, `arguments` ORDER BY `next_run`, `priority` DESC, (`frequency`=0) DESC, `frequency` DESC) AS `row_number` FROM (
+                                    SELECT `task`, `arguments`, `instance`, `next_run`, `priority`, `frequency` FROM `'.$this->prefix.'schedule` AS `instances`
+                                    WHERE `enabled`=1 AND `run_by` IS NULL AND `next_run`<=CURRENT_TIMESTAMP(6) AND EXISTS (SELECT 1 FROM `'.$this->prefix.'tasks` `tasks` WHERE `tasks`.`task`=`instances`.`task` AND `tasks`.`enabled`=1)
+                                    LIMIT :inner_limit
                                 ) `ranked`
                             ) `deduped`
                             WHERE `row_number` = 1
-                            ORDER BY `calculated` DESC, `next_run` LIMIT :limit FOR UPDATE SKIP LOCKED
+                            ORDER BY `next_run`, `priority` DESC, (`frequency`=0) DESC, `frequency` DESC LIMIT :limit FOR UPDATE SKIP LOCKED
                         ) `to_select`
                         ON `to_update`.`task`=`to_select`.`task`
                             AND `to_update`.`arguments`=`to_select`.`arguments`
@@ -192,9 +185,6 @@ class Agent
                     ':run_by' => $this->run_by,
                     ':sse' => [SSE::$sse, 'bool'],
                     ':limit' => [$items, 'int'],
-                    #Using this approach seems to be the best solution so far, so that no temporary tables are used (or smaller ones, at least), and it is still relatively performant.
-                    #In the worst case scenario tested with 8mil+ records in schedule, the query took 1.5 minutes, which was happening while there are other queries running on the same table at the same time.
-                    #On smaller (and more realistic) data sets performance hit is negligible.
                     ':inner_limit' => [$items * 2, 'int']
                 ]);
         } catch (\Throwable $exception) {
@@ -204,7 +194,7 @@ class Agent
         #Get tasks
         try {
             return Query::query(
-                'SELECT `task`, `arguments`, `instance` FROM `'.$this->prefix.'schedule` WHERE `run_by`=:run_by ORDER BY '.self::CALCULATED_PRIORITY.' DESC, `next_run`;',
+                'SELECT `task`, `arguments`, `instance` FROM `'.$this->prefix.'schedule` WHERE `run_by`=:run_by ORDER BY `next_run`, `priority` DESC, (`frequency`=0) DESC, `frequency` DESC;',
                 [
                     ':run_by' => $this->run_by,
                 ], return: 'all'
