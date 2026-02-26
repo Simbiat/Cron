@@ -302,7 +302,7 @@ class TaskInstance
                 ':message' => [$this->message, (\preg_match('/^\s*$/u', $this->message ?? '') !== 0 ? 'null' : 'string')],
                 ':next_run' => [$this->next_time, 'datetime'],
             ], return: 'affected');
-            $this->found_in_db = true;
+            $this->getFromDB();
         } catch (\Throwable $throwable) {
             $this->log('Failed to add or update task instance.', EventTypes::InstanceAddFail, error: $throwable, task: $this);
             return false;

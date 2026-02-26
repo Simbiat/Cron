@@ -247,7 +247,7 @@ class Task
                 ':system' => [$this->system, 'bool'],
                 ':desc' => [$this->description, (\preg_match('/^\s*$/u', $this->description ?? '') !== 0 ? 'null' : 'string')],
             ], return: 'affected');
-            $this->found_in_db = true;
+            $this->getFromDB();
         } catch (\Throwable $throwable) {
             $this->log('Failed to add or update task with following details: '.$task_details_string.'.', EventTypes::TaskAddFail, error: $throwable);
             return false;
