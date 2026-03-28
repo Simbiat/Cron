@@ -230,7 +230,7 @@ class TaskInstance
     }
     
     /**
-     * Set task settings from associative array
+     * Set task settings from an associative array
      *
      * @return $this
      */
@@ -388,7 +388,7 @@ class TaskInstance
     }
     
     /**
-     * Function to enable or disable task instance
+     * Function to enable or disable a task instance
      * @param bool $enabled Flag indicating whether we want to enable or disable the instance
      *
      * @return bool
@@ -649,8 +649,9 @@ class TaskInstance
             #Increase time value by
             try {
                 $new_time = $this->next_time->modify('+'.(\max($possible_runs, 1) * $seconds).' seconds');
-            } catch (\DateMalformedStringException) {
+            } catch (\DateMalformedStringException $throwable) {
                 #We should not get here, since the value is not from the user, and there are validations on earlier steps; this is just a failback
+                $this->log('Failed to add time for next run, failed back.', EventTypes::RescheduleFail, error: $throwable, task: $this);
                 $new_time = $current_time;
             }
         }
@@ -662,8 +663,9 @@ class TaskInstance
             return SandClock::suggestNextDay($new_time,
                 (\preg_match('/^\s*$/u', $this->day_of_week ?? '') === 0 ? \json_decode($this->day_of_week, flags: \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_BIGINT_AS_STRING | \JSON_OBJECT_AS_ARRAY) : []),
                 (\preg_match('/^\s*$/u', $this->day_of_month ?? '') === 0 ? \json_decode($this->day_of_month, flags: \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_BIGINT_AS_STRING | \JSON_OBJECT_AS_ARRAY) : []));
-        } catch (\Throwable) {
+        } catch (\Throwable $throwable) {
             #We should not get here, since the value is not from the user, and there are validations on earlier steps; this is just a failback
+            $this->log('Failed to infer appropriate next run time, failed back.', EventTypes::RescheduleFail, error: $throwable, task: $this);
             return $current_time;
         }
     }
