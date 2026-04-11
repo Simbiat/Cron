@@ -6,6 +6,7 @@ namespace Simbiat\Cron;
 use Simbiat\Database\Query;
 use Simbiat\HTTP\SSE;
 use Simbiat\SandClock;
+use Simbiat\StringHelpers\Sanitize;
 use function in_array;
 
 /**
@@ -19,7 +20,7 @@ trait TraitForCron
      */
     private(set) \PDO|null $dbh = null;
     /**
-     * PDO Cron database prefix. Only Latin characters, underscores, dashes and numbers are allowed. Maximum 53 symbols.
+     * PDO Cron database prefix. Only Latin characters, underscores, dashes, and numbers are allowed. Maximum 53 symbols.
      * @var string
      */
     private(set) string $prefix = 'cron__' {
@@ -27,7 +28,7 @@ trait TraitForCron
          * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81560
          */
         set {
-            if (\preg_match('/^[\w\-]{0,53}$/u', $value) === 1) {
+            if (Sanitize::dbName($value, true, 53)) {
                 $this->prefix = $value;
             } else {
                 throw new \UnexpectedValueException('Invalid database prefix');
