@@ -4,6 +4,7 @@ declare(strict_types = 1);
 namespace Simbiat\Cron;
 
 use Simbiat\Database\Query;
+use Simbiat\StringHelpers\Sanitize;
 use function is_string, is_array;
 
 /**
@@ -145,7 +146,7 @@ class Task
     public function __construct(string $task_name = '', \PDO|null $dbh = null, string $prefix = 'cron__')
     {
         $this->init($dbh, $prefix);
-        if (\preg_match('/^\s*$/u', $task_name ?? '') === 0) {
+        if (!Sanitize::whiteString($task_name ?? '')) {
             $this->task_name = $task_name;
             #Attempt to get settings from DB
             $this->getFromDB();
@@ -162,7 +163,7 @@ class Task
         $settings = Query::query('SELECT * FROM `'.$this->prefix.'tasks` WHERE `task`=:name;', [':name' => $this->task_name], return: 'row');
         if ($settings !== []) {
             $this->settingsFromArray($settings);
-            if (\preg_match('/^\s*$/u', $this->function ?? '') !== 0) {
+            if (Sanitize::whiteString($this->function ?? '')) {
                 throw new \UnexpectedValueException('Task has no assigned function');
             }
             $this->found_in_db = true;
@@ -226,10 +227,10 @@ class Task
      */
     public function add(): bool
     {
-        if (\preg_match('/^\s*$/u', $this->task_name ?? '') !== 0) {
+        if (Sanitize::whiteString($this->task_name ?? '')) {
             throw new \UnexpectedValueException('Task name is not set');
         }
-        if (\preg_match('/^\s*$/u', $this->function ?? '') !== 0) {
+        if (Sanitize::whiteString($this->function ?? '')) {
             throw new \UnexpectedValueException('Function name is not set');
         }
         try {
@@ -237,15 +238,15 @@ class Task
             $result = Query::query('INSERT INTO `'.$this->prefix.'tasks` (`task`, `function`, `object`, `parameters`, `allowed_returns`, `max_time`, `min_frequency`, `retry`, `enabled`, `system`, `description`) VALUES (:task, :function, :object, :parameters, :returns, :max_time, :min_frequency, :retry, :enabled, :system, :desc) ON DUPLICATE KEY UPDATE `function`=:function, `object`=:object, `parameters`=:parameters, `allowed_returns`=:returns, `max_time`=:max_time, `min_frequency`=:min_frequency, `retry`=:retry, `description`=:desc;', [
                 ':task' => [$this->task_name, 'string'],
                 ':function' => [$this->function, 'string'],
-                ':object' => [$this->object, (\preg_match('/^\s*$/u', $this->object ?? '') !== 0 ? 'null' : 'string')],
-                ':parameters' => [$this->parameters, (\preg_match('/^\s*$/u', $this->parameters ?? '') !== 0 ? 'null' : 'string')],
-                ':returns' => [$this->returns, (\preg_match('/^\s*$/u', $this->returns ?? '') !== 0 ? 'null' : 'string')],
+                ':object' => [$this->object, (Sanitize::whiteString($this->object ?? '') ? 'null' : 'string')],
+                ':parameters' => [$this->parameters, (Sanitize::whiteString($this->parameters ?? '') ? 'null' : 'string')],
+                ':returns' => [$this->returns, (Sanitize::whiteString($this->returns ?? '') ? 'null' : 'string')],
                 ':max_time' => [$this->max_time, 'int'],
                 ':min_frequency' => [$this->min_frequency, 'int'],
                 ':retry' => [$this->retry, 'int'],
                 ':enabled' => [$this->enabled, 'bool'],
                 ':system' => [$this->system, 'bool'],
-                ':desc' => [$this->description, (\preg_match('/^\s*$/u', $this->description ?? '') !== 0 ? 'null' : 'string')],
+                ':desc' => [$this->description, (Sanitize::whiteString($this->description ?? '') ? 'null' : 'string')],
             ], return: 'affected');
             $this->getFromDB();
         } catch (\Throwable $throwable) {
@@ -266,7 +267,7 @@ class Task
      */
     public function delete(): bool
     {
-        if (\preg_match('/^\s*$/u', $this->task_name ?? '') !== 0) {
+        if (Sanitize::whiteString($this->task_name ?? '')) {
             throw new \UnexpectedValueException('Task name is not set');
         }
         try {
@@ -299,7 +300,7 @@ class Task
      */
     public function setSystem(): bool
     {
-        if (\preg_match('/^\s*$/u', $this->task_name ?? '') !== 0) {
+        if (Sanitize::whiteString($this->task_name ?? '')) {
             throw new \UnexpectedValueException('Task name is not set');
         }
         if ($this->found_in_db) {
@@ -329,7 +330,7 @@ class Task
      */
     public function setEnabled(bool $enabled = true): bool
     {
-        if (\preg_match('/^\s*$/u', $this->task_name ?? '') !== 0) {
+        if (Sanitize::whiteString($this->task_name ?? '')) {
             throw new \UnexpectedValueException('Task name is not set');
         }
         if ($this->found_in_db) {

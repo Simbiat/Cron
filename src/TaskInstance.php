@@ -5,6 +5,7 @@ namespace Simbiat\Cron;
 
 use Simbiat\Database\Query;
 use Simbiat\SandClock;
+use Simbiat\StringHelpers\Sanitize;
 use function is_string, is_array, in_array;
 
 /**
@@ -184,7 +185,7 @@ class TaskInstance
     public function __construct(string $task_name = '', string|array|null $arguments = null, int $instance = 1, \PDO|null $dbh = null, string $prefix = 'cron__')
     {
         $this->init($dbh, $prefix);
-        if (\preg_match('/^\s*$/u', $task_name) === 0) {
+        if (!Sanitize::whiteString($task_name)) {
             $this->task_name = $task_name;
             $this->arguments = $arguments;
             $this->instance = $instance;
@@ -264,7 +265,7 @@ class TaskInstance
                     $this->next_time = SandClock::valueToDateTime($value);
                     break;
                 case 'message':
-                    if (!is_string($value) || \preg_match('/^\s*$/u', $value) !== 0) {
+                    if (!is_string($value) || Sanitize::whiteString($value)) {
                         $this->message = null;
                     } else {
                         $this->message = $value;
@@ -285,7 +286,7 @@ class TaskInstance
      */
     public function add(): bool
     {
-        if (\preg_match('/^\s*$/u', $this->task_name) !== 0) {
+        if (Sanitize::whiteString($this->task_name)) {
             throw new \UnexpectedValueException('Task name is not set');
         }
         try {
@@ -296,10 +297,10 @@ class TaskInstance
                 ':enabled' => [$this->enabled, 'enabled'],
                 ':system' => [$this->system, 'bool'],
                 ':frequency' => [$this->frequency, 'int'],
-                ':day_of_month' => [$this->day_of_month, (\preg_match('/^\s*$/u', $this->day_of_month ?? '') !== 0 ? 'null' : 'string')],
-                ':day_of_week' => [$this->day_of_week, (\preg_match('/^\s*$/u', $this->day_of_week ?? '') !== 0 ? 'null' : 'string')],
+                ':day_of_month' => [$this->day_of_month, (Sanitize::whiteString($this->day_of_month ?? '') ? 'null' : 'string')],
+                ':day_of_week' => [$this->day_of_week, (Sanitize::whiteString($this->day_of_week ?? '') ? 'null' : 'string')],
                 ':priority' => [$this->priority, 'int'],
-                ':message' => [$this->message, (\preg_match('/^\s*$/u', $this->message ?? '') !== 0 ? 'null' : 'string')],
+                ':message' => [$this->message, (Sanitize::whiteString($this->message ?? '') ? 'null' : 'string')],
                 ':next_run' => [$this->next_time, 'datetime'],
             ], return: 'affected');
             $this->getFromDB();
@@ -321,7 +322,7 @@ class TaskInstance
      */
     public function delete(): bool
     {
-        if (\preg_match('/^\s*$/u', $this->task_name) !== 0) {
+        if (Sanitize::whiteString($this->task_name)) {
             throw new \UnexpectedValueException('Task name is not set');
         }
         try {
@@ -486,7 +487,7 @@ class TaskInstance
     public function run(): bool
     {
         #If run_by value is empty (a job is being run manually) - generate it
-        if (\preg_match('/^\s*$/u', $this->run_by ?? '') !== 0) {
+        if (Sanitize::whiteString($this->run_by ?? '')) {
             $this->run_by = $this->generateRunBy();
         }
         if (!$this->found_in_db) {
@@ -494,8 +495,8 @@ class TaskInstance
             return true;
         }
         if ($this->next_time !== SandClock::suggestNextDay($this->next_time,
-                (\preg_match('/^\s*$/u', $this->day_of_week ?? '') === 0 ? \json_decode($this->day_of_week, flags: \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_BIGINT_AS_STRING | \JSON_OBJECT_AS_ARRAY) : []),
-                (\preg_match('/^\s*$/u', $this->day_of_month ?? '') === 0 ? \json_decode($this->day_of_month, flags: \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_BIGINT_AS_STRING | \JSON_OBJECT_AS_ARRAY) : []))
+                (!Sanitize::whiteString($this->day_of_week ?? '') ? \json_decode($this->day_of_week, flags: \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_BIGINT_AS_STRING | \JSON_OBJECT_AS_ARRAY) : []),
+                (!Sanitize::whiteString($this->day_of_month ?? '') ? \json_decode($this->day_of_month, flags: \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_BIGINT_AS_STRING | \JSON_OBJECT_AS_ARRAY) : []))
         ) {
             #Register error.
             $this->log('Attempted to run function during forbidden day of week or day of month.', EventTypes::InstanceFail, task: $this);
@@ -516,13 +517,13 @@ class TaskInstance
             return true;
         }
         #Decode allowed returns if any
-        if (\preg_match('/^\s*$/u', $this->task_object->returns ?? '') === 0) {
+        if (!Sanitize::whiteString($this->task_object->returns ?? '')) {
             $allowed_returns = \json_decode($this->task_object->returns, flags: \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_BIGINT_AS_STRING | \JSON_OBJECT_AS_ARRAY);
         }
         try {
             $function = $this->functionCreation();
             #Run function
-            if (\preg_match('/^\s*$/u', $this->arguments ?? '') !== 0) {
+            if (Sanitize::whiteString($this->arguments ?? '')) {
                 $result = $function();
             } else {
                 #Replace instance reference
@@ -561,9 +562,9 @@ class TaskInstance
         $object = null;
         $extra_methods = [];
         #Check if an object is required
-        if (\preg_match('/^\s*$/u', $this->task_object->object ?? '') === 0) {
+        if (!Sanitize::whiteString($this->task_object->object ?? '')) {
             #Check if parameters for the object are set
-            if (\preg_match('/^\s*$/u', $this->task_object->parameters ?? '') === 0) {
+            if (!Sanitize::whiteString($this->task_object->parameters ?? '')) {
                 $parameters = \json_decode($this->task_object->parameters, flags: \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_BIGINT_AS_STRING | \JSON_OBJECT_AS_ARRAY);
                 #Check if extra methods are set
                 if (!empty($parameters['extra_methods'])) {
@@ -655,14 +656,14 @@ class TaskInstance
                 $new_time = $current_time;
             }
         }
-        if (\preg_match('/^\s*$/u', $this->day_of_month ?? '') !== 0 && \preg_match('/^\s*$/u', $this->day_of_week ?? '') !== 0) {
+        if (Sanitize::whiteString($this->day_of_month ?? '') && Sanitize::whiteString($this->day_of_week ?? '')) {
             return $new_time;
         }
         #Check if the new time will satisfy day of week/month requirements
         try {
             return SandClock::suggestNextDay($new_time,
-                (\preg_match('/^\s*$/u', $this->day_of_week ?? '') === 0 ? \json_decode($this->day_of_week, flags: \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_BIGINT_AS_STRING | \JSON_OBJECT_AS_ARRAY) : []),
-                (\preg_match('/^\s*$/u', $this->day_of_month ?? '') === 0 ? \json_decode($this->day_of_month, flags: \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_BIGINT_AS_STRING | \JSON_OBJECT_AS_ARRAY) : []));
+                (!Sanitize::whiteString($this->day_of_week ?? '') ? \json_decode($this->day_of_week, flags: \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_BIGINT_AS_STRING | \JSON_OBJECT_AS_ARRAY) : []),
+                (!Sanitize::whiteString($this->day_of_month ?? '') ? \json_decode($this->day_of_month, flags: \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_BIGINT_AS_STRING | \JSON_OBJECT_AS_ARRAY) : []));
         } catch (\Throwable $throwable) {
             #We should not get here, since the value is not from the user, and there are validations on earlier steps; this is just a failback
             $this->log('Failed to infer appropriate next run time, failed back.', EventTypes::RescheduleFail, error: $throwable, task: $this);
