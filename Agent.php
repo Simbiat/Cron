@@ -171,11 +171,13 @@ class Agent
                                 SELECT `task`, `arguments`, `instance`, `next_run`, `priority`, `frequency`, ROW_NUMBER() OVER (PARTITION BY `task`, `arguments` ORDER BY `next_run`, `priority` DESC, (`frequency`=0) DESC, `frequency` DESC) AS `row_number` FROM (
                                     SELECT `task`, `arguments`, `instance`, `next_run`, `priority`, `frequency` FROM `'.$this->prefix.'schedule` AS `instances`
                                     WHERE `enabled`=1 AND `run_by` IS NULL AND `next_run`<=CURRENT_TIMESTAMP(6) AND EXISTS (SELECT 1 FROM `'.$this->prefix.'tasks` `tasks` WHERE `tasks`.`task`=`instances`.`task` AND `tasks`.`enabled`=1)
+                                    ORDER BY `priority` DESC, `next_run`, (`frequency`=0) DESC, `frequency` DESC
                                     LIMIT :inner_limit
                                 ) `ranked`
                             ) `deduped`
                             WHERE `row_number` = 1
-                            ORDER BY `next_run`, `priority` DESC, (`frequency`=0) DESC, `frequency` DESC LIMIT :limit FOR UPDATE SKIP LOCKED
+                            ORDER BY `priority` DESC, `next_run`, (`frequency`=0) DESC, `frequency` DESC
+                            LIMIT :limit FOR UPDATE SKIP LOCKED
                         ) `to_select`
                         ON `to_update`.`task`=`to_select`.`task`
                             AND `to_update`.`arguments`=`to_select`.`arguments`
