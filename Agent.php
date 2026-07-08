@@ -189,9 +189,15 @@ class Agent
                     ':limit' => [$items, 'int'],
                     ':inner_limit' => [$items * 2, 'int']
                 ]);
-        } catch (\Throwable $exception) {
-            #Notify about the end of the stream
-            $this->log('Failed to queue job', EventTypes::CronFail, true, $exception);
+        } catch (\Throwable $throwable) {
+            #Check if caused by deadlock, which can be normal in case of large number of tasks in the database and enough parallel processes
+            if (mb_stripos($throwable->getMessage(), 'Deadlock', 0, 'UTF-8') === false) {
+                #Notify about the end of the stream
+                $this->log('Failed to queue tasks', EventTypes::CronFail, true, $throwable);
+            }
+            #If it was a deadlock, return empty array, treat this as CronNoThreads, and let it be retried next time (if in SSE)
+            $this->log('Deadlock encountered during queueing. Treating as threads exhaustion.', EventTypes::CronNoThreads);
+            return [];
         }
         #Get tasks
         try {

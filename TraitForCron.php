@@ -144,17 +144,17 @@ trait TraitForCron
     }
     
     /**
-     * Function to end SSE stream and rethrow an error, if it was provided
+     * Log events with the option to end SSE stream and rethrow an error if it was provided
      *
-     * @param string                          $message    Log message
-     * @param \Simbiat\Cron\EventTypes        $event      Log event type
-     * @param bool                            $end_stream Flag to indicate whether we end the stream
-     * @param \Throwable|null                 $error      Error object
-     * @param \Simbiat\Cron\TaskInstance|null $task       TaskInstance object
+     * @param string                          $message     Log message
+     * @param \Simbiat\Cron\EventTypes        $event       Log event type
+     * @param bool                            $end_process Flag to indicate whether we end the stream
+     * @param \Throwable|null                 $error       Error object
+     * @param \Simbiat\Cron\TaskInstance|null $task        TaskInstance object
      *
      * @return void
      */
-    public function log(string $message, EventTypes $event, bool $end_stream = false, ?\Throwable $error = null, ?TaskInstance $task = null): void
+    public function log(string $message, EventTypes $event, bool $end_process = false, ?\Throwable $error = null, ?TaskInstance $task = null): void
     {
         $skip_insert = false;
         #If task instance was not passed, attempt to find it in backtrace
@@ -168,8 +168,8 @@ trait TraitForCron
             $run_by = $task->run_by ?? $this->run_by;
         }
         $queries = [];
-        #To reduce the amount of NoThreads, Empty and Disabled events in the DB log, we check if the latest event is the same we want to write
-        if (in_array($event->name, ['CronDisabled', 'CronEmpty', 'CronNoThreads'])) {
+        #To reduce the number of NoThreads, Empty and Disabled events in the DB log, we check if the latest event is the same we want to write
+        if (in_array($event->name,['CronDisabled', 'CronEmpty', 'CronNoThreads'], true)) {
             #Reset run_by value to null, since these entries can belong to multiple threads, and we don't really care about which one was the last one
             $run_by = null;
             #Get last event time and type
@@ -214,16 +214,15 @@ trait TraitForCron
         }
         Query::query($queries);
         if (SSE::$sse) {
-            SSE::send($message, $event->name, ((($end_stream || $error !== null)) ? 0 : $this->sse_retry));
+            SSE::send($message, $event->name, ((($end_process || $error !== null)) ? 0 : $this->sse_retry));
         }
-        if ($end_stream) {
+        if ($end_process) {
             if (SSE::$sse) {
                 SSE::close();
             }
             if ($error !== null) {
                 throw new \RuntimeException($message, previous: $error);
             }
-            exit(0);
         }
     }
     
