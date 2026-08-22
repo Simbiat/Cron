@@ -20,7 +20,7 @@
 
 ## What
 
-Despite the name this is not a CRON replacement, but it **is** a task scheduler nonetheless, that uses MySQL/MariaDB database to store tasks and their schedule.
+Despite the name this is not a CRON replacement, but it **is** a database-backed task scheduler for PHP. It allows managing recurring and one-time tasks stored in MySQL/MariaDB, with support for parallel processing, priorities, scheduling restrictions, and logging – usable both from CLI and web (SSE). Framework-agnostic, requires only a PDO connection object.
 
 ## Why
 
