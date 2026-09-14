@@ -15,7 +15,7 @@ use function is_string, is_array, in_array;
 class TaskInstance
 {
     use TraitForCron;
-    
+
     /**
      * @var string Unique name of the task
      */
@@ -172,8 +172,8 @@ class TaskInstance
      * @var Task|null Task object
      */
     private(set) ?Task $task_object = null;
-    
-    
+
+
     /**
      * @param string            $task_name Task name
      * @param string|array|null $arguments Arguments for the task
@@ -193,7 +193,7 @@ class TaskInstance
             $this->getFromDB();
         }
     }
-    
+
     /**
      * Get task settings from database
      *
@@ -222,14 +222,14 @@ class TaskInstance
             $this->status = $settings['status'];
             unset($settings['status']);
             #Get task object
-            $this->task_object = (new Task($this->task_name));
+            $this->task_object = (new Task($this->task_name, $this->dbh, $this->prefix));
             #Process settings
             $this->settingsFromArray($settings);
             #If nothing failed at this point, set the flag to `true`
             $this->found_in_db = $this->task_object->found_in_db;
         }
     }
-    
+
     /**
      * Set task settings from an associative array
      *
@@ -239,7 +239,7 @@ class TaskInstance
     {
         #If we are creating a task instance from outside the class (for example, new instance), we may not have all details, so ensure we get them
         if ($this->task_object === null && !empty($settings['task'])) {
-            $this->task_object = (new Task($settings['task']));
+            $this->task_object = (new Task($settings['task'], $this->dbh, $this->prefix));
         }
         #We need to process system status first, since frequency depends on it
         if (\array_key_exists('system', $settings)) {
@@ -278,7 +278,7 @@ class TaskInstance
         }
         return $this;
     }
-    
+
     /**
      * Schedule or update a task
      *
@@ -314,7 +314,7 @@ class TaskInstance
         }
         return true;
     }
-    
+
     /**
      * Delete item from schedule
      *
@@ -357,7 +357,7 @@ class TaskInstance
         }
         return true;
     }
-    
+
     /**
      * Set the task instance as a system one
      * @return bool
@@ -387,7 +387,7 @@ class TaskInstance
         }
         return true;
     }
-    
+
     /**
      * Function to enable or disable a task instance
      * @param bool $enabled Flag indicating whether we want to enable or disable the instance
@@ -417,7 +417,7 @@ class TaskInstance
         }
         return true;
     }
-    
+
     /**
      * Reschedule a task (or remove it if it's onetime)
      *
@@ -477,7 +477,7 @@ class TaskInstance
         }
         return true;
     }
-    
+
     /**
      * Run the function based on the task details
      *
@@ -551,7 +551,7 @@ class TaskInstance
         }
         return $result;
     }
-    
+
     /**
      * Create a function to run
      * @return string|array
@@ -612,7 +612,7 @@ class TaskInstance
         }
         return $function;
     }
-    
+
     /**
      * Calculate time for the next run
      *

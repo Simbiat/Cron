@@ -15,13 +15,13 @@ use function in_array;
 class Agent
 {
     use TraitForCron;
-    
+
     /**
      * Supported settings
      * @var array
      */
     private const array SETTINGS = ['enabled', 'log_life', 'retry', 'sse_loop', 'sse_retry', 'max_threads'];
-    
+
     /**
      * Class constructor
      * @param \PDO|null $dbh    PDO object to use for database connection. If not provided, the class expects the existence of `\Simbiat\Database\Pool` to use that instead.
@@ -31,7 +31,7 @@ class Agent
     {
         $this->init($dbh, $prefix);
     }
-    
+
     /**
      * Process Cron items
      *
@@ -124,7 +124,7 @@ class Agent
         }
         return true;
     }
-    
+
     /**
      * Wrapper for running the task
      * @param array $task        Task object
@@ -136,7 +136,7 @@ class Agent
     private function runTask(array $task, int $number, int $total_tasks): void
     {
         try {
-            $task_instance = (new TaskInstance($task['task'], $task['arguments'], $task['instance']));
+            $task_instance = (new TaskInstance($task['task'], $task['arguments'], $task['instance'], $this->dbh, $this->prefix));
             #Notify of the task starting
             $this->log($number.'/'.$total_tasks.' '.(empty($task['message']) ? $task['task'].' starting' : $task['message']), EventTypes::InstanceStart, task: $task_instance);
             #Attemp to run
@@ -154,7 +154,7 @@ class Agent
             $this->log($number.'/'.$total_tasks.' '.$task['task'].' failed', EventTypes::InstanceFail, task: $task_instance);
         }
     }
-    
+
     /**
      * Schedule and get a list of tasks using a previously generated random ID
      * @param int $items Number of items to select
@@ -213,7 +213,7 @@ class Agent
         }
         return [];
     }
-    
+
     /**
      * Adjust settings
      * @param string $setting Setting to change
@@ -265,7 +265,7 @@ class Agent
         }
         throw new \UnexpectedValueException('Failed to set setting `'.$setting.'` to '.$value);
     }
-    
+
     /**
      * Function to reschedule hanged jobs
      *
@@ -287,13 +287,13 @@ class Agent
         #Delete task instances that were marked as `For removal` (`status` was set to `3`), which means they failed to be removed initially, but succeeded to be updated.
         $tasks = Query::query('SELECT `task`, `arguments`, `instance` FROM `'.$this->prefix.'schedule` as `a` WHERE `status` = 3;', return: 'all');
         foreach ($tasks as $task) {
-            new TaskInstance($task['task'], $task['arguments'], $task['instance'])->delete();
+            new TaskInstance($task['task'], $task['arguments'], $task['instance'], $this->dbh, $this->prefix)->delete();
         }
         $tasks = Query::query('SELECT `task`, `arguments`, `instance`, `status` FROM `'.$this->prefix.'schedule` as `a` WHERE `run_by` IS NOT NULL AND (`thread_heartbeat` IS NULL OR CURRENT_TIMESTAMP(6)>DATE_ADD(`thread_heartbeat`, INTERVAL (SELECT `max_time` FROM `'.$this->prefix.'tasks` WHERE `'.$this->prefix.'tasks`.`task`=`a`.`task`) SECOND));', return: 'all');
         foreach ($tasks as $task) {
             #If this was a one-time task, schedule it for right now, to avoid delaying it for double the time.
             try {
-                new TaskInstance($task['task'], $task['arguments'], $task['instance'])->reSchedule($task['status'] === 1 ? 'Hanged thread' : 'Hanged job');
+                new TaskInstance($task['task'], $task['arguments'], $task['instance'], $this->dbh, $this->prefix)->reSchedule($task['status'] === 1 ? 'Hanged thread' : 'Hanged job');
             } catch (\Throwable $exception) {
                 #If the instance was not found in the database, it was probably deleted, so we can safely ignore the error.
                 if ($exception->getMessage() !== 'Not found in database.') {
@@ -303,7 +303,7 @@ class Agent
         }
         return true;
     }
-    
+
     /**
      * Function to clean up log
      * @return bool
