@@ -1,5 +1,6 @@
 <?php
-declare(strict_types = 1);
+
+declare(strict_types=1);
 
 namespace Simbiat\Cron;
 
@@ -75,7 +76,7 @@ trait TraitForCron
      * @var null|TaskInstance
      */
     private ?TaskInstance $current_task = null;
-    
+
     /**
      * Class constructor
      * @param \PDO|null $dbh    PDO object to use for database connection. If not provided, the class expects the existence of `\Simbiat\Database\Pool` to use that instead.
@@ -83,57 +84,57 @@ trait TraitForCron
      */
     private function init(\PDO|null $dbh = null, string $prefix = 'cron__'): void
     {
-        #Check that a database connection is established
+        // Check that a database connection is established
         if ($dbh !== null) {
             $this->dbh = $dbh;
         }
         $this->prefix = $prefix;
-        #Establish it, if possible
+        // Establish it, if possible
         new Query($dbh);
         $this->getCronSettings();
     }
-    
+
     /**
      * Helper function to get settings
      */
     private function getCronSettings(): bool
     {
-        #Get settings
+        // Get settings
         try {
             $settings = Query::query('SELECT `setting`, `value` FROM `'.$this->prefix.'settings`', return: 'pair');
         } catch (\Throwable) {
             return false;
         }
-        #Update enabled flag
+        // Update enabled flag
         if (\array_key_exists('enabled', $settings)) {
             $this->cron_enabled = (bool)(int)$settings['enabled'];
         }
-        #Update SSE loop flag
+        // Update SSE loop flag
         if (\array_key_exists('sse_loop', $settings)) {
             $this->sse_loop = (bool)(int)$settings['sse_loop'];
         }
-        #Update retry time
+        // Update retry time
         if (\array_key_exists('retry', $settings)) {
             $settings['retry'] = (int)$settings['retry'];
             if ($settings['retry'] > 0) {
                 $this->one_time_retry = $settings['retry'];
             }
         }
-        #Update SSE retry time
+        // Update SSE retry time
         if (\array_key_exists('sse_retry', $settings)) {
             $settings['sse_retry'] = (int)$settings['sse_retry'];
             if ($settings['sse_retry'] > 0) {
                 $this->sse_retry = $settings['sse_retry'];
             }
         }
-        #Update maximum number of threads
+        // Update maximum number of threads
         if (\array_key_exists('max_threads', $settings)) {
             $settings['max_threads'] = (int)$settings['max_threads'];
             if ($settings['max_threads'] > 0) {
                 $this->max_threads = $settings['max_threads'];
             }
         }
-        #Update maximum life of an error
+        // Update maximum life of an error
         if (\array_key_exists('log_life', $settings)) {
             $settings['log_life'] = (int)$settings['log_life'];
             if ($settings['log_life'] > 0) {
@@ -142,7 +143,7 @@ trait TraitForCron
         }
         return true;
     }
-    
+
     /**
      * Log events with the option to end SSE stream and rethrow an error if it was provided
      *
@@ -157,26 +158,26 @@ trait TraitForCron
     public function log(string $message, EventTypes $event, bool $end_process = false, ?\Throwable $error = null, ?TaskInstance $task = null): void
     {
         $skip_insert = false;
-        #If task instance was not passed, attempt to find it in backtrace
+        // If task instance was not passed, attempt to find it in backtrace
         if ($task === null) {
             $run_by = $this->runByFromBackTrace();
             if ($run_by !== null) {
                 $task = $this->taskInstanceFromBackTrace($run_by);
             }
         } else {
-            #If $task instance was passed, or we found it, use its value for run_by
+            // If $task instance was passed, or we found it, use its value for run_by
             $run_by = $task->run_by ?? $this->run_by;
         }
         $queries = [];
-        #To reduce the number of NoThreads, Empty and Disabled events in the DB log, we check if the latest event is the same we want to write
+        // To reduce the number of NoThreads, Empty and Disabled events in the DB log, we check if the latest event is the same we want to write
         if (in_array($event->name,['CronDisabled', 'CronEmpty', 'CronNoThreads'], true)) {
-            #Reset run_by value to null, since these entries can belong to multiple threads, and we don't really care about which one was the last one
+            // Reset run_by value to null, since these entries can belong to multiple threads, and we don't really care about which one was the last one
             $run_by = null;
-            #Get last event time and type
+            // Get last event time and type
             $last_event = Query::query('SELECT `time`, `type` FROM `'.$this->prefix.'log` ORDER BY `time` DESC LIMIT 1', return: 'row');
-            #Checking for empty, in case there are no logs in the table
+            // Checking for empty, in case there are no logs in the table
             if (!empty($last_event['type']) && $last_event['type'] === $event->value) {
-                #Update the message of last event with current time
+                // Update the message of last event with current time
                 $queries[] = [
                     'UPDATE `'.$this->prefix.'log` SET `message`=:message WHERE `time`=:time AND `type`=:type;',
                     [
@@ -188,7 +189,7 @@ trait TraitForCron
                 $skip_insert = true;
             }
         }
-        #Insert log entry only if we did not update the last log on previous check
+        // Insert log entry only if we did not update the last log on previous check
         if (!$skip_insert) {
             $queries[] = [
                 'INSERT INTO `'.$this->prefix.'log` (`time`, `type`, `run_by`, `sse`, `task`, `arguments`, `instance`, `message`) VALUES (:time, :type,:run_by,:sse,:task, :arguments, :instance, :message);',
@@ -225,7 +226,7 @@ trait TraitForCron
             }
         }
     }
-    
+
     /**
      * Get `run_by` value based from backtrace
      * @return string|null
@@ -243,7 +244,7 @@ trait TraitForCron
         }
         return $run_by;
     }
-    
+
     /**
      * Get task instance from which is associated with provided `run_by`
      * @param string $run_by
@@ -258,8 +259,8 @@ trait TraitForCron
         foreach ($backtrace as $frame) {
             if (
                 !empty($frame['object']) && $frame['object'] instanceof $instance_class && $frame['object']->run_by === $run_by &&
-                #TaskInstance calls logs with reference to itself, so this matters only if we are in a Task/Agent
-                #or if we are in TaskInstance, that was triggered by another TaskInstance (e.g. TaskInstance creating other one)
+                // TaskInstance calls logs with reference to itself, so this matters only if we are in a Task/Agent
+                // or if we are in TaskInstance, that was triggered by another TaskInstance (e.g. TaskInstance creating other one)
                 (!$this instanceof $instance_class || $frame['object'] !== $this)
             ) {
                 $instance = $frame['object'];
@@ -269,7 +270,7 @@ trait TraitForCron
         /* @noinspection PhpIncompatibleReturnTypeInspection Peculiarity of how backtrace works */
         return $instance;
     }
-    
+
     /**
      * Generate random ID to be used by threads
      * @return false|string

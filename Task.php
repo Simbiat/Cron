@@ -1,5 +1,6 @@
 <?php
-declare(strict_types = 1);
+
+declare(strict_types=1);
 
 namespace Simbiat\Cron;
 
@@ -14,7 +15,7 @@ use function is_string, is_array;
 class Task
 {
     use TraitForCron;
-    
+
     /**
      * @var string Unique name of the task
      */
@@ -89,7 +90,7 @@ class Task
             }
         }
     }
-    
+
     /**
      * @var int Minimal-allowed frequency (in seconds) at which a task instance can run. Does not apply to one-time jobs.
      */
@@ -104,7 +105,7 @@ class Task
             }
         }
     }
-    
+
     /**
      * @var int Custom number of seconds to reschedule a failed task instance for. 0 disables the functionality.
      */
@@ -135,7 +136,7 @@ class Task
      * @var bool Whether a task was found in a database
      */
     private(set) bool $found_in_db = false;
-    
+
     /**
      * Create a Cron task object
      *
@@ -148,11 +149,11 @@ class Task
         $this->init($dbh, $prefix);
         if (!Sanitize::whiteString($task_name ?? '')) {
             $this->task_name = $task_name;
-            #Attempt to get settings from DB
+            // Attempt to get settings from DB
             $this->getFromDB();
         }
     }
-    
+
     /**
      * Get task settings from database
      *
@@ -169,7 +170,7 @@ class Task
             $this->found_in_db = true;
         }
     }
-    
+
     /**
      * Set task settings from associative array
      *
@@ -213,13 +214,13 @@ class Task
                     }
                     break;
                 default:
-                    #Do nothing
+                    // Do nothing
                     break;
             }
         }
         return $this;
     }
-    
+
     /**
      * Add (or update) the task
      *
@@ -253,13 +254,13 @@ class Task
             $this->log('Failed to add or update task with following details: '.$task_details_string.'.', EventTypes::TaskAddFail, error: $throwable);
             return false;
         }
-        #Log only if something was actually changed
+        // Log only if something was actually changed
         if ($result > 0) {
             $this->log('Added or updated task with following details: '.$task_details_string.'.', EventTypes::TaskAdd);
         }
         return true;
     }
-    
+
     /**
      * Delete the task if it's not a system one
      *
@@ -278,22 +279,22 @@ class Task
             $this->log('Failed delete task `'.$this->task_name.'`.', EventTypes::TaskDeleteFail, error: $throwable);
             return false;
         }
-        #Log only if something was actually deleted
+        // Log only if something was actually deleted
         if ($result > 0) {
             $this->found_in_db = false;
             try {
-                #Try to delete the respective task instances as well
+                // Try to delete the respective task instances as well
                 Query::query('DELETE FROM `'.$this->prefix.'schedule` WHERE `task`=:task AND `system`=0;', [
                     ':task' => [$this->task_name, 'string'],
                 ]);
             } catch (\Throwable) {
-                #Do nothing, not critical
+                // Do nothing, not critical
             }
             $this->log('Deleted task  `'.$this->task_name.'`.', EventTypes::TaskDelete);
         }
         return true;
     }
-    
+
     /**
      * Set the task as a system one
      * @return bool
@@ -312,7 +313,7 @@ class Task
                 $this->log('Failed to mark task `'.$this->task_name.'` as system one.', EventTypes::TaskToSystemFail, error: $throwable);
                 return false;
             }
-            #Log only if something was actually changed
+            // Log only if something was actually changed
             if ($result > 0) {
                 $this->system = true;
                 $this->log('Marked task `'.$this->task_name.'` as system one.', EventTypes::TaskToSystem);
@@ -321,7 +322,7 @@ class Task
         }
         return false;
     }
-    
+
     /**
      * Function to enable or disable the task and its instances
      * @param bool $enabled Flag indicating whether we want to enable or disable the task
@@ -343,7 +344,7 @@ class Task
                 $this->log('Failed to '.($enabled ? 'enable' : 'disable').' task.', ($enabled ? EventTypes::TaskEnableFail : EventTypes::TaskDisableFail), error: $throwable);
                 return false;
             }
-            #Log only if something was actually changed
+            // Log only if something was actually changed
             if ($result > 0) {
                 $this->enabled = $enabled;
                 $this->log(($enabled ? 'Enabled' : 'Disabled').' task.', ($enabled ? EventTypes::TaskEnable : EventTypes::TaskDisable));

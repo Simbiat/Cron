@@ -1,5 +1,6 @@
 <?php
-declare(strict_types = 1);
+
+declare(strict_types=1);
 
 namespace Simbiat\Cron;
 
@@ -42,40 +43,40 @@ class Agent
      */
     public function process(int $items = 1): bool
     {
-        #Start stream if not in CLI
+        // Start stream if not in CLI
         if (SSE::isPossible()) {
             SSE::open();
         }
-        #Generate random ID
+        // Generate random ID
         $this->run_by = $this->generateRunBy();
         if (SSE::$sse) {
             $this->log('Cron processing started in SSE mode', EventTypes::SSEStart);
         }
-        #Regular maintenance
+        // Regular maintenance
         if (Query::$dbh !== null) {
-            #Reschedule hanged jobs
+            // Reschedule hanged jobs
             $this->unHang();
-            #Depending on the number of events in the log, this may take a while, so use a bit of randomization to not do this on very run.
+            // Depending on the number of events in the log, this may take a while, so use a bit of randomization to not do this on very run.
             try {
                 if (\random_int(1, 60 * $this->max_threads) < 60 * ($this->max_threads - 1)) {
-                    #Clean old logs
+                    // Clean old logs
                     $this->logPurge();
                 }
             } catch (\Throwable) {
-                #Do nothing, not critical, since these are just logs
+                // Do nothing, not critical, since these are just logs
             }
         } else {
-            #Notify about the end of the stream
+            // Notify about the end of the stream
             $this->log('Cron database not available', EventTypes::CronFail, true);
             return false;
         }
-        #Check if cron is enabled and process only if it is
+        // Check if cron is enabled and process only if it is
         if (!$this->cron_enabled) {
-            #Notify about the end of the stream
+            // Notify about the end of the stream
             $this->log('Cron processing is disabled', EventTypes::CronDisabled, true);
             return false;
         }
-        #Sanitize the number of items
+        // Sanitize the number of items
         if ($items < 1) {
             $items = 1;
         }
@@ -84,14 +85,14 @@ class Agent
                 $this->log('Failed to get CRON settings', EventTypes::CronFail, true);
                 return false;
             }
-            #Check if enough threads are available
+            // Check if enough threads are available
             try {
                 if (Query::query('SELECT COUNT(DISTINCT(`run_by`)) as `count` FROM `'.$this->prefix.'schedule` WHERE `run_by` IS NOT NULL;', return: 'count') >= $this->max_threads) {
                     $this->log('Cron threads are exhausted', EventTypes::CronNoThreads);
                     if (!SSE::$sse) {
                         return false;
                     }
-                    #Sleep for a bit
+                    // Sleep for a bit
                     \sleep($this->sse_retry / 20);
                     continue;
                 }
@@ -99,12 +100,12 @@ class Agent
                 $this->log('Failed to check for available threads', EventTypes::CronFail, true, $exception);
                 return false;
             }
-            #Queue tasks for this random ID
+            // Queue tasks for this random ID
             $tasks = $this->getTasks($items);
             if ($tasks === false || $tasks === []) {
                 $this->log('Cron list is empty', EventTypes::CronEmpty);
                 if (SSE::$sse) {
-                    #Sleep for a bit
+                    // Sleep for a bit
                     \sleep($this->sse_retry / 20);
                 }
             } else {
@@ -113,12 +114,12 @@ class Agent
                     $this->runTask($task, $number + 1, $total_tasks);
                 }
             }
-            #Additionally, reschedule hanged jobs if we're in SSE
+            // Additionally, reschedule hanged jobs if we're in SSE
             if (SSE::$sse && $this->sse_loop) {
                 $this->unHang();
             }
         } while ($this->cron_enabled && SSE::$sse && $this->sse_loop && \connection_status() === 0);
-        #Notify about the end of the stream
+        // Notify about the end of the stream
         if (SSE::$sse) {
             $this->log('Cron processing finished', EventTypes::SSEEnd, true);
         }
@@ -137,9 +138,9 @@ class Agent
     {
         try {
             $task_instance = (new TaskInstance($task['task'], $task['arguments'], $task['instance'], $this->dbh, $this->prefix));
-            #Notify of the task starting
+            // Notify of the task starting
             $this->log($number.'/'.$total_tasks.' '.(empty($task['message']) ? $task['task'].' starting' : $task['message']), EventTypes::InstanceStart, task: $task_instance);
-            #Attemp to run
+            // Attemp to run
             $result = $task_instance->run();
         } catch (\Throwable $exception) {
             $this->log('Failed to run task `'.$task['task'].'` ('.$number.'/'.$total_tasks.')', EventTypes::InstanceFail, false, $exception, ($task_instance ?? null));
@@ -147,7 +148,7 @@ class Agent
         } finally {
             $this->current_task = null;
         }
-        #Notify of the task finishing
+        // Notify of the task finishing
         if ($result) {
             $this->log($number.'/'.$total_tasks.' '.$task['task'].' finished'.($task_instance->frequency === 0 ? ' and deleted' : ''), EventTypes::InstanceEnd, task: $task_instance);
         } else {
@@ -190,16 +191,16 @@ class Agent
                     ':inner_limit' => [$items * 2, 'int']
                 ]);
         } catch (\Throwable $throwable) {
-            #Check if caused by deadlock, which can be normal in case of large number of tasks in the database and enough parallel processes
+            // Check if caused by deadlock, which can be normal in case of large number of tasks in the database and enough parallel processes
             if (mb_stripos($throwable->getMessage(), 'Deadlock', 0, 'UTF-8') === false) {
                 $this->log('Failed to queue tasks', EventTypes::CronFail, true, $throwable);
             } else {
-                #If it was a deadlock, return empty array, treat this as CronNoThreads, and let it be retried next time (if in SSE)
+                // If it was a deadlock, return empty array, treat this as CronNoThreads, and let it be retried next time (if in SSE)
                 $this->log('Deadlock encountered during queueing. Treating as threads exhaustion.', EventTypes::CronNoThreads);
             }
             return [];
         }
-        #Get tasks
+        // Get tasks
         try {
             return Query::query(
                 'SELECT `task`, `arguments`, `instance` FROM `'.$this->prefix.'schedule` WHERE `run_by`=:run_by ORDER BY `next_run`, `priority` DESC, (`frequency`=0) DESC, `frequency` DESC;',
@@ -208,7 +209,7 @@ class Agent
                 ], return: 'all'
             );
         } catch (\Throwable $exception) {
-            #Notify about the end the stream
+            // Notify about the end the stream
             $this->log('Failed to get queued tasks', EventTypes::CronFail, true, $exception);
         }
         return [];
@@ -223,11 +224,11 @@ class Agent
      */
     public function setSetting(#[ExpectedValues(self::SETTINGS)] string $setting, int $value): self
     {
-        #Check setting name
+        // Check setting name
         if (!in_array($setting, self::SETTINGS, true)) {
             throw new \InvalidArgumentException('Attempt to set unsupported setting');
         }
-        #Handle values lower than 0
+        // Handle values lower than 0
         if ($value <= 0) {
             $value = match ($setting) {
                 'enabled', 'sse_loop' => 0,
@@ -274,28 +275,28 @@ class Agent
      */
     public function unHang(): bool
     {
-        #Delete task instances that do not have a respective task registered.
-        #Depending on the number of task instances, this may take a while, so use a bit of randomization to not do this on very run.
-        #It is also not critical: these tasks, if picked-up, will fail to run due to `function` ending up being `null`, and thus not callable.
+        // Delete task instances that do not have a respective task registered.
+        // Depending on the number of task instances, this may take a while, so use a bit of randomization to not do this on very run.
+        // It is also not critical: these tasks, if picked-up, will fail to run due to `function` ending up being `null`, and thus not callable.
         try {
             if (\random_int(1, 60 * $this->max_threads) >= 60 * ($this->max_threads - 1)) {
                 Query::query('DELETE FROM `'.$this->prefix.'schedule` WHERE `task` IS NOT IN (SELECT `task` FROM `'.$this->prefix.'tasks`);');
             }
         } catch (\Throwable) {
-            #Do nothing
+            // Do nothing
         }
-        #Delete task instances that were marked as `For removal` (`status` was set to `3`), which means they failed to be removed initially, but succeeded to be updated.
+        // Delete task instances that were marked as `For removal` (`status` was set to `3`), which means they failed to be removed initially, but succeeded to be updated.
         $tasks = Query::query('SELECT `task`, `arguments`, `instance` FROM `'.$this->prefix.'schedule` as `a` WHERE `status` = 3;', return: 'all');
         foreach ($tasks as $task) {
             new TaskInstance($task['task'], $task['arguments'], $task['instance'], $this->dbh, $this->prefix)->delete();
         }
         $tasks = Query::query('SELECT `task`, `arguments`, `instance`, `status` FROM `'.$this->prefix.'schedule` as `a` WHERE `run_by` IS NOT NULL AND (`thread_heartbeat` IS NULL OR CURRENT_TIMESTAMP(6)>DATE_ADD(`thread_heartbeat`, INTERVAL (SELECT `max_time` FROM `'.$this->prefix.'tasks` WHERE `'.$this->prefix.'tasks`.`task`=`a`.`task`) SECOND));', return: 'all');
         foreach ($tasks as $task) {
-            #If this was a one-time task, schedule it for right now, to avoid delaying it for double the time.
+            // If this was a one-time task, schedule it for right now, to avoid delaying it for double the time.
             try {
                 new TaskInstance($task['task'], $task['arguments'], $task['instance'], $this->dbh, $this->prefix)->reSchedule($task['status'] === 1 ? 'Hanged thread' : 'Hanged job');
             } catch (\Throwable $exception) {
-                #If the instance was not found in the database, it was probably deleted, so we can safely ignore the error.
+                // If the instance was not found in the database, it was probably deleted, so we can safely ignore the error.
                 if ($exception->getMessage() !== 'Not found in database.') {
                     throw $exception;
                 }

@@ -1,5 +1,6 @@
 <?php
-declare(strict_types = 1);
+
+declare(strict_types=1);
 
 namespace Simbiat\Cron;
 
@@ -189,7 +190,7 @@ class TaskInstance
             $this->task_name = $task_name;
             $this->arguments = $arguments;
             $this->instance = $instance;
-            #Attempt to get settings from DB
+            // Attempt to get settings from DB
             $this->getFromDB();
         }
     }
@@ -209,23 +210,23 @@ class TaskInstance
             ], return: 'row'
         );
         if (\count($settings) > 0) {
-            #Set `run_by` value, if present
+            // Set `run_by` value, if present
             if (!empty($settings['run_by'])) {
                 $this->run_by = $settings['run_by'];
             }
-            #When function is called from Agent (or something that was invoked by an Agent), we need to get the `run_by` of that Agent instance and use that instead
+            // When function is called from Agent (or something that was invoked by an Agent), we need to get the `run_by` of that Agent instance and use that instead
             $run_by = $this->runByFromBackTrace();
             if ($run_by !== null) {
                 $this->run_by = $run_by;
             }
-            #Status is not allowed to be changed from outside, so `settingsFromArray` does not handle it, but we do update it in the class itself
+            // Status is not allowed to be changed from outside, so `settingsFromArray` does not handle it, but we do update it in the class itself
             $this->status = $settings['status'];
             unset($settings['status']);
-            #Get task object
+            // Get task object
             $this->task_object = (new Task($this->task_name, $this->dbh, $this->prefix));
-            #Process settings
+            // Process settings
             $this->settingsFromArray($settings);
-            #If nothing failed at this point, set the flag to `true`
+            // If nothing failed at this point, set the flag to `true`
             $this->found_in_db = $this->task_object->found_in_db;
         }
     }
@@ -237,11 +238,11 @@ class TaskInstance
      */
     public function settingsFromArray(array $settings): self
     {
-        #If we are creating a task instance from outside the class (for example, new instance), we may not have all details, so ensure we get them
+        // If we are creating a task instance from outside the class (for example, new instance), we may not have all details, so ensure we get them
         if ($this->task_object === null && !empty($settings['task'])) {
             $this->task_object = (new Task($settings['task'], $this->dbh, $this->prefix));
         }
-        #We need to process system status first, since frequency depends on it
+        // We need to process system status first, since frequency depends on it
         if (\array_key_exists('system', $settings)) {
             $this->system = (bool)$settings['system'];
         }
@@ -272,7 +273,7 @@ class TaskInstance
                     }
                     break;
                 default:
-                    #Do nothing
+                    // Do nothing
                     break;
             }
         }
@@ -308,7 +309,7 @@ class TaskInstance
             $this->log('Failed to add or update task instance.', EventTypes::InstanceAddFail, error: $throwable, task: $this);
             return false;
         }
-        #Log only if something was actually changed
+        // Log only if something was actually changed
         if ($result > 0) {
             $this->log('Added or updated task instance.', EventTypes::InstanceAdd, task: $this);
         }
@@ -339,7 +340,7 @@ class TaskInstance
                     ':arguments' => [$this->arguments, 'string'],
                     ':instance' => [$this->instance, 'int'],
                 ], return: 'affected');
-                #Log only if something was actually deleted, and if it's not a one-time job
+                // Log only if something was actually deleted, and if it's not a one-time job
                 if ($result > 0) {
                     $this->log('Task instance marked for removal.', EventTypes::InstanceDelete, task: $this);
                 }
@@ -350,7 +351,7 @@ class TaskInstance
         }
         if ($result > 0) {
             $this->found_in_db = false;
-            #Log only if something was actually deleted, and if it's not a one-time job
+            // Log only if something was actually deleted, and if it's not a one-time job
             if ($this->frequency > 0) {
                 $this->log('Deleted task instance.', EventTypes::InstanceDelete, task: $this);
             }
@@ -380,7 +381,7 @@ class TaskInstance
             $this->log('Failed to mark task instance as system one.', EventTypes::InstanceToSystemFail, error: $throwable, task: $this);
             return false;
         }
-        #Log only if something was actually changed
+        // Log only if something was actually changed
         if ($result > 0) {
             $this->system = true;
             $this->log('Marked task instance as system one.', EventTypes::InstanceToSystem, task: $this);
@@ -410,7 +411,7 @@ class TaskInstance
             $this->log('Failed to '.($enabled ? 'enable' : 'disable').' task instance.', ($enabled ? EventTypes::InstanceEnableFail : EventTypes::InstanceDisableFail), error: $throwable, task: $this);
             return false;
         }
-        #Log only if something was actually changed
+        // Log only if something was actually changed
         if ($result > 0) {
             $this->enabled = $enabled;
             $this->log(($enabled ? 'Enabled' : 'Disabled').' task instance.', ($enabled ? EventTypes::InstanceEnable : EventTypes::InstanceDisable), task: $this);
@@ -431,25 +432,25 @@ class TaskInstance
         if (!$this->found_in_db) {
             throw new \UnexpectedValueException('Not found in database.');
         }
-        #Check whether this is a successful one-time job
+        // Check whether this is a successful one-time job
         if ($this->frequency === 0 && $result === true) {
-            #Since this is a one-time task, we can just remove it
+            // Since this is a one-time task, we can just remove it
             return $this->delete();
         }
-        #Determine a new time
+        // Determine a new time
         /** @noinspection IsEmptyFunctionUsageInspection Valid scenario due to multiple possible types used for the variable */
         if (empty($timestamp)) {
             $time = $this->updateNextRun(is_string($result) ? false : $result);
         } else {
             $time = SandClock::valueToDateTime($timestamp);
         }
-        #Actually reschedule. One task time task will be rescheduled for the retry time from settings
+        // Actually reschedule. One task time task will be rescheduled for the retry time from settings
         try {
             if ($result === true) {
                 $query = /** @lang SQL */
                     'UPDATE `'.$this->prefix.'schedule` SET `status`=0, `run_by`=NULL, `thread_heartbeat`=NULL, `sse`=0, `next_run`=:time, `last_success`=CURRENT_TIMESTAMP(6), `success_total`=`success_total`+1, `success_streak`=`success_streak`+1, `error_streak`=0, `last_error_message`=NULL WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance;';
             } else {
-                #If `status` is not equal to 2, then the job was not tried to be run, and probably is being rescheduled due to some issue not related to this specific run, so not increasing counters
+                // If `status` is not equal to 2, then the job was not tried to be run, and probably is being rescheduled due to some issue not related to this specific run, so not increasing counters
                 $query = /** @lang SQL */
                     'UPDATE `'.$this->prefix.'schedule` SET `run_by`=NULL, `sse`=0, `next_run`=:time, `last_error`=COALESCE(GREATEST(`last_run`, `thread_heartbeat`), CURRENT_TIMESTAMP(6)), `error_total`=IF(`status`=2, `error_total`+1, `error_total`), `error_streak`=IF(`status`=2, `error_streak`+1, `error_streak`), `success_streak`=IF(`status`=2, 0, `success_streak`), `last_error_message`=:error_text, `thread_heartbeat`=NULL, `status`=0 WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance;';
             }
@@ -464,7 +465,7 @@ class TaskInstance
             $this->log('Failed to reschedule task instance for '.SandClock::format($time, 'c').'.', EventTypes::RescheduleFail, error: $throwable, task: $this);
             return false;
         }
-        #Log only if something was actually changed
+        // Log only if something was actually changed
         if ($affected > 0) {
             if ($result === true) {
                 $reason = ' on success';
@@ -486,26 +487,26 @@ class TaskInstance
      */
     public function run(): bool
     {
-        #If run_by value is empty (a job is being run manually) - generate it
+        // If run_by value is empty (a job is being run manually) - generate it
         if (Sanitize::whiteString($this->run_by ?? '')) {
             $this->run_by = $this->generateRunBy();
         }
         if (!$this->found_in_db) {
-            #Assume that it was a [one-time job], that has already been run and removed by another (possibly manual) process
+            // Assume that it was a [one-time job], that has already been run and removed by another (possibly manual) process
             return true;
         }
         if ($this->next_time !== SandClock::suggestNextDay($this->next_time,
                 (!Sanitize::whiteString($this->day_of_week ?? '') ? \json_decode($this->day_of_week, flags: \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_BIGINT_AS_STRING | \JSON_OBJECT_AS_ARRAY) : []),
                 (!Sanitize::whiteString($this->day_of_month ?? '') ? \json_decode($this->day_of_month, flags: \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_BIGINT_AS_STRING | \JSON_OBJECT_AS_ARRAY) : []))
         ) {
-            #Register error.
+            // Register error.
             $this->log('Attempted to run function during forbidden day of week or day of month.', EventTypes::InstanceFail, task: $this);
             $this->reSchedule('Wrong day of week or month');
             return false;
         }
-        #Set the time limit for the task
+        // Set the time limit for the task
         \set_time_limit($this->task_object->max_time);
-        #Update last run
+        // Update last run
         $affected = Query::query(/** @lang SQL */ 'UPDATE `'.$this->prefix.'schedule` SET `status`=2, `run_by`=:run_by, `thread_heartbeat` = CURRENT_TIMESTAMP(6), `last_run` = CURRENT_TIMESTAMP(6) WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance AND `status` IN (0, 1);', [
             ':task' => [$this->task_name, 'string'],
             ':arguments' => [$this->arguments, 'string'],
@@ -513,27 +514,27 @@ class TaskInstance
             ':run_by' => [$this->run_by, 'string'],
         ], return: 'affected');
         if ($affected <= 0) {
-            #The task was either picked up by some manual process or has been removed
+            // The task was either picked up by some manual process or has been removed
             return true;
         }
-        #Decode allowed returns if any
+        // Decode allowed returns if any
         if (!Sanitize::whiteString($this->task_object->returns ?? '')) {
             $allowed_returns = \json_decode($this->task_object->returns, flags: \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_BIGINT_AS_STRING | \JSON_OBJECT_AS_ARRAY);
         }
         try {
             $function = $this->functionCreation();
-            #Run function
+            // Run function
             if (Sanitize::whiteString($this->arguments ?? '')) {
                 $result = $function();
             } else {
-                #Replace instance reference
+                // Replace instance reference
                 $arguments = \str_replace('"$cron_instance"', (string)$this->instance, $this->arguments);
                 $result = \call_user_func_array($function, \json_decode($arguments, flags: \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_BIGINT_AS_STRING | \JSON_OBJECT_AS_ARRAY));
             }
         } catch (\Throwable $throwable) {
             $result = $throwable->getMessage()."\r\n".$throwable->getTraceAsString();
         }
-        #Check if it's an allowed return value, unless it's regular boolean
+        // Check if it's an allowed return value, unless it's regular boolean
         if (!\is_bool($result)) {
             /** @noinspection IsEmptyFunctionUsageInspection Valid case, since we do not know to what the JSON got decoded here */
             if (!empty($allowed_returns) && in_array($result, $allowed_returns, true)) {
@@ -543,9 +544,9 @@ class TaskInstance
                 $this->log($result, EventTypes::InstanceFail, task: $this);
             }
         }
-        #Reschedule
+        // Reschedule
         $this->reSchedule($result);
-        #Return
+        // Return
         if (is_string($result)) {
             return false;
         }
@@ -561,52 +562,52 @@ class TaskInstance
     {
         $object = null;
         $extra_methods = [];
-        #Check if an object is required
+        // Check if an object is required
         if (!Sanitize::whiteString($this->task_object->object ?? '')) {
-            #Check if parameters for the object are set
+            // Check if parameters for the object are set
             if (!Sanitize::whiteString($this->task_object->parameters ?? '')) {
                 $parameters = \json_decode($this->task_object->parameters, flags: \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_BIGINT_AS_STRING | \JSON_OBJECT_AS_ARRAY);
-                #Check if extra methods are set
+                // Check if extra methods are set
                 if (!empty($parameters['extra_methods'])) {
-                    #Separate extra methods
+                    // Separate extra methods
                     $extra_methods = $parameters['extra_methods'];
-                    #Remove them from the original
+                    // Remove them from the original
                     unset($parameters['extra_methods']);
                 }
             } else {
                 $parameters = null;
             }
-            #Generate object
+            // Generate object
             if ($parameters === null || $parameters === []) {
                 $object = (new $this->task_object->object());
             } else {
                 $object = (new $this->task_object->object(...$parameters));
             }
-            #Call the extra methods
+            // Call the extra methods
             if ($extra_methods !== []) {
                 foreach ($extra_methods as $method) {
-                    #Check if the method value is present, skip the method, if not
+                    // Check if the method value is present, skip the method, if not
                     if (empty($method['method']) || !is_string($method['method'])) {
                         continue;
                     }
-                    #Check for arguments for the method
+                    // Check for arguments for the method
                     if (empty($method['arguments']) || !is_array($method['arguments'])) {
-                        #Call without arguments
+                        // Call without arguments
                         $object = $object->{$method['method']}();
                     } else {
-                        #Call with arguments
+                        // Call with arguments
                         $object = $object->{$method['method']}(...$method['arguments']);
                     }
                 }
             }
         }
-        #Set function
+        // Set function
         if ($object === null) {
             $function = $this->task_object->function;
         } else {
             $function = [$object, $this->task_object->function];
         }
-        #Check if callable
+        // Check if callable
         if (!\is_callable($function)) {
             throw new \RuntimeException('Function is not callable');
         }
@@ -633,25 +634,25 @@ class TaskInstance
             try {
                 $new_time = $this->next_time->modify('+'.$this->task_object->retry.' seconds');
             } catch (\DateMalformedStringException) {
-                #We should not get here, since the value is not from the user, and there are validations on earlier steps; this is just a failback
+                // We should not get here, since the value is not from the user, and there are validations on earlier steps; this is just a failback
                 $new_time = $current_time;
             }
         } else {
-            #Determine minimum seconds to move the time by
+            // Determine minimum seconds to move the time by
             if ($this->frequency > 0) {
                 $seconds = $this->frequency;
             } else {
                 $seconds = $this->one_time_retry;
             }
-            #Determine the time difference between current time and run time that was initially set
+            // Determine the time difference between current time and run time that was initially set
             $time_diff = $current_time->getTimestamp() - $this->next_time->getTimestamp();
-            #Determine how many runs (based on frequency) could have happened within the time difference, essentially to "skip" over the missed runs
+            // Determine how many runs (based on frequency) could have happened within the time difference, essentially to "skip" over the missed runs
             $possible_runs = (int)\ceil($time_diff / $seconds);
-            #Increase time value by
+            // Increase time value by
             try {
                 $new_time = $this->next_time->modify('+'.(\max($possible_runs, 1) * $seconds).' seconds');
             } catch (\DateMalformedStringException $throwable) {
-                #We should not get here, since the value is not from the user, and there are validations on earlier steps; this is just a failback
+                // We should not get here, since the value is not from the user, and there are validations on earlier steps; this is just a failback
                 $this->log('Failed to add time for next run, failed back.', EventTypes::RescheduleFail, error: $throwable, task: $this);
                 $new_time = $current_time;
             }
@@ -659,13 +660,13 @@ class TaskInstance
         if (Sanitize::whiteString($this->day_of_month ?? '') && Sanitize::whiteString($this->day_of_week ?? '')) {
             return $new_time;
         }
-        #Check if the new time will satisfy day of week/month requirements
+        // Check if the new time will satisfy day of week/month requirements
         try {
             return SandClock::suggestNextDay($new_time,
                 (!Sanitize::whiteString($this->day_of_week ?? '') ? \json_decode($this->day_of_week, flags: \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_BIGINT_AS_STRING | \JSON_OBJECT_AS_ARRAY) : []),
                 (!Sanitize::whiteString($this->day_of_month ?? '') ? \json_decode($this->day_of_month, flags: \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_BIGINT_AS_STRING | \JSON_OBJECT_AS_ARRAY) : []));
         } catch (\Throwable $throwable) {
-            #We should not get here, since the value is not from the user, and there are validations on earlier steps; this is just a failback
+            // We should not get here, since the value is not from the user, and there are validations on earlier steps; this is just a failback
             $this->log('Failed to infer appropriate next run time, failed back.', EventTypes::RescheduleFail, error: $throwable, task: $this);
             return $current_time;
         }
