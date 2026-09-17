@@ -8,7 +8,6 @@ use Simbiat\Database\Query;
 use Simbiat\HTTP\SSE;
 use Simbiat\SandClock;
 use Simbiat\StringHelpers\Sanitize;
-use function in_array;
 
 /**
  * Collection of methods shared by classes in Cron namespace
@@ -17,11 +16,13 @@ trait TraitForCron
 {
     /**
      * PDO object to use for database connection. If not provided, the class expects the existence of `\Simbiat\Database\Pool` to use that instead.
+     *
      * @var \PDO|null
      */
     private(set) \PDO|null $dbh = null;
     /**
      * PDO Cron database prefix. Only Latin characters, underscores, dashes, and numbers are allowed. Maximum 53 symbols.
+     *
      * @var string
      */
     private(set) string $prefix = 'cron__' {
@@ -38,47 +39,56 @@ trait TraitForCron
     }
     /**
      * Flag to indicate whether Cron is enabled
+     *
      * @var bool
      */
     private(set) bool $cron_enabled = false;
     /**
      * Retry time for one-time jobs
+     *
      * @var int
      */
     private(set) int $one_time_retry = 3600;
     /**
      * Days to store errors for
+     *
      * @var int
      */
     private(set) int $log_life = 30;
     /**
      * Flag to indicate whether SSE is looped or not
+     *
      * @var bool
      */
     private(set) bool $sse_loop = false;
     /**
      * Number of milliseconds for connection retry for SSE. Will also be used to determine how long should the loop sleep if no threads or jobs, but will be treated as a number of seconds divided by 20. The default is `10000` (or roughly 8 minutes for empty cycles).
+     *
      * @var int
      */
     private(set) int $sse_retry = 10000;
     /**
      * Maximum threads
+     *
      * @var int
      */
     private(set) int $max_threads = 4;
     /**
      * Random ID
-     * @var null|string
+     *
+     * @var string|null
      */
     private(set) ?string $run_by = null;
     /**
      * Current task object
-     * @var null|TaskInstance
+     *
+     * @var TaskInstance|null
      */
     private ?TaskInstance $current_task = null;
 
     /**
      * Class constructor
+     *
      * @param \PDO|null $dbh    PDO object to use for database connection. If not provided, the class expects the existence of `\Simbiat\Database\Pool` to use that instead.
      * @param string    $prefix Cron database prefix.
      */
@@ -107,36 +117,36 @@ trait TraitForCron
         }
         // Update enabled flag
         if (\array_key_exists('enabled', $settings)) {
-            $this->cron_enabled = (bool)(int)$settings['enabled'];
+            $this->cron_enabled = (bool) (int) $settings['enabled'];
         }
         // Update SSE loop flag
         if (\array_key_exists('sse_loop', $settings)) {
-            $this->sse_loop = (bool)(int)$settings['sse_loop'];
+            $this->sse_loop = (bool) (int) $settings['sse_loop'];
         }
         // Update retry time
         if (\array_key_exists('retry', $settings)) {
-            $settings['retry'] = (int)$settings['retry'];
+            $settings['retry'] = (int) $settings['retry'];
             if ($settings['retry'] > 0) {
                 $this->one_time_retry = $settings['retry'];
             }
         }
         // Update SSE retry time
         if (\array_key_exists('sse_retry', $settings)) {
-            $settings['sse_retry'] = (int)$settings['sse_retry'];
+            $settings['sse_retry'] = (int) $settings['sse_retry'];
             if ($settings['sse_retry'] > 0) {
                 $this->sse_retry = $settings['sse_retry'];
             }
         }
         // Update maximum number of threads
         if (\array_key_exists('max_threads', $settings)) {
-            $settings['max_threads'] = (int)$settings['max_threads'];
+            $settings['max_threads'] = (int) $settings['max_threads'];
             if ($settings['max_threads'] > 0) {
                 $this->max_threads = $settings['max_threads'];
             }
         }
         // Update maximum life of an error
         if (\array_key_exists('log_life', $settings)) {
-            $settings['log_life'] = (int)$settings['log_life'];
+            $settings['log_life'] = (int) $settings['log_life'];
             if ($settings['log_life'] > 0) {
                 $this->log_life = $settings['log_life'];
             }
@@ -170,7 +180,7 @@ trait TraitForCron
         }
         $queries = [];
         // To reduce the number of NoThreads, Empty and Disabled events in the DB log, we check if the latest event is the same we want to write
-        if (in_array($event->name,['CronDisabled', 'CronEmpty', 'CronNoThreads'], true)) {
+        if (\in_array($event->name, ['CronDisabled', 'CronEmpty', 'CronNoThreads'], true)) {
             // Reset run_by value to null, since these entries can belong to multiple threads, and we don't really care about which one was the last one
             $run_by = null;
             // Get last event time and type
@@ -184,7 +194,7 @@ trait TraitForCron
                         ':type' => [$event->value, 'int'],
                         ':time' => [$last_event['time'], 'datetime'],
                         ':message' => [$message.' (last check at '.SandClock::format(0, 'c').')', 'string'],
-                    ]
+                    ],
                 ];
                 $skip_insert = true;
             }
@@ -202,15 +212,15 @@ trait TraitForCron
                     ':arguments' => [$task?->arguments, $task === null ? 'null' : 'string'],
                     ':instance' => [$task?->instance, $task === null ? 'null' : 'int'],
                     ':message' => [$message.($error !== null ? "\r\n".$error->getMessage()."\r\n".$error->getTraceAsString() : ''), 'string'],
-                ]
+                ],
             ];
         }
         if ($run_by !== null) {
             $queries[] = [
                 'UPDATE `'.$this->prefix.'schedule` SET `thread_heartbeat`=CURRENT_TIMESTAMP(6) WHERE `run_by`=:run_by;',
                 [
-                    ':run_by' => $run_by
-                ]
+                    ':run_by' => $run_by,
+                ],
             ];
         }
         Query::query($queries);
@@ -229,6 +239,7 @@ trait TraitForCron
 
     /**
      * Get `run_by` value based from backtrace
+     *
      * @return string|null
      */
     private function runByFromBackTrace(): ?string
@@ -247,6 +258,7 @@ trait TraitForCron
 
     /**
      * Get task instance from which is associated with provided `run_by`
+     *
      * @param string $run_by
      *
      * @return \Simbiat\Cron\TaskInstance|null
@@ -273,6 +285,7 @@ trait TraitForCron
 
     /**
      * Generate random ID to be used by threads
+     *
      * @return false|string
      */
     private function generateRunBy(): false|string

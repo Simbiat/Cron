@@ -10,6 +10,7 @@ use function is_string, is_array;
 
 /**
  * Cron task object
+ *
  * @noinspection ContractViolationInspection https://github.com/kalessil/phpinspectionsea/issues/1996
  */
 class Task
@@ -39,13 +40,13 @@ class Task
             /** @noinspection IsEmptyFunctionUsageInspection We do not know what values to expect here, so this should be fine as a universal solution */
             if (empty($value)) {
                 $this->parameters = null;
-            } elseif (is_array($value)) {
+            } elseif (\is_array($value)) {
                 try {
                     $this->parameters = \json_encode($value, \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_UNESCAPED_UNICODE | \JSON_PRESERVE_ZERO_FRACTION);
                 } catch (\Throwable) {
                     $this->parameters = null;
                 }
-            } elseif (is_string($value) && \json_validate($value)) {
+            } elseif (\is_string($value) && \json_validate($value)) {
                 $this->parameters = $value;
             } else {
                 throw new \UnexpectedValueException('`parameters` is not an array or a valid JSON string');
@@ -63,13 +64,13 @@ class Task
             /** @noinspection IsEmptyFunctionUsageInspection We do not know what values to expect here, so this should be fine as a universal solution */
             if (empty($value)) {
                 $this->returns = null;
-            } elseif (is_array($value)) {
+            } elseif (\is_array($value)) {
                 try {
                     $this->returns = \json_encode($value, \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_UNESCAPED_UNICODE | \JSON_PRESERVE_ZERO_FRACTION);
                 } catch (\Throwable) {
                     $this->returns = null;
                 }
-            } elseif (is_string($value) && \json_validate($value)) {
+            } elseif (\is_string($value) && \json_validate($value)) {
                 $this->returns = $value;
             } else {
                 throw new \UnexpectedValueException('`returns` is not an array or a valid JSON string');
@@ -203,7 +204,7 @@ class Task
                     break;
                 case 'enabled':
                 case 'system':
-                    $this->{$setting} = (bool)$value;
+                    $this->{$setting} = (bool) $value;
                     break;
                 case 'description':
                     /** @noinspection IsEmptyFunctionUsageInspection Valid use case, we don't know what's in the provided array */
@@ -297,6 +298,7 @@ class Task
 
     /**
      * Set the task as a system one
+     *
      * @return bool
      */
     public function setSystem(): bool
@@ -325,6 +327,7 @@ class Task
 
     /**
      * Function to enable or disable the task and its instances
+     *
      * @param bool $enabled Flag indicating whether we want to enable or disable the task
      *
      * @return bool

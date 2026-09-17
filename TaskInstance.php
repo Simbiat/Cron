@@ -7,7 +7,6 @@ namespace Simbiat\Cron;
 use Simbiat\Database\Query;
 use Simbiat\SandClock;
 use Simbiat\StringHelpers\Sanitize;
-use function is_string, is_array, in_array;
 
 /**
  * Scheduled task instance object
@@ -32,13 +31,13 @@ class TaskInstance
             /** @noinspection IsEmptyFunctionUsageInspection We do not know what values to expect here, so this should be fine as a universal solution */
             if (empty($value)) {
                 $this->arguments = '';
-            } elseif (is_array($value)) {
+            } elseif (\is_array($value)) {
                 try {
                     $this->arguments = \json_encode($value, \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_UNESCAPED_UNICODE | \JSON_PRESERVE_ZERO_FRACTION);
                 } catch (\Throwable) {
                     $this->arguments = '';
                 }
-            } elseif (is_string($value) && \json_validate($value)) {
+            } elseif (\is_string($value) && \json_validate($value)) {
                 $this->arguments = $value;
             } else {
                 throw new \UnexpectedValueException('`arguments` is not an array or a valid JSON string');
@@ -104,13 +103,13 @@ class TaskInstance
             /** @noinspection IsEmptyFunctionUsageInspection We do not know what values to expect here, so this should be fine as a universal solution */
             if (empty($value)) {
                 $this->day_of_month = null;
-            } elseif (is_array($value)) {
+            } elseif (\is_array($value)) {
                 try {
                     $this->day_of_month = \json_encode($value, \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_UNESCAPED_UNICODE | \JSON_PRESERVE_ZERO_FRACTION);
                 } catch (\Throwable) {
                     $this->day_of_month = null;
                 }
-            } elseif (is_string($value) && \json_validate($value)) {
+            } elseif (\is_string($value) && \json_validate($value)) {
                 $this->day_of_month = $value;
             } else {
                 throw new \UnexpectedValueException('`day_of_month` is not an array or a valid JSON string');
@@ -128,13 +127,13 @@ class TaskInstance
             /** @noinspection IsEmptyFunctionUsageInspection We do not know what values to expect here, so this should be fine as a universal solution */
             if (empty($value)) {
                 $this->day_of_week = null;
-            } elseif (is_array($value)) {
+            } elseif (\is_array($value)) {
                 try {
                     $this->day_of_week = \json_encode($value, \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_UNESCAPED_UNICODE | \JSON_PRESERVE_ZERO_FRACTION);
                 } catch (\Throwable) {
                     $this->day_of_week = null;
                 }
-            } elseif (is_string($value) && \json_validate($value)) {
+            } elseif (\is_string($value) && \json_validate($value)) {
                 $this->day_of_week = $value;
             } else {
                 throw new \UnexpectedValueException('`day_of_week` is not an array or a valid JSON string');
@@ -162,7 +161,7 @@ class TaskInstance
      */
     private(set) ?string $message = null;
     /**
-     * @var null|\DateTimeImmutable Time of the next run
+     * @var \DateTimeImmutable|null Time of the next run
      */
     private(set) ?\DateTimeImmutable $next_time = null;
     /**
@@ -207,7 +206,7 @@ class TaskInstance
                 ':name' => $this->task_name,
                 ':arguments' => $this->arguments,
                 ':instance' => [$this->instance, 'int'],
-            ], return: 'row'
+            ], return: 'row',
         );
         if (\count($settings) > 0) {
             // Set `run_by` value, if present
@@ -244,7 +243,7 @@ class TaskInstance
         }
         // We need to process system status first, since frequency depends on it
         if (\array_key_exists('system', $settings)) {
-            $this->system = (bool)$settings['system'];
+            $this->system = (bool) $settings['system'];
         }
         foreach ($settings as $setting => $value) {
             switch ($setting) {
@@ -260,13 +259,13 @@ class TaskInstance
                     $this->{$setting} = $value;
                     break;
                 case 'enabled':
-                    $this->enabled = (bool)$value;
+                    $this->enabled = (bool) $value;
                     break;
                 case 'next_run':
                     $this->next_time = SandClock::valueToDateTime($value);
                     break;
                 case 'message':
-                    if (!is_string($value) || Sanitize::whiteString($value)) {
+                    if (!\is_string($value) || Sanitize::whiteString($value)) {
                         $this->message = null;
                     } else {
                         $this->message = $value;
@@ -361,6 +360,7 @@ class TaskInstance
 
     /**
      * Set the task instance as a system one
+     *
      * @return bool
      */
     public function setSystem(): bool
@@ -391,6 +391,7 @@ class TaskInstance
 
     /**
      * Function to enable or disable a task instance
+     *
      * @param bool $enabled Flag indicating whether we want to enable or disable the instance
      *
      * @return bool
@@ -440,7 +441,7 @@ class TaskInstance
         // Determine a new time
         /** @noinspection IsEmptyFunctionUsageInspection Valid scenario due to multiple possible types used for the variable */
         if (empty($timestamp)) {
-            $time = $this->updateNextRun(is_string($result) ? false : $result);
+            $time = $this->updateNextRun(\is_string($result) ? false : $result);
         } else {
             $time = SandClock::valueToDateTime($timestamp);
         }
@@ -459,7 +460,7 @@ class TaskInstance
                 ':task' => [$this->task_name, 'string'],
                 ':arguments' => [$this->arguments, 'string'],
                 ':instance' => [$this->instance, 'int'],
-                ':error_text' => [\is_bool($result) ? null : $result, \is_bool($result) ? 'null' : 'string']
+                ':error_text' => [\is_bool($result) ? null : $result, \is_bool($result) ? 'null' : 'string'],
             ], return: 'affected');
         } catch (\Throwable $throwable) {
             $this->log('Failed to reschedule task instance for '.SandClock::format($time, 'c').'.', EventTypes::RescheduleFail, error: $throwable, task: $this);
@@ -528,7 +529,7 @@ class TaskInstance
                 $result = $function();
             } else {
                 // Replace instance reference
-                $arguments = \str_replace('"$cron_instance"', (string)$this->instance, $this->arguments);
+                $arguments = \str_replace('"$cron_instance"', (string) $this->instance, $this->arguments);
                 $result = \call_user_func_array($function, \json_decode($arguments, flags: \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_BIGINT_AS_STRING | \JSON_OBJECT_AS_ARRAY));
             }
         } catch (\Throwable $throwable) {
@@ -537,7 +538,7 @@ class TaskInstance
         // Check if it's an allowed return value, unless it's regular boolean
         if (!\is_bool($result)) {
             /** @noinspection IsEmptyFunctionUsageInspection Valid case, since we do not know to what the JSON got decoded here */
-            if (!empty($allowed_returns) && in_array($result, $allowed_returns, true)) {
+            if (!empty($allowed_returns) && \in_array($result, $allowed_returns, true)) {
                 $result = true;
             } else {
                 $result = 'Unexpected return `'.\json_encode($result, \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_UNESCAPED_UNICODE | \JSON_PRESERVE_ZERO_FRACTION).'`.';
@@ -547,7 +548,7 @@ class TaskInstance
         // Reschedule
         $this->reSchedule($result);
         // Return
-        if (is_string($result)) {
+        if (\is_string($result)) {
             return false;
         }
         return $result;
@@ -555,6 +556,7 @@ class TaskInstance
 
     /**
      * Create a function to run
+     *
      * @return string|array
      * @throws \JsonException
      */
@@ -587,11 +589,11 @@ class TaskInstance
             if ($extra_methods !== []) {
                 foreach ($extra_methods as $method) {
                     // Check if the method value is present, skip the method, if not
-                    if (empty($method['method']) || !is_string($method['method'])) {
+                    if (empty($method['method']) || !\is_string($method['method'])) {
                         continue;
                     }
                     // Check for arguments for the method
-                    if (empty($method['arguments']) || !is_array($method['arguments'])) {
+                    if (empty($method['arguments']) || !\is_array($method['arguments'])) {
                         // Call without arguments
                         $object = $object->{$method['method']}();
                     } else {
@@ -647,7 +649,7 @@ class TaskInstance
             // Determine the time difference between current time and run time that was initially set
             $time_diff = $current_time->getTimestamp() - $this->next_time->getTimestamp();
             // Determine how many runs (based on frequency) could have happened within the time difference, essentially to "skip" over the missed runs
-            $possible_runs = (int)\ceil($time_diff / $seconds);
+            $possible_runs = (int) \ceil($time_diff / $seconds);
             // Increase time value by
             try {
                 $new_time = $this->next_time->modify('+'.(\max($possible_runs, 1) * $seconds).' seconds');

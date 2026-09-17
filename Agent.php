@@ -192,7 +192,7 @@ class Agent
                 ]);
         } catch (\Throwable $throwable) {
             // Check if caused by deadlock, which can be normal in case of large number of tasks in the database and enough parallel processes
-            if (mb_stripos($throwable->getMessage(), 'Deadlock', 0, 'UTF-8') === false) {
+            if (\mb_stripos($throwable->getMessage(), 'Deadlock', 0, 'UTF-8') === false) {
                 $this->log('Failed to queue tasks', EventTypes::CronFail, true, $throwable);
             } else {
                 // If it was a deadlock, return empty array, treat this as CronNoThreads, and let it be retried next time (if in SSE)
@@ -225,7 +225,7 @@ class Agent
     public function setSetting(#[ExpectedValues(self::SETTINGS)] string $setting, int $value): self
     {
         // Check setting name
-        if (!in_array($setting, self::SETTINGS, true)) {
+        if (!\in_array($setting, self::SETTINGS, true)) {
             throw new \InvalidArgumentException('Attempt to set unsupported setting');
         }
         // Handle values lower than 0
@@ -240,14 +240,14 @@ class Agent
         }
         if (Query::query('UPDATE `'.$this->prefix.'settings` SET `value`=:value WHERE `setting`=:setting;', [
             ':setting' => [$setting, 'string'],
-            ':value' => [$value, in_array($setting, ['enabled', 'sse_loop']) ? 'bool' : 'int'],
+            ':value' => [$value, \in_array($setting, ['enabled', 'sse_loop']) ? 'bool' : 'int'],
         ])) {
             switch ($setting) {
                 case 'enabled':
-                    $this->cron_enabled = (bool)$value;
+                    $this->cron_enabled = (bool) $value;
                     break;
                 case 'sse_loop':
-                    $this->sse_loop = (bool)$value;
+                    $this->sse_loop = (bool) $value;
                     break;
                 case 'log_life':
                     $this->log_life = $value;
