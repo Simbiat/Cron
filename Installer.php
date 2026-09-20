@@ -17,6 +17,7 @@ class Installer
 
     /**
      * Class constructor
+     *
      * @param \PDO|null $dbh    PDO object to use for database connection. If not provided, the class expects the existence of `\Simbiat\Database\Pool` to use that instead.
      * @param string    $prefix Cron database prefix.
      */
@@ -27,6 +28,7 @@ class Installer
 
     /**
      * Install the necessary tables
+     *
      * @return bool
      */
     public function install(): bool
@@ -36,6 +38,7 @@ class Installer
 
     /**
      * Get the current version of the Agent from the database perspective (can be different from the library version)
+     *
      * @return string
      */
     public function getVersion(): string
@@ -48,7 +51,10 @@ class Installer
             // If an empty installer script was run before 2.1.2, we need to determine what version we have based on other things
             if (!Sanitize::whiteString($version ?? '')) {
                 // If errors' table does not exist, and the log table does, then we are on version 2.0.0
-                if (Manage::checkTable($this->prefix.'errors') === 0 && Manage::checkTable($this->prefix.'log') === 1) {
+                if (
+                    Manage::checkTable($this->prefix.'errors') === 0
+                    && Manage::checkTable($this->prefix.'log') === 1
+                ) {
                     $version = '2.0.0';
                     // If one of the schedule columns is datetime, it's 1.5.0
                 } elseif (Manage::getColumnType($this->prefix.'schedule', 'registered') === 'datetime') {
@@ -80,6 +86,7 @@ class Installer
                 }
             }
         }
+
         return $version;
     }
 }

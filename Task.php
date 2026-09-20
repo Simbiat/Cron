@@ -39,17 +39,20 @@ class Task
         set (mixed $value) {
             /** @noinspection IsEmptyFunctionUsageInspection We do not know what values to expect here, so this should be fine as a universal solution */
             if (empty($value)) {
-                $this->parameters = null;
+        $this->parameters = null;
             } elseif (\is_array($value)) {
-                try {
-                    $this->parameters = \json_encode($value, \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_UNESCAPED_UNICODE | \JSON_PRESERVE_ZERO_FRACTION);
-                } catch (\Throwable) {
-                    $this->parameters = null;
-                }
-            } elseif (\is_string($value) && \json_validate($value)) {
-                $this->parameters = $value;
+        try {
+            $this->parameters = \json_encode($value, \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_UNESCAPED_UNICODE | \JSON_PRESERVE_ZERO_FRACTION);
+        } catch (\Throwable) {
+            $this->parameters = null;
+        }
+            } elseif (
+                \is_string($value)
+                && \json_validate($value)
+            ) {
+        $this->parameters = $value;
             } else {
-                throw new \UnexpectedValueException('`parameters` is not an array or a valid JSON string');
+        throw new \UnexpectedValueException('`parameters` is not an array or a valid JSON string');
             }
         }
     }
@@ -63,17 +66,20 @@ class Task
         set (mixed $value) {
             /** @noinspection IsEmptyFunctionUsageInspection We do not know what values to expect here, so this should be fine as a universal solution */
             if (empty($value)) {
-                $this->returns = null;
+        $this->returns = null;
             } elseif (\is_array($value)) {
-                try {
-                    $this->returns = \json_encode($value, \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_UNESCAPED_UNICODE | \JSON_PRESERVE_ZERO_FRACTION);
-                } catch (\Throwable) {
-                    $this->returns = null;
-                }
-            } elseif (\is_string($value) && \json_validate($value)) {
-                $this->returns = $value;
+        try {
+            $this->returns = \json_encode($value, \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_UNESCAPED_UNICODE | \JSON_PRESERVE_ZERO_FRACTION);
+        } catch (\Throwable) {
+            $this->returns = null;
+        }
+            } elseif (
+                \is_string($value)
+                && \json_validate($value)
+            ) {
+        $this->returns = $value;
             } else {
-                throw new \UnexpectedValueException('`returns` is not an array or a valid JSON string');
+        throw new \UnexpectedValueException('`returns` is not an array or a valid JSON string');
             }
         }
     }
@@ -87,7 +93,7 @@ class Task
         set {
             $this->max_time = $value;
             if ($this->max_time < 0) {
-                $this->max_time = 0;
+        $this->max_time = 0;
             }
         }
     }
@@ -102,7 +108,7 @@ class Task
         set {
             $this->min_frequency = $value;
             if ($this->min_frequency < 0) {
-                $this->min_frequency = 0;
+        $this->min_frequency = 0;
             }
         }
     }
@@ -117,7 +123,7 @@ class Task
         set {
             $this->retry = $value;
             if ($this->retry < 0) {
-                $this->retry = 0;
+        $this->retry = 0;
             }
         }
     }
@@ -188,12 +194,15 @@ class Task
                     } else {
                         $this->object = $value;
                     }
+
                     break;
                 case 'allowed_returns':
                     $this->returns = $value;
+
                     break;
                 case 'task':
                     $this->task_name = $value;
+
                     break;
                 case 'function':
                 case 'parameters':
@@ -201,10 +210,12 @@ class Task
                 case 'min_frequency':
                 case 'retry':
                     $this->{$setting} = $value;
+
                     break;
                 case 'enabled':
                 case 'system':
                     $this->{$setting} = (bool) $value;
+
                     break;
                 case 'description':
                     /** @noinspection IsEmptyFunctionUsageInspection Valid use case, we don't know what's in the provided array */
@@ -213,12 +224,14 @@ class Task
                     } else {
                         $this->description = $value;
                     }
+
                     break;
                 default:
                     // Do nothing
                     break;
             }
         }
+
         return $this;
     }
 
@@ -253,12 +266,14 @@ class Task
             $this->getFromDB();
         } catch (\Throwable $throwable) {
             $this->log('Failed to add or update task with following details: '.$task_details_string.'.', EventTypes::TaskAddFail, error: $throwable);
+
             return false;
         }
         // Log only if something was actually changed
         if ($result > 0) {
             $this->log('Added or updated task with following details: '.$task_details_string.'.', EventTypes::TaskAdd);
         }
+
         return true;
     }
 
@@ -278,6 +293,7 @@ class Task
             ], return: 'affected');
         } catch (\Throwable $throwable) {
             $this->log('Failed delete task `'.$this->task_name.'`.', EventTypes::TaskDeleteFail, error: $throwable);
+
             return false;
         }
         // Log only if something was actually deleted
@@ -293,6 +309,7 @@ class Task
             }
             $this->log('Deleted task  `'.$this->task_name.'`.', EventTypes::TaskDelete);
         }
+
         return true;
     }
 
@@ -313,6 +330,7 @@ class Task
                 ], return: 'affected');
             } catch (\Throwable $throwable) {
                 $this->log('Failed to mark task `'.$this->task_name.'` as system one.', EventTypes::TaskToSystemFail, error: $throwable);
+
                 return false;
             }
             // Log only if something was actually changed
@@ -320,8 +338,10 @@ class Task
                 $this->system = true;
                 $this->log('Marked task `'.$this->task_name.'` as system one.', EventTypes::TaskToSystem);
             }
+
             return true;
         }
+
         return false;
     }
 
@@ -345,6 +365,7 @@ class Task
                 ], return: 'affected');
             } catch (\Throwable $throwable) {
                 $this->log('Failed to '.($enabled ? 'enable' : 'disable').' task.', ($enabled ? EventTypes::TaskEnableFail : EventTypes::TaskDisableFail), error: $throwable);
+
                 return false;
             }
             // Log only if something was actually changed
@@ -352,8 +373,10 @@ class Task
                 $this->enabled = $enabled;
                 $this->log(($enabled ? 'Enabled' : 'Disabled').' task.', ($enabled ? EventTypes::TaskEnable : EventTypes::TaskDisable));
             }
+
             return true;
         }
+
         return false;
     }
 }

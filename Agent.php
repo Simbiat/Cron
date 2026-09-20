@@ -11,6 +11,7 @@ use function in_array;
 
 /**
  * Task scheduler that uses MySQL/MariaDB database to store tasks and their schedule.
+ *
  * @noinspection ContractViolationInspection https://github.com/kalessil/phpinspectionsea/issues/1996
  */
 class Agent
@@ -19,12 +20,14 @@ class Agent
 
     /**
      * Supported settings
+     *
      * @var array
      */
     private const array SETTINGS = ['enabled', 'log_life', 'retry', 'sse_loop', 'sse_retry', 'max_threads'];
 
     /**
      * Class constructor
+     *
      * @param \PDO|null $dbh    PDO object to use for database connection. If not provided, the class expects the existence of `\Simbiat\Database\Pool` to use that instead.
      * @param string    $prefix Cron database prefix.
      */
@@ -39,6 +42,7 @@ class Agent
      * @param int $items Number of items to process
      *
      * @return bool
+     *
      * @throws \Throwable
      */
     public function process(int $items = 1): bool
@@ -68,12 +72,14 @@ class Agent
         } else {
             // Notify about the end of the stream
             $this->log('Cron database not available', EventTypes::CronFail, true);
+
             return false;
         }
         // Check if cron is enabled and process only if it is
         if (!$this->cron_enabled) {
             // Notify about the end of the stream
             $this->log('Cron processing is disabled', EventTypes::CronDisabled, true);
+
             return false;
         }
         // Sanitize the number of items
@@ -83,6 +89,7 @@ class Agent
         do {
             if (!$this->getCronSettings()) {
                 $this->log('Failed to get CRON settings', EventTypes::CronFail, true);
+
                 return false;
             }
             // Check if enough threads are available
@@ -94,15 +101,20 @@ class Agent
                     }
                     // Sleep for a bit
                     \sleep($this->sse_retry / 20);
+
                     continue;
                 }
             } catch (\Throwable $exception) {
                 $this->log('Failed to check for available threads', EventTypes::CronFail, true, $exception);
+
                 return false;
             }
             // Queue tasks for this random ID
             $tasks = $this->getTasks($items);
-            if ($tasks === false || $tasks === []) {
+            if (
+                $tasks === false
+                || $tasks === []
+            ) {
                 $this->log('Cron list is empty', EventTypes::CronEmpty);
                 if (SSE::$sse) {
                     // Sleep for a bit
@@ -115,19 +127,29 @@ class Agent
                 }
             }
             // Additionally, reschedule hanged jobs if we're in SSE
-            if (SSE::$sse && $this->sse_loop) {
+            if (
+                SSE::$sse
+                && $this->sse_loop
+            ) {
                 $this->unHang();
             }
-        } while ($this->cron_enabled && SSE::$sse && $this->sse_loop && \connection_status() === 0);
+        } while (
+            $this->cron_enabled
+            && SSE::$sse
+            && $this->sse_loop
+            && \connection_status() === 0
+        );
         // Notify about the end of the stream
         if (SSE::$sse) {
             $this->log('Cron processing finished', EventTypes::SSEEnd, true);
         }
+
         return true;
     }
 
     /**
      * Wrapper for running the task
+     *
      * @param array $task        Task object
      * @param int   $number      Current task number
      * @param int   $total_tasks Total number of tasks
@@ -137,13 +159,14 @@ class Agent
     private function runTask(array $task, int $number, int $total_tasks): void
     {
         try {
-            $task_instance = (new TaskInstance($task['task'], $task['arguments'], $task['instance'], $this->dbh, $this->prefix));
+            $task_instance = new TaskInstance($task['task'], $task['arguments'], $task['instance'], $this->dbh, $this->prefix);
             // Notify of the task starting
             $this->log($number.'/'.$total_tasks.' '.(empty($task['message']) ? $task['task'].' starting' : $task['message']), EventTypes::InstanceStart, task: $task_instance);
             // Attemp to run
             $result = $task_instance->run();
         } catch (\Throwable $exception) {
             $this->log('Failed to run task `'.$task['task'].'` ('.$number.'/'.$total_tasks.')', EventTypes::InstanceFail, false, $exception, ($task_instance ?? null));
+
             return;
         } finally {
             $this->current_task = null;
@@ -158,6 +181,7 @@ class Agent
 
     /**
      * Schedule and get a list of tasks using a previously generated random ID
+     *
      * @param int $items Number of items to select
      *
      * @return bool|array
@@ -198,6 +222,7 @@ class Agent
                 // If it was a deadlock, return empty array, treat this as CronNoThreads, and let it be retried next time (if in SSE)
                 $this->log('Deadlock encountered during queueing. Treating as threads exhaustion.', EventTypes::CronNoThreads);
             }
+
             return [];
         }
         // Get tasks
@@ -212,11 +237,13 @@ class Agent
             // Notify about the end the stream
             $this->log('Failed to get queued tasks', EventTypes::CronFail, true, $exception);
         }
+
         return [];
     }
 
     /**
      * Adjust settings
+     *
      * @param string $setting Setting to change
      * @param int    $value   Value to set
      *
@@ -245,25 +272,33 @@ class Agent
             switch ($setting) {
                 case 'enabled':
                     $this->cron_enabled = (bool) $value;
+
                     break;
                 case 'sse_loop':
                     $this->sse_loop = (bool) $value;
+
                     break;
                 case 'log_life':
                     $this->log_life = $value;
+
                     break;
                 case 'retry':
                     $this->one_time_retry = $value;
+
                     break;
                 case 'sse_retry':
                     $this->sse_retry = $value;
+
                     break;
                 case 'max_threads':
                     $this->max_threads = $value;
+
                     break;
             }
+
             return $this;
         }
+
         throw new \UnexpectedValueException('Failed to set setting `'.$setting.'` to '.$value);
     }
 
@@ -271,6 +306,7 @@ class Agent
      * Function to reschedule hanged jobs
      *
      * @return bool
+     *
      * @throws \Throwable
      */
     public function unHang(): bool
@@ -302,11 +338,13 @@ class Agent
                 }
             }
         }
+
         return true;
     }
 
     /**
      * Function to clean up log
+     *
      * @return bool
      */
     public function logPurge(): bool

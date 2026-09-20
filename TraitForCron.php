@@ -31,9 +31,9 @@ trait TraitForCron
          */
         set {
             if (Sanitize::dbName($value, true, 53)) {
-                $this->prefix = $value;
+        $this->prefix = $value;
             } else {
-                throw new \UnexpectedValueException('Invalid database prefix');
+        throw new \UnexpectedValueException('Invalid database prefix');
             }
         }
     }
@@ -151,6 +151,7 @@ trait TraitForCron
                 $this->log_life = $settings['log_life'];
             }
         }
+
         return true;
     }
 
@@ -186,7 +187,10 @@ trait TraitForCron
             // Get last event time and type
             $last_event = Query::query('SELECT `time`, `type` FROM `'.$this->prefix.'log` ORDER BY `time` DESC LIMIT 1', return: 'row');
             // Checking for empty, in case there are no logs in the table
-            if (!empty($last_event['type']) && $last_event['type'] === $event->value) {
+            if (
+                !empty($last_event['type'])
+                && $last_event['type'] === $event->value
+            ) {
                 // Update the message of last event with current time
                 $queries[] = [
                     'UPDATE `'.$this->prefix.'log` SET `message`=:message WHERE `time`=:time AND `type`=:type;',
@@ -225,7 +229,7 @@ trait TraitForCron
         }
         Query::query($queries);
         if (SSE::$sse) {
-            SSE::send($message, $event->name, ((($end_process || $error !== null)) ? 0 : $this->sse_retry));
+            SSE::send($message, $event->name, ($end_process || $error !== null ? 0 : $this->sse_retry));
         }
         if ($end_process) {
             if (SSE::$sse) {
@@ -248,11 +252,17 @@ trait TraitForCron
         $agent_class = Agent::class;
         $backtrace = \debug_backtrace(\DEBUG_BACKTRACE_PROVIDE_OBJECT | \DEBUG_BACKTRACE_IGNORE_ARGS);
         foreach ($backtrace as $frame) {
-            if (!empty($frame['object']) && $frame['object'] instanceof $agent_class && $frame['object']->run_by !== null) {
+            if (
+                !empty($frame['object'])
+                && $frame['object'] instanceof $agent_class
+                && $frame['object']->run_by !== null
+            ) {
                 $run_by = $frame['object']->run_by;
+
                 break;
             }
         }
+
         return $run_by;
     }
 
@@ -270,15 +280,23 @@ trait TraitForCron
         $backtrace = \debug_backtrace(\DEBUG_BACKTRACE_PROVIDE_OBJECT | \DEBUG_BACKTRACE_IGNORE_ARGS);
         foreach ($backtrace as $frame) {
             if (
-                !empty($frame['object']) && $frame['object'] instanceof $instance_class && $frame['object']->run_by === $run_by &&
+                !empty($frame['object'])
+                && $frame['object'] instanceof $instance_class
+                && $frame['object']->run_by === $run_by
+                &&
                 // TaskInstance calls logs with reference to itself, so this matters only if we are in a Task/Agent
                 // or if we are in TaskInstance, that was triggered by another TaskInstance (e.g. TaskInstance creating other one)
-                (!$this instanceof $instance_class || $frame['object'] !== $this)
+                (
+                    !$this instanceof $instance_class
+                    || $frame['object'] !== $this
+                )
             ) {
                 $instance = $frame['object'];
+
                 break;
             }
         }
+
         /* @noinspection PhpIncompatibleReturnTypeInspection Peculiarity of how backtrace works */
         return $instance;
     }
@@ -294,6 +312,7 @@ trait TraitForCron
             return \bin2hex(\random_bytes(15));
         } catch (\Throwable $exception) {
             $this->log('Failed to generate random ID', EventTypes::CronFail, true, $exception);
+
             return false;
         }
     }
