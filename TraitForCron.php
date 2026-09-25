@@ -20,6 +20,7 @@ trait TraitForCron
      * @var \PDO|null
      */
     private(set) \PDO|null $dbh = null;
+
     /**
      * PDO Cron database prefix. Only Latin characters, underscores, dashes, and numbers are allowed. Maximum 53 symbols.
      *
@@ -37,48 +38,56 @@ trait TraitForCron
             }
         }
     }
+
     /**
      * Flag to indicate whether Cron is enabled
      *
      * @var bool
      */
     private(set) bool $cron_enabled = false;
+
     /**
      * Retry time for one-time jobs
      *
      * @var int
      */
     private(set) int $one_time_retry = 3600;
+
     /**
      * Days to store errors for
      *
      * @var int
      */
     private(set) int $log_life = 30;
+
     /**
      * Flag to indicate whether SSE is looped or not
      *
      * @var bool
      */
     private(set) bool $sse_loop = false;
+
     /**
      * Number of milliseconds for connection retry for SSE. Will also be used to determine how long should the loop sleep if no threads or jobs, but will be treated as a number of seconds divided by 20. The default is `10000` (or roughly 8 minutes for empty cycles).
      *
      * @var int
      */
     private(set) int $sse_retry = 10000;
+
     /**
      * Maximum threads
      *
      * @var int
      */
     private(set) int $max_threads = 4;
+
     /**
      * Random ID
      *
      * @var string|null
      */
     private(set) ?string $run_by = null;
+
     /**
      * Current task object
      *
@@ -195,9 +204,9 @@ trait TraitForCron
                 $queries[] = [
                     'UPDATE `'.$this->prefix.'log` SET `message`=:message WHERE `time`=:time AND `type`=:type;',
                     [
-                        ':type' => [$event->value, 'int'],
-                        ':time' => [$last_event['time'], 'datetime'],
                         ':message' => [$message.' (last check at '.SandClock::format(0, 'c').')', 'string'],
+                        ':time' => [$last_event['time'], 'datetime'],
+                        ':type' => [$event->value, 'int'],
                     ],
                 ];
                 $skip_insert = true;
@@ -208,14 +217,14 @@ trait TraitForCron
             $queries[] = [
                 'INSERT INTO `'.$this->prefix.'log` (`time`, `type`, `run_by`, `sse`, `task`, `arguments`, `instance`, `message`) VALUES (:time, :type,:run_by,:sse,:task, :arguments, :instance, :message);',
                 [
-                    ':time' => [\microtime(true), 'timestamp'],
-                    ':type' => [$event->value, 'int'],
-                    ':run_by' => [$run_by ?? null, $run_by === null ? 'null' : 'string'],
-                    ':sse' => [SSE::$sse, 'bool'],
-                    ':task' => [$task?->task_name, $task === null ? 'null' : 'string'],
                     ':arguments' => [$task?->arguments, $task === null ? 'null' : 'string'],
                     ':instance' => [$task?->instance, $task === null ? 'null' : 'int'],
                     ':message' => [$message.($error !== null ? "\r\n".$error->getMessage()."\r\n".$error->getTraceAsString() : ''), 'string'],
+                    ':run_by' => [$run_by ?? null, $run_by === null ? 'null' : 'string'],
+                    ':sse' => [SSE::$sse, 'bool'],
+                    ':task' => [$task?->task_name, $task === null ? 'null' : 'string'],
+                    ':time' => [\microtime(true), 'timestamp'],
+                    ':type' => [$event->value, 'int'],
                 ],
             ];
         }

@@ -6,7 +6,6 @@ namespace Simbiat\Cron;
 
 use Simbiat\Database\Query;
 use Simbiat\StringHelpers\Sanitize;
-use function is_string, is_array;
 
 /**
  * Cron task object
@@ -21,14 +20,17 @@ class Task
      * @var string Unique name of the task
      */
     private(set) string $task_name = '';
+
     /**
      * @var string Name of the task
      */
     private(set) string $function = '';
+
     /**
      * @var string|null Optional object reference
      */
     private(set) ?string $object = null;
+
     /**
      * @var string|null Parameters to set for the object (passed to construct)
      */
@@ -36,7 +38,7 @@ class Task
         /**
          * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81560
          */
-        set (mixed $value) {
+        \set(mixed $value) {
             /** @noinspection IsEmptyFunctionUsageInspection We do not know what values to expect here, so this should be fine as a universal solution */
             if (empty($value)) {
         $this->parameters = null;
@@ -56,6 +58,7 @@ class Task
             }
         }
     }
+
     /**
      * @var string|null Expected (and allowed) return values
      */
@@ -63,7 +66,7 @@ class Task
         /**
          * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81560
          */
-        set (mixed $value) {
+        \set(mixed $value) {
             /** @noinspection IsEmptyFunctionUsageInspection We do not know what values to expect here, so this should be fine as a universal solution */
             if (empty($value)) {
         $this->returns = null;
@@ -83,6 +86,7 @@ class Task
             }
         }
     }
+
     /**
      * @var int Maximum execution time
      */
@@ -127,18 +131,22 @@ class Task
             }
         }
     }
+
     /**
      * @var bool Whether a task is system one or not
      */
     private(set) bool $system = false;
+
     /**
      * @var bool Whether a task (and its task instances) is enabled
      */
     private(set) bool $enabled = true;
+
     /**
      * @var string|null Description of the task
      */
     private(set) ?string $description = null;
+
     /**
      * @var bool Whether a task was found in a database
      */
@@ -251,17 +259,17 @@ class Task
         try {
             $task_details_string = \json_encode($this, \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_UNESCAPED_UNICODE | \JSON_PRESERVE_ZERO_FRACTION);
             $result = Query::query('INSERT INTO `'.$this->prefix.'tasks` (`task`, `function`, `object`, `parameters`, `allowed_returns`, `max_time`, `min_frequency`, `retry`, `enabled`, `system`, `description`) VALUES (:task, :function, :object, :parameters, :returns, :max_time, :min_frequency, :retry, :enabled, :system, :desc) ON DUPLICATE KEY UPDATE `function`=:function, `object`=:object, `parameters`=:parameters, `allowed_returns`=:returns, `max_time`=:max_time, `min_frequency`=:min_frequency, `retry`=:retry, `description`=:desc;', [
-                ':task' => [$this->task_name, 'string'],
+                ':desc' => [$this->description, (Sanitize::whiteString($this->description ?? '') ? 'null' : 'string')],
+                ':enabled' => [$this->enabled, 'bool'],
                 ':function' => [$this->function, 'string'],
-                ':object' => [$this->object, (Sanitize::whiteString($this->object ?? '') ? 'null' : 'string')],
-                ':parameters' => [$this->parameters, (Sanitize::whiteString($this->parameters ?? '') ? 'null' : 'string')],
-                ':returns' => [$this->returns, (Sanitize::whiteString($this->returns ?? '') ? 'null' : 'string')],
                 ':max_time' => [$this->max_time, 'int'],
                 ':min_frequency' => [$this->min_frequency, 'int'],
+                ':object' => [$this->object, (Sanitize::whiteString($this->object ?? '') ? 'null' : 'string')],
+                ':parameters' => [$this->parameters, (Sanitize::whiteString($this->parameters ?? '') ? 'null' : 'string')],
                 ':retry' => [$this->retry, 'int'],
-                ':enabled' => [$this->enabled, 'bool'],
+                ':returns' => [$this->returns, (Sanitize::whiteString($this->returns ?? '') ? 'null' : 'string')],
                 ':system' => [$this->system, 'bool'],
-                ':desc' => [$this->description, (Sanitize::whiteString($this->description ?? '') ? 'null' : 'string')],
+                ':task' => [$this->task_name, 'string'],
             ], return: 'affected');
             $this->getFromDB();
         } catch (\Throwable $throwable) {
@@ -360,8 +368,8 @@ class Task
         if ($this->found_in_db) {
             try {
                 $result = Query::query('UPDATE `'.$this->prefix.'tasks` SET `enabled`=:enabled WHERE `task`=:task;', [
-                    ':task' => [$this->task_name, 'string'],
                     ':enabled' => [$enabled, 'bool'],
+                    ':task' => [$this->task_name, 'string'],
                 ], return: 'affected');
             } catch (\Throwable $throwable) {
                 $this->log('Failed to '.($enabled ? 'enable' : 'disable').' task.', ($enabled ? EventTypes::TaskEnableFail : EventTypes::TaskDisableFail), error: $throwable);

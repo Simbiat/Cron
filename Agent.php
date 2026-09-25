@@ -7,7 +7,6 @@ namespace Simbiat\Cron;
 use JetBrains\PhpStorm\ExpectedValues;
 use Simbiat\Database\Query;
 use Simbiat\HTTP\SSE;
-use function in_array;
 
 /**
  * Task scheduler that uses MySQL/MariaDB database to store tasks and their schedule.
@@ -21,7 +20,6 @@ class Agent
     /**
      * Supported settings
      *
-     * @var array
      */
     private const array SETTINGS = ['enabled', 'log_life', 'retry', 'sse_loop', 'sse_retry', 'max_threads'];
 
@@ -189,7 +187,8 @@ class Agent
     private function getTasks(int $items): bool|array
     {
         try {
-            Query::query('UPDATE `'.$this->prefix.'schedule` AS `to_update`
+            Query::query(
+                'UPDATE `'.$this->prefix.'schedule` AS `to_update`
                         INNER JOIN
                         (
                             SELECT `task`, `arguments`, `instance` FROM (
@@ -209,11 +208,12 @@ class Agent
                             AND `to_update`.`instance`=`to_select`.`instance`
                         SET `status`=1, `run_by`=:run_by, `sse`=:sse;',
                 [
+                    ':inner_limit' => [$items * 2, 'int'],
+                    ':limit' => [$items, 'int'],
                     ':run_by' => $this->run_by,
                     ':sse' => [SSE::$sse, 'bool'],
-                    ':limit' => [$items, 'int'],
-                    ':inner_limit' => [$items * 2, 'int']
-                ]);
+                ],
+            );
         } catch (\Throwable $throwable) {
             // Check if caused by deadlock, which can be normal in case of large number of tasks in the database and enough parallel processes
             if (\mb_stripos($throwable->getMessage(), 'Deadlock', 0, 'UTF-8') === false) {
@@ -231,7 +231,8 @@ class Agent
                 'SELECT `task`, `arguments`, `instance` FROM `'.$this->prefix.'schedule` WHERE `run_by`=:run_by ORDER BY `next_run`, `priority` DESC, (`frequency`=0) DESC, `frequency` DESC;',
                 [
                     ':run_by' => $this->run_by,
-                ], return: 'all'
+                ],
+                return: 'all',
             );
         } catch (\Throwable $exception) {
             // Notify about the end the stream
@@ -265,10 +266,12 @@ class Agent
                 'max_threads' => 4,
             };
         }
-        if (Query::query('UPDATE `'.$this->prefix.'settings` SET `value`=:value WHERE `setting`=:setting;', [
+        if (
+            Query::query('UPDATE `'.$this->prefix.'settings` SET `value`=:value WHERE `setting`=:setting;', [
             ':setting' => [$setting, 'string'],
             ':value' => [$value, \in_array($setting, ['enabled', 'sse_loop']) ? 'bool' : 'int'],
-        ])) {
+            ])
+        ) {
             switch ($setting) {
                 case 'enabled':
                     $this->cron_enabled = (bool) $value;

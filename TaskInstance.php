@@ -21,6 +21,7 @@ class TaskInstance
      * @var string Unique name of the task
      */
     private(set) string $task_name = '';
+
     /**
      * @var string Optional arguments
      */
@@ -28,7 +29,7 @@ class TaskInstance
         /**
          * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81560
          */
-        set (mixed $value) {
+        \set(mixed $value) {
             /** @noinspection IsEmptyFunctionUsageInspection We do not know what values to expect here, so this should be fine as a universal solution */
             if (empty($value)) {
         $this->arguments = '';
@@ -48,6 +49,7 @@ class TaskInstance
             }
         }
     }
+
     /**
      * @var int Task instance number
      */
@@ -56,25 +58,29 @@ class TaskInstance
          * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81560
          * @noinspection PhpUnusedParameterInspection https://youtrack.jetbrains.com/issue/WI-81990
          */
-        set (int $value) {
+        \set(int $value) {
             $this->instance = $value;
             if ($this->instance < 1) {
         $this->instance = 1;
             }
         }
     }
+
     /**
      * @var int Task instance status. `0` means a task is not running; `1` - queued; `2` - running; `3` - to be removed (used only in case of failed removal)
      */
     private(set) int $status = 0;
+
     /**
      * @var bool Whether the task instance is system one or not
      */
     private(set) bool $system = false;
+
     /**
      * @var bool Whether the task instance is enabled
      */
     private(set) bool $enabled = true;
+
     /**
      * @var int Task instance frequency
      */
@@ -102,6 +108,7 @@ class TaskInstance
             $this->frequency = $frequency;
         }
     }
+
     /**
      * @var string|null Day of month limitation
      */
@@ -109,7 +116,7 @@ class TaskInstance
         /**
          * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81560
          */
-        set (mixed $value) {
+        \set(mixed $value) {
             /** @noinspection IsEmptyFunctionUsageInspection We do not know what values to expect here, so this should be fine as a universal solution */
             if (empty($value)) {
         $this->day_of_month = null;
@@ -129,6 +136,7 @@ class TaskInstance
             }
         }
     }
+
     /**
      * @var string|null Day of week limitation
      */
@@ -136,7 +144,7 @@ class TaskInstance
         /**
          * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81560
          */
-        set (mixed $value) {
+        \set(mixed $value) {
             /** @noinspection IsEmptyFunctionUsageInspection We do not know what values to expect here, so this should be fine as a universal solution */
             if (empty($value)) {
         $this->day_of_week = null;
@@ -156,6 +164,7 @@ class TaskInstance
             }
         }
     }
+
     /**
      * @var int Task instance priority
      */
@@ -172,18 +181,22 @@ class TaskInstance
             }
         }
     }
+
     /**
      * @var string|null Message to show in SSE mode
      */
     private(set) ?string $message = null;
+
     /**
      * @var \DateTimeImmutable|null Time of the next run
      */
     private(set) ?\DateTimeImmutable $next_time = null;
+
     /**
      * @var bool Whether the task was found in the database
      */
     private(set) bool $found_in_db = false;
+
     /**
      * @var Task|null Task object
      */
@@ -216,12 +229,14 @@ class TaskInstance
      */
     private function getFromDB(): void
     {
-        $settings = Query::query('SELECT * FROM `'.$this->prefix.'schedule` WHERE `task`=:name AND `arguments`=:arguments AND `instance`=:instance;',
+        $settings = Query::query(
+            'SELECT * FROM `'.$this->prefix.'schedule` WHERE `task`=:name AND `arguments`=:arguments AND `instance`=:instance;',
             [
-                ':name' => $this->task_name,
                 ':arguments' => $this->arguments,
                 ':instance' => [$this->instance, 'int'],
-            ], return: 'row',
+                ':name' => $this->task_name,
+            ],
+            return: 'row',
         );
         if (\count($settings) > 0) {
             // Set `run_by` value, if present
@@ -318,17 +333,17 @@ class TaskInstance
         }
         try {
             $result = Query::query('INSERT INTO `'.$this->prefix.'schedule` (`task`, `arguments`, `instance`, `enabled`, `system`, `frequency`, `day_of_month`, `day_of_week`, `priority`, `message`, `next_run`) VALUES (:task, :arguments, :instance, :enabled, :system, :frequency, :day_of_month, :day_of_week, :priority, :message, :next_run) ON DUPLICATE KEY UPDATE `frequency`=:frequency, `day_of_month`=:day_of_month, `day_of_week`=:day_of_week, `next_run`=IF(:frequency=0, `next_run`, :next_run), `priority`=IF(:frequency=0, IF(`priority`>:priority, `priority`, :priority), :priority), `message`=:message, `updated`=CURRENT_TIMESTAMP(6);', [
-                ':task' => [$this->task_name, 'string'],
                 ':arguments' => [$this->arguments, 'string'],
-                ':instance' => [$this->instance, 'int'],
-                ':enabled' => [$this->enabled, 'enabled'],
-                ':system' => [$this->system, 'bool'],
-                ':frequency' => [$this->frequency, 'int'],
                 ':day_of_month' => [$this->day_of_month, (Sanitize::whiteString($this->day_of_month ?? '') ? 'null' : 'string')],
                 ':day_of_week' => [$this->day_of_week, (Sanitize::whiteString($this->day_of_week ?? '') ? 'null' : 'string')],
-                ':priority' => [$this->priority, 'int'],
+                ':enabled' => [$this->enabled, 'enabled'],
+                ':frequency' => [$this->frequency, 'int'],
+                ':instance' => [$this->instance, 'int'],
                 ':message' => [$this->message, (Sanitize::whiteString($this->message ?? '') ? 'null' : 'string')],
                 ':next_run' => [$this->next_time, 'datetime'],
+                ':priority' => [$this->priority, 'int'],
+                ':system' => [$this->system, 'bool'],
+                ':task' => [$this->task_name, 'string'],
             ], return: 'affected');
             $this->getFromDB();
         } catch (\Throwable $throwable) {
@@ -356,17 +371,17 @@ class TaskInstance
         }
         try {
             $result = Query::query('DELETE FROM `'.$this->prefix.'schedule` WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance AND `system`=0;', [
-                ':task' => [$this->task_name, 'string'],
                 ':arguments' => [$this->arguments, 'string'],
                 ':instance' => [$this->instance, 'int'],
+                ':task' => [$this->task_name, 'string'],
             ], return: 'affected');
         } catch (\Throwable $first) {
             $this->log('Failed to delete task instance.', EventTypes::InstanceDeleteFail, error: $first, task: $this);
             try {
                 $result = Query::query('UPDATE `'.$this->prefix.'schedule` SET `status` = 3 WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance AND `system`=0;', [
-                    ':task' => [$this->task_name, 'string'],
                     ':arguments' => [$this->arguments, 'string'],
                     ':instance' => [$this->instance, 'int'],
+                    ':task' => [$this->task_name, 'string'],
                 ], return: 'affected');
                 // Log only if something was actually deleted, and if it's not a one-time job
                 if ($result > 0) {
@@ -404,9 +419,9 @@ class TaskInstance
         }
         try {
             $result = Query::query('UPDATE `'.$this->prefix.'schedule` SET `system`=1 WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance AND `system`=0;', [
-                ':task' => [$this->task_name, 'string'],
                 ':arguments' => [$this->arguments, 'string'],
                 ':instance' => [$this->instance, 'int'],
+                ':task' => [$this->task_name, 'string'],
             ], return: 'affected');
         } catch (\Throwable $throwable) {
             $this->log('Failed to mark task instance as system one.', EventTypes::InstanceToSystemFail, error: $throwable, task: $this);
@@ -436,10 +451,10 @@ class TaskInstance
         }
         try {
             $result = Query::query('UPDATE `'.$this->prefix.'schedule` SET `enabled`=:enabled WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance;', [
-                ':task' => [$this->task_name, 'string'],
                 ':arguments' => [$this->arguments, 'string'],
-                ':instance' => [$this->instance, 'int'],
                 ':enabled' => [$enabled, 'bool'],
+                ':instance' => [$this->instance, 'int'],
+                ':task' => [$this->task_name, 'string'],
             ], return: 'affected');
         } catch (\Throwable $throwable) {
             $this->log('Failed to '.($enabled ? 'enable' : 'disable').' task instance.', ($enabled ? EventTypes::InstanceEnableFail : EventTypes::InstanceDisableFail), error: $throwable, task: $this);
@@ -494,11 +509,11 @@ class TaskInstance
                     'UPDATE `'.$this->prefix.'schedule` SET `run_by`=NULL, `sse`=0, `next_run`=:time, `last_error`=COALESCE(GREATEST(`last_run`, `thread_heartbeat`), CURRENT_TIMESTAMP(6)), `error_total`=IF(`status`=2, `error_total`+1, `error_total`), `error_streak`=IF(`status`=2, `error_streak`+1, `error_streak`), `success_streak`=IF(`status`=2, 0, `success_streak`), `last_error_message`=:error_text, `thread_heartbeat`=NULL, `status`=0 WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance;';
             }
             $affected = Query::query($query, [
-                ':time' => [$time, 'datetime'],
-                ':task' => [$this->task_name, 'string'],
                 ':arguments' => [$this->arguments, 'string'],
-                ':instance' => [$this->instance, 'int'],
                 ':error_text' => [\is_bool($result) ? null : $result, \is_bool($result) ? 'null' : 'string'],
+                ':instance' => [$this->instance, 'int'],
+                ':task' => [$this->task_name, 'string'],
+                ':time' => [$time, 'datetime'],
             ], return: 'affected');
         } catch (\Throwable $throwable) {
             $this->log('Failed to reschedule task instance for '.SandClock::format($time, 'c').'.', EventTypes::RescheduleFail, error: $throwable, task: $this);
@@ -540,9 +555,12 @@ class TaskInstance
             // Assume that it was a [one-time job], that has already been run and removed by another (possibly manual) process
             return true;
         }
-        if ($this->next_time !== SandClock::suggestNextDay($this->next_time,
+        if (
+            $this->next_time !== SandClock::suggestNextDay(
+                $this->next_time,
                 (!Sanitize::whiteString($this->day_of_week ?? '') ? \json_decode($this->day_of_week, flags: \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_BIGINT_AS_STRING | \JSON_OBJECT_AS_ARRAY) : []),
-                (!Sanitize::whiteString($this->day_of_month ?? '') ? \json_decode($this->day_of_month, flags: \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_BIGINT_AS_STRING | \JSON_OBJECT_AS_ARRAY) : []))
+                (!Sanitize::whiteString($this->day_of_month ?? '') ? \json_decode($this->day_of_month, flags: \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_BIGINT_AS_STRING | \JSON_OBJECT_AS_ARRAY) : []),
+            )
         ) {
             // Register error.
             $this->log('Attempted to run function during forbidden day of week or day of month.', EventTypes::InstanceFail, task: $this);
@@ -554,10 +572,10 @@ class TaskInstance
         \set_time_limit($this->task_object->max_time);
         // Update last run
         $affected = Query::query(/** @lang SQL */ 'UPDATE `'.$this->prefix.'schedule` SET `status`=2, `run_by`=:run_by, `thread_heartbeat` = CURRENT_TIMESTAMP(6), `last_run` = CURRENT_TIMESTAMP(6) WHERE `task`=:task AND `arguments`=:arguments AND `instance`=:instance AND `status` IN (0, 1);', [
-            ':task' => [$this->task_name, 'string'],
             ':arguments' => [$this->arguments, 'string'],
             ':instance' => [$this->instance, 'int'],
             ':run_by' => [$this->run_by, 'string'],
+            ':task' => [$this->task_name, 'string'],
         ], return: 'affected');
         if ($affected <= 0) {
             // The task was either picked up by some manual process or has been removed
@@ -731,9 +749,11 @@ class TaskInstance
         }
         // Check if the new time will satisfy day of week/month requirements
         try {
-            return SandClock::suggestNextDay($new_time,
+            return SandClock::suggestNextDay(
+                $new_time,
                 (!Sanitize::whiteString($this->day_of_week ?? '') ? \json_decode($this->day_of_week, flags: \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_BIGINT_AS_STRING | \JSON_OBJECT_AS_ARRAY) : []),
-                (!Sanitize::whiteString($this->day_of_month ?? '') ? \json_decode($this->day_of_month, flags: \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_BIGINT_AS_STRING | \JSON_OBJECT_AS_ARRAY) : []));
+                (!Sanitize::whiteString($this->day_of_month ?? '') ? \json_decode($this->day_of_month, flags: \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_BIGINT_AS_STRING | \JSON_OBJECT_AS_ARRAY) : []),
+            );
         } catch (\Throwable $throwable) {
             // We should not get here, since the value is not from the user, and there are validations on earlier steps; this is just a failback
             $this->log('Failed to infer appropriate next run time, failed back.', EventTypes::RescheduleFail, error: $throwable, task: $this);
