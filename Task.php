@@ -12,7 +12,7 @@ use Simbiat\StringHelpers\Sanitize;
  *
  * @noinspection ContractViolationInspection https://github.com/kalessil/phpinspectionsea/issues/1996
  */
-class Task
+final class Task
 {
     use TraitForCron;
 
@@ -38,23 +38,23 @@ class Task
         /**
          * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81560
          */
-        \set(mixed $value) {
+        set(mixed $value) {
             /** @noinspection IsEmptyFunctionUsageInspection We do not know what values to expect here, so this should be fine as a universal solution */
             if (empty($value)) {
-        $this->parameters = null;
+                $this->parameters = null;
             } elseif (\is_array($value)) {
-        try {
-            $this->parameters = \json_encode($value, \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_UNESCAPED_UNICODE | \JSON_PRESERVE_ZERO_FRACTION);
-        } catch (\Throwable) {
-            $this->parameters = null;
-        }
+                try {
+                    $this->parameters = \json_encode($value, \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_UNESCAPED_UNICODE | \JSON_PRESERVE_ZERO_FRACTION);
+                } catch (\Throwable) {
+                    $this->parameters = null;
+                }
             } elseif (
                 \is_string($value)
                 && \json_validate($value)
             ) {
-        $this->parameters = $value;
+                $this->parameters = $value;
             } else {
-        throw new \UnexpectedValueException('`parameters` is not an array or a valid JSON string');
+                throw new \UnexpectedValueException('`parameters` is not an array or a valid JSON string');
             }
         }
     }
@@ -66,23 +66,23 @@ class Task
         /**
          * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81560
          */
-        \set(mixed $value) {
+        set(mixed $value) {
             /** @noinspection IsEmptyFunctionUsageInspection We do not know what values to expect here, so this should be fine as a universal solution */
             if (empty($value)) {
-        $this->returns = null;
+                $this->returns = null;
             } elseif (\is_array($value)) {
-        try {
-            $this->returns = \json_encode($value, \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_UNESCAPED_UNICODE | \JSON_PRESERVE_ZERO_FRACTION);
-        } catch (\Throwable) {
-            $this->returns = null;
-        }
+                try {
+                    $this->returns = \json_encode($value, \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE | \JSON_UNESCAPED_UNICODE | \JSON_PRESERVE_ZERO_FRACTION);
+                } catch (\Throwable) {
+                    $this->returns = null;
+                }
             } elseif (
                 \is_string($value)
                 && \json_validate($value)
             ) {
-        $this->returns = $value;
+                $this->returns = $value;
             } else {
-        throw new \UnexpectedValueException('`returns` is not an array or a valid JSON string');
+                throw new \UnexpectedValueException('`returns` is not an array or a valid JSON string');
             }
         }
     }
@@ -97,7 +97,7 @@ class Task
         set {
             $this->max_time = $value;
             if ($this->max_time < 0) {
-        $this->max_time = 0;
+                $this->max_time = 0;
             }
         }
     }
@@ -112,7 +112,7 @@ class Task
         set {
             $this->min_frequency = $value;
             if ($this->min_frequency < 0) {
-        $this->min_frequency = 0;
+                $this->min_frequency = 0;
             }
         }
     }
@@ -127,7 +127,7 @@ class Task
         set {
             $this->retry = $value;
             if ($this->retry < 0) {
-        $this->retry = 0;
+                $this->retry = 0;
             }
         }
     }
@@ -162,11 +162,13 @@ class Task
     public function __construct(string $task_name = '', \PDO|null $dbh = null, string $prefix = 'cron__')
     {
         $this->init($dbh, $prefix);
-        if (!Sanitize::whiteString($task_name ?? '')) {
-            $this->task_name = $task_name;
-            // Attempt to get settings from DB
-            $this->getFromDB();
+        if (Sanitize::whiteString($task_name ?? '')) {
+            return;
         }
+
+        $this->task_name = $task_name;
+        // Attempt to get settings from DB
+        $this->getFromDB();
     }
 
     /**
@@ -177,13 +179,15 @@ class Task
     private function getFromDB(): void
     {
         $settings = Query::query('SELECT * FROM `'.$this->prefix.'tasks` WHERE `task`=:name;', [':name' => $this->task_name], return: 'row');
-        if ($settings !== []) {
-            $this->settingsFromArray($settings);
-            if (Sanitize::whiteString($this->function ?? '')) {
-                throw new \UnexpectedValueException('Task has no assigned function');
-            }
-            $this->found_in_db = true;
+        if ($settings === []) {
+            return;
         }
+
+        $this->settingsFromArray($settings);
+        if (Sanitize::whiteString($this->function ?? '')) {
+            throw new \UnexpectedValueException('Task has no assigned function');
+        }
+        $this->found_in_db = true;
     }
 
     /**
@@ -197,11 +201,7 @@ class Task
             switch ($setting) {
                 case 'object':
                     /** @noinspection IsEmptyFunctionUsageInspection Valid use case, we don't know what's in the provided array */
-                    if (empty($value)) {
-                        $this->object = null;
-                    } else {
-                        $this->object = $value;
-                    }
+                    $this->object = empty($value) ? null : $value;
 
                     break;
                 case 'allowed_returns':
@@ -227,11 +227,7 @@ class Task
                     break;
                 case 'description':
                     /** @noinspection IsEmptyFunctionUsageInspection Valid use case, we don't know what's in the provided array */
-                    if (empty($value)) {
-                        $this->description = null;
-                    } else {
-                        $this->description = $value;
-                    }
+                    $this->description = empty($value) ? null : $value;
 
                     break;
                 default:

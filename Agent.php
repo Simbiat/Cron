@@ -13,7 +13,7 @@ use Simbiat\HTTP\SSE;
  *
  * @noinspection ContractViolationInspection https://github.com/kalessil/phpinspectionsea/issues/1996
  */
-class Agent
+final class Agent
 {
     use TraitForCron;
 
@@ -55,23 +55,23 @@ class Agent
             $this->log('Cron processing started in SSE mode', EventTypes::SSEStart);
         }
         // Regular maintenance
-        if (Query::$dbh !== null) {
-            // Reschedule hanged jobs
-            $this->unHang();
-            // Depending on the number of events in the log, this may take a while, so use a bit of randomization to not do this on very run.
-            try {
-                if (\random_int(1, 60 * $this->max_threads) < 60 * ($this->max_threads - 1)) {
-                    // Clean old logs
-                    $this->logPurge();
-                }
-            } catch (\Throwable) {
-                // Do nothing, not critical, since these are just logs
-            }
-        } else {
+        if (Query::$dbh === null) {
             // Notify about the end of the stream
             $this->log('Cron database not available', EventTypes::CronFail, true);
 
             return false;
+        }
+
+        // Reschedule hanged jobs
+        $this->unHang();
+        // Depending on the number of events in the log, this may take a while, so use a bit of randomization to not do this on very run.
+        try {
+            if (\random_int(1, 60 * $this->max_threads) < 60 * ($this->max_threads - 1)) {
+                // Clean old logs
+                $this->logPurge();
+            }
+        } catch (\Throwable) {
+            // Do nothing, not critical, since these are just logs
         }
         // Check if cron is enabled and process only if it is
         if (!$this->cron_enabled) {

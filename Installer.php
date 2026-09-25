@@ -11,7 +11,7 @@ use Simbiat\StringHelpers\Sanitize;
 /**
  * Installer class for CRON library.
  */
-class Installer
+final class Installer
 {
     use TraitForCron;
 

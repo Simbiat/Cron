@@ -31,11 +31,11 @@ trait TraitForCron
          * @noinspection PhpMethodNamingConventionInspection https://youtrack.jetbrains.com/issue/WI-81560
          */
         set {
-            if (Sanitize::dbName($value, true, 53)) {
-        $this->prefix = $value;
-            } else {
-        throw new \UnexpectedValueException('Invalid database prefix');
+            if (!Sanitize::dbName($value, true, 53)) {
+                throw new \UnexpectedValueException('Invalid database prefix');
             }
+
+            $this->prefix = $value;
         }
     }
 
@@ -240,13 +240,15 @@ trait TraitForCron
         if (SSE::$sse) {
             SSE::send($message, $event->name, ($end_process || $error !== null ? 0 : $this->sse_retry));
         }
-        if ($end_process) {
-            if (SSE::$sse) {
-                SSE::close();
-            }
-            if ($error !== null) {
-                throw new \RuntimeException($message, previous: $error);
-            }
+        if (!$end_process) {
+            return;
+        }
+
+        if (SSE::$sse) {
+            SSE::close();
+        }
+        if ($error !== null) {
+            throw new \RuntimeException($message, previous: $error);
         }
     }
 
