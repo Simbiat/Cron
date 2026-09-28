@@ -19,7 +19,6 @@ final class Agent
 
     /**
      * Supported settings
-     *
      */
     private const array SETTINGS = ['enabled', 'log_life', 'retry', 'sse_loop', 'sse_retry', 'max_threads'];
 
@@ -146,6 +145,125 @@ final class Agent
     }
 
     /**
+     * Adjust settings
+     *
+     * @param string $setting Setting to change
+     * @param int    $value   Value to set
+     *
+     * @return $this
+     */
+    public function setSetting(#[ExpectedValues(self::SETTINGS)] string $setting, int $value): self
+    {
+        // Check setting name
+        if (!\in_array($setting, self::SETTINGS, true)) {
+            throw new \InvalidArgumentException('Attempt to set unsupported setting');
+        }
+        // Handle values lower than 0
+        if ($value <= 0) {
+            $value = match ($setting) {
+                'enabled', 'sse_loop' => 0,
+                'log_life' => 30,
+                'retry' => 3600,
+                'sse_retry' => 10000,
+                'max_threads' => 4,
+            };
+        }
+        if (
+            Query::query('UPDATE `'.$this->prefix.'settings` SET `value`=:value WHERE `setting`=:setting;', [
+                ':setting' => [$setting, 'string'],
+                ':value' => [$value, \in_array($setting, ['enabled', 'sse_loop']) ? 'bool' : 'int'],
+            ])
+        ) {
+            switch ($setting) {
+                case 'enabled':
+                    $this->cron_enabled = (bool) $value;
+
+                    break;
+                case 'sse_loop':
+                    $this->sse_loop = (bool) $value;
+
+                    break;
+                case 'log_life':
+                    $this->log_life = $value;
+
+                    break;
+                case 'retry':
+                    $this->one_time_retry = $value;
+
+                    break;
+                case 'sse_retry':
+                    $this->sse_retry = $value;
+
+                    break;
+                case 'max_threads':
+                    $this->max_threads = $value;
+
+                    break;
+            }
+
+            return $this;
+        }
+
+        throw new \UnexpectedValueException('Failed to set setting `'.$setting.'` to '.$value);
+    }
+
+    /**
+     * Function to reschedule hanged jobs
+     *
+     * @return bool
+     *
+     * @throws \Throwable
+     */
+    public function unHang(): bool
+    {
+        // Delete task instances that do not have a respective task registered.
+        // Depending on the number of task instances, this may take a while, so use a bit of randomization to not do this on very run.
+        // It is also not critical: these tasks, if picked-up, will fail to run due to `function` ending up being `null`, and thus not callable.
+        try {
+            if (\random_int(1, 60 * $this->max_threads) >= 60 * ($this->max_threads - 1)) {
+                Query::query('DELETE FROM `'.$this->prefix.'schedule` WHERE `task` IS NOT IN (SELECT `task` FROM `'.$this->prefix.'tasks`);');
+            }
+        } catch (\Throwable) {
+            // Do nothing
+        }
+        // Delete task instances that were marked as `For removal` (`status` was set to `3`), which means they failed to be removed initially, but succeeded to be updated.
+        $tasks = Query::query('SELECT `task`, `arguments`, `instance` FROM `'.$this->prefix.'schedule` as `a` WHERE `status` = 3;', return: 'all');
+        foreach ($tasks as $task) {
+            new TaskInstance($task['task'], $task['arguments'], $task['instance'], $this->dbh, $this->prefix)->delete();
+        }
+        $tasks = Query::query('SELECT `task`, `arguments`, `instance`, `status` FROM `'.$this->prefix.'schedule` as `a` WHERE `run_by` IS NOT NULL AND (`thread_heartbeat` IS NULL OR CURRENT_TIMESTAMP(6)>DATE_ADD(`thread_heartbeat`, INTERVAL (SELECT `max_time` FROM `'.$this->prefix.'tasks` WHERE `'.$this->prefix.'tasks`.`task`=`a`.`task`) SECOND));', return: 'all');
+        foreach ($tasks as $task) {
+            // If this was a one-time task, schedule it for right now, to avoid delaying it for double the time.
+            try {
+                new TaskInstance($task['task'], $task['arguments'], $task['instance'], $this->dbh, $this->prefix)->reSchedule($task['status'] === 1 ? 'Hanged thread' : 'Hanged job');
+            } catch (\Throwable $exception) {
+                // If the instance was not found in the database, it was probably deleted, so we can safely ignore the error.
+                if ($exception->getMessage() !== 'Not found in database.') {
+                    throw $exception;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Function to clean up log
+     *
+     * @return bool
+     */
+    public function logPurge(): bool
+    {
+        try {
+            return Query::query('DELETE FROM `'.$this->prefix.'log` WHERE `time` <= DATE_SUB(CURRENT_TIMESTAMP(6), INTERVAL :log_life DAY);', [
+                ':log_life' => [$this->log_life, 'int'],
+            ]);
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
      * Wrapper for running the task
      *
      * @param array $task        Task object
@@ -240,124 +358,5 @@ final class Agent
         }
 
         return [];
-    }
-
-    /**
-     * Adjust settings
-     *
-     * @param string $setting Setting to change
-     * @param int    $value   Value to set
-     *
-     * @return $this
-     */
-    public function setSetting(#[ExpectedValues(self::SETTINGS)] string $setting, int $value): self
-    {
-        // Check setting name
-        if (!\in_array($setting, self::SETTINGS, true)) {
-            throw new \InvalidArgumentException('Attempt to set unsupported setting');
-        }
-        // Handle values lower than 0
-        if ($value <= 0) {
-            $value = match ($setting) {
-                'enabled', 'sse_loop' => 0,
-                'log_life' => 30,
-                'retry' => 3600,
-                'sse_retry' => 10000,
-                'max_threads' => 4,
-            };
-        }
-        if (
-            Query::query('UPDATE `'.$this->prefix.'settings` SET `value`=:value WHERE `setting`=:setting;', [
-            ':setting' => [$setting, 'string'],
-            ':value' => [$value, \in_array($setting, ['enabled', 'sse_loop']) ? 'bool' : 'int'],
-            ])
-        ) {
-            switch ($setting) {
-                case 'enabled':
-                    $this->cron_enabled = (bool) $value;
-
-                    break;
-                case 'sse_loop':
-                    $this->sse_loop = (bool) $value;
-
-                    break;
-                case 'log_life':
-                    $this->log_life = $value;
-
-                    break;
-                case 'retry':
-                    $this->one_time_retry = $value;
-
-                    break;
-                case 'sse_retry':
-                    $this->sse_retry = $value;
-
-                    break;
-                case 'max_threads':
-                    $this->max_threads = $value;
-
-                    break;
-            }
-
-            return $this;
-        }
-
-        throw new \UnexpectedValueException('Failed to set setting `'.$setting.'` to '.$value);
-    }
-
-    /**
-     * Function to reschedule hanged jobs
-     *
-     * @return bool
-     *
-     * @throws \Throwable
-     */
-    public function unHang(): bool
-    {
-        // Delete task instances that do not have a respective task registered.
-        // Depending on the number of task instances, this may take a while, so use a bit of randomization to not do this on very run.
-        // It is also not critical: these tasks, if picked-up, will fail to run due to `function` ending up being `null`, and thus not callable.
-        try {
-            if (\random_int(1, 60 * $this->max_threads) >= 60 * ($this->max_threads - 1)) {
-                Query::query('DELETE FROM `'.$this->prefix.'schedule` WHERE `task` IS NOT IN (SELECT `task` FROM `'.$this->prefix.'tasks`);');
-            }
-        } catch (\Throwable) {
-            // Do nothing
-        }
-        // Delete task instances that were marked as `For removal` (`status` was set to `3`), which means they failed to be removed initially, but succeeded to be updated.
-        $tasks = Query::query('SELECT `task`, `arguments`, `instance` FROM `'.$this->prefix.'schedule` as `a` WHERE `status` = 3;', return: 'all');
-        foreach ($tasks as $task) {
-            new TaskInstance($task['task'], $task['arguments'], $task['instance'], $this->dbh, $this->prefix)->delete();
-        }
-        $tasks = Query::query('SELECT `task`, `arguments`, `instance`, `status` FROM `'.$this->prefix.'schedule` as `a` WHERE `run_by` IS NOT NULL AND (`thread_heartbeat` IS NULL OR CURRENT_TIMESTAMP(6)>DATE_ADD(`thread_heartbeat`, INTERVAL (SELECT `max_time` FROM `'.$this->prefix.'tasks` WHERE `'.$this->prefix.'tasks`.`task`=`a`.`task`) SECOND));', return: 'all');
-        foreach ($tasks as $task) {
-            // If this was a one-time task, schedule it for right now, to avoid delaying it for double the time.
-            try {
-                new TaskInstance($task['task'], $task['arguments'], $task['instance'], $this->dbh, $this->prefix)->reSchedule($task['status'] === 1 ? 'Hanged thread' : 'Hanged job');
-            } catch (\Throwable $exception) {
-                // If the instance was not found in the database, it was probably deleted, so we can safely ignore the error.
-                if ($exception->getMessage() !== 'Not found in database.') {
-                    throw $exception;
-                }
-            }
-        }
-
-        return true;
-    }
-
-    /**
-     * Function to clean up log
-     *
-     * @return bool
-     */
-    public function logPurge(): bool
-    {
-        try {
-            return Query::query('DELETE FROM `'.$this->prefix.'log` WHERE `time` <= DATE_SUB(CURRENT_TIMESTAMP(6), INTERVAL :log_life DAY);', [
-                ':log_life' => [$this->log_life, 'int'],
-            ]);
-        } catch (\Throwable) {
-            return false;
-        }
     }
 }

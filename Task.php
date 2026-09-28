@@ -172,25 +172,6 @@ final class Task
     }
 
     /**
-     * Get task settings from database
-     *
-     * @return void
-     */
-    private function getFromDB(): void
-    {
-        $settings = Query::query('SELECT * FROM `'.$this->prefix.'tasks` WHERE `task`=:name;', [':name' => $this->task_name], return: 'row');
-        if ($settings === []) {
-            return;
-        }
-
-        $this->settingsFromArray($settings);
-        if (Sanitize::whiteString($this->function ?? '')) {
-            throw new \UnexpectedValueException('Task has no assigned function');
-        }
-        $this->found_in_db = true;
-    }
-
-    /**
      * Set task settings from associative array
      *
      * @return $this
@@ -201,7 +182,9 @@ final class Task
             switch ($setting) {
                 case 'object':
                     /** @noinspection IsEmptyFunctionUsageInspection Valid use case, we don't know what's in the provided array */
-                    $this->object = empty($value) ? null : $value;
+                    $this->object = empty($value)
+                        ? null
+                        : $value;
 
                     break;
                 case 'allowed_returns':
@@ -227,7 +210,9 @@ final class Task
                     break;
                 case 'description':
                     /** @noinspection IsEmptyFunctionUsageInspection Valid use case, we don't know what's in the provided array */
-                    $this->description = empty($value) ? null : $value;
+                    $this->description = empty($value)
+                        ? null
+                        : $value;
 
                     break;
                 default:
@@ -382,5 +367,24 @@ final class Task
         }
 
         return false;
+    }
+
+    /**
+     * Get task settings from database
+     *
+     * @return void
+     */
+    private function getFromDB(): void
+    {
+        $settings = Query::query('SELECT * FROM `'.$this->prefix.'tasks` WHERE `task`=:name;', [':name' => $this->task_name], return: 'row');
+        if ($settings === []) {
+            return;
+        }
+
+        $this->settingsFromArray($settings);
+        if (Sanitize::whiteString($this->function ?? '')) {
+            throw new \UnexpectedValueException('Task has no assigned function');
+        }
+        $this->found_in_db = true;
     }
 }

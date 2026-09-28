@@ -91,78 +91,9 @@ trait TraitForCron
     /**
      * Current task object
      *
-     * @var TaskInstance|null
+     * @var \Simbiat\Cron\TaskInstance|null
      */
     private ?TaskInstance $current_task = null;
-
-    /**
-     * Class constructor
-     *
-     * @param \PDO|null $dbh    PDO object to use for database connection. If not provided, the class expects the existence of `\Simbiat\Database\Pool` to use that instead.
-     * @param string    $prefix Cron database prefix.
-     */
-    private function init(\PDO|null $dbh = null, string $prefix = 'cron__'): void
-    {
-        // Check that a database connection is established
-        if ($dbh !== null) {
-            $this->dbh = $dbh;
-            // Establish it, if possible
-            new Query($dbh);
-        }
-        $this->prefix = $prefix;
-        $this->getCronSettings();
-    }
-
-    /**
-     * Helper function to get settings
-     */
-    private function getCronSettings(): bool
-    {
-        // Get settings
-        try {
-            $settings = Query::query('SELECT `setting`, `value` FROM `'.$this->prefix.'settings`', return: 'pair');
-        } catch (\Throwable) {
-            return false;
-        }
-        // Update enabled flag
-        if (\array_key_exists('enabled', $settings)) {
-            $this->cron_enabled = (bool) (int) $settings['enabled'];
-        }
-        // Update SSE loop flag
-        if (\array_key_exists('sse_loop', $settings)) {
-            $this->sse_loop = (bool) (int) $settings['sse_loop'];
-        }
-        // Update retry time
-        if (\array_key_exists('retry', $settings)) {
-            $settings['retry'] = (int) $settings['retry'];
-            if ($settings['retry'] > 0) {
-                $this->one_time_retry = $settings['retry'];
-            }
-        }
-        // Update SSE retry time
-        if (\array_key_exists('sse_retry', $settings)) {
-            $settings['sse_retry'] = (int) $settings['sse_retry'];
-            if ($settings['sse_retry'] > 0) {
-                $this->sse_retry = $settings['sse_retry'];
-            }
-        }
-        // Update maximum number of threads
-        if (\array_key_exists('max_threads', $settings)) {
-            $settings['max_threads'] = (int) $settings['max_threads'];
-            if ($settings['max_threads'] > 0) {
-                $this->max_threads = $settings['max_threads'];
-            }
-        }
-        // Update maximum life of an error
-        if (\array_key_exists('log_life', $settings)) {
-            $settings['log_life'] = (int) $settings['log_life'];
-            if ($settings['log_life'] > 0) {
-                $this->log_life = $settings['log_life'];
-            }
-        }
-
-        return true;
-    }
 
     /**
      * Log events with the option to end SSE stream and rethrow an error if it was provided
@@ -175,7 +106,7 @@ trait TraitForCron
      *
      * @return void
      */
-    public function log(string $message, EventTypes $event, bool $end_process = false, ?\Throwable $error = null, ?TaskInstance $task = null): void
+    final public function log(string $message, EventTypes $event, bool $end_process = false, ?\Throwable $error = null, ?TaskInstance $task = null): void
     {
         $skip_insert = false;
         // If task instance was not passed, attempt to find it in backtrace
@@ -250,6 +181,75 @@ trait TraitForCron
         if ($error !== null) {
             throw new \RuntimeException($message, previous: $error);
         }
+    }
+
+    /**
+     * Class constructor
+     *
+     * @param \PDO|null $dbh    PDO object to use for database connection. If not provided, the class expects the existence of `\Simbiat\Database\Pool` to use that instead.
+     * @param string    $prefix Cron database prefix.
+     */
+    private function init(\PDO|null $dbh = null, string $prefix = 'cron__'): void
+    {
+        // Check that a database connection is established
+        if ($dbh !== null) {
+            $this->dbh = $dbh;
+            // Establish it, if possible
+            new Query($dbh);
+        }
+        $this->prefix = $prefix;
+        $this->getCronSettings();
+    }
+
+    /**
+     * Helper function to get settings
+     */
+    private function getCronSettings(): bool
+    {
+        // Get settings
+        try {
+            $settings = Query::query('SELECT `setting`, `value` FROM `'.$this->prefix.'settings`', return: 'pair');
+        } catch (\Throwable) {
+            return false;
+        }
+        // Update enabled flag
+        if (\array_key_exists('enabled', $settings)) {
+            $this->cron_enabled = (bool) (int) $settings['enabled'];
+        }
+        // Update SSE loop flag
+        if (\array_key_exists('sse_loop', $settings)) {
+            $this->sse_loop = (bool) (int) $settings['sse_loop'];
+        }
+        // Update retry time
+        if (\array_key_exists('retry', $settings)) {
+            $settings['retry'] = (int) $settings['retry'];
+            if ($settings['retry'] > 0) {
+                $this->one_time_retry = $settings['retry'];
+            }
+        }
+        // Update SSE retry time
+        if (\array_key_exists('sse_retry', $settings)) {
+            $settings['sse_retry'] = (int) $settings['sse_retry'];
+            if ($settings['sse_retry'] > 0) {
+                $this->sse_retry = $settings['sse_retry'];
+            }
+        }
+        // Update maximum number of threads
+        if (\array_key_exists('max_threads', $settings)) {
+            $settings['max_threads'] = (int) $settings['max_threads'];
+            if ($settings['max_threads'] > 0) {
+                $this->max_threads = $settings['max_threads'];
+            }
+        }
+        // Update maximum life of an error
+        if (\array_key_exists('log_life', $settings)) {
+            $settings['log_life'] = (int) $settings['log_life'];
+            if ($settings['log_life'] > 0) {
+                $this->log_life = $settings['log_life'];
+            }
+        }
+
+        return true;
     }
 
     /**
